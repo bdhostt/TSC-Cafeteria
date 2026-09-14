@@ -967,6 +967,36 @@ async function startServer() {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Cloud Print Bridge Job Queue (For Remote Thermal Printing via Local Agent)
+  // ---------------------------------------------------------------------------
+  interface CloudPrintJob {
+    id: string;
+    type: 'KOT' | 'BILL' | 'ZREPORT' | 'WAITER_SLIP' | 'CHEF_SLIP' | 'DAYEND';
+    payload: any;
+    createdAt: number;
+    status: 'pending' | 'completed';
+  }
+
+  const cloudPrintJobs: CloudPrintJob[] = [];
+  let lastAgentHeartbeat = 0;
+
+  function enqueueCloudPrintJob(type: CloudPrintJob['type'], payload: any) {
+    const job: CloudPrintJob = {
+      id: 'pjob_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      type,
+      payload,
+      createdAt: Date.now(),
+      status: 'pending'
+    };
+    cloudPrintJobs.push(job);
+    if (cloudPrintJobs.length > 60) {
+      cloudPrintJobs.splice(0, cloudPrintJobs.length - 60);
+    }
+    console.log(`📥 [Print Queue] Enqueued ${type} job (${job.id}) for local print bridge.`);
+    return job;
+  }
+
   // REST endpoint: Discover connected Windows physical printers
   app.get("/api/hardware/printers", async (req, res) => {
     try {
@@ -977,6 +1007,40 @@ async function startServer() {
     }
   });
 
+  // REST endpoints for Local Print Bridge Agent
+  app.get("/api/print-bridge/poll", (req, res) => {
+    lastAgentHeartbeat = Date.now();
+    const pending = cloudPrintJobs.filter(j => j.status === 'pending');
+    res.json({
+      success: true,
+      jobs: pending,
+      serverTime: Date.now()
+    });
+  });
+
+  app.post("/api/print-bridge/complete", (req, res) => {
+    lastAgentHeartbeat = Date.now();
+    const { jobIds } = req.body || {};
+    if (Array.isArray(jobIds)) {
+      for (const j of cloudPrintJobs) {
+        if (jobIds.includes(j.id)) {
+          j.status = 'completed';
+        }
+      }
+    }
+    res.json({ success: true });
+  });
+
+  app.get("/api/print-bridge/status", (req, res) => {
+    const isOnline = (Date.now() - lastAgentHeartbeat) < 30000;
+    res.json({
+      success: true,
+      isAgentOnline: isOnline,
+      lastHeartbeatAgoSeconds: Math.floor((Date.now() - lastAgentHeartbeat) / 1000),
+      pendingCount: cloudPrintJobs.filter(j => j.status === 'pending').length
+    });
+  });
+
   // REST endpoint: Direct hardware Bill / Cash Memo print with auto-cut
   app.post("/api/hardware/print-bill", async (req, res) => {
     try {
@@ -984,6 +1048,9 @@ async function startServer() {
       if (!billData || !billData.items || billData.items.length === 0) {
         return res.status(400).json({ success: false, error: "No bill data provided" });
       }
+
+      // Enqueue for cloud print agent
+      enqueueCloudPrintJob('BILL', billData);
 
       const installedPrinters = await getWindowsPrinters();
       // Bill printer preference: "POS", "Receipt", "Thermal", "Kot" or first installed
@@ -1131,6 +1198,9 @@ async function startServer() {
       if (!slips || !Array.isArray(slips) || slips.length === 0) {
         return res.status(400).json({ success: false, error: "No slips provided to print" });
       }
+
+      // Enqueue for cloud print agent
+      enqueueCloudPrintJob('KOT', req.body);
 
       const installedPrinters = await getWindowsPrinters();
       // Master / default printer preference: "Kot Printer" -> POS / thermal -> first installed

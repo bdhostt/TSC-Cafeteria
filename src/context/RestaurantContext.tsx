@@ -2950,18 +2950,28 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }))
         }];
 
+    const kotHardwarePayload = {
+      tableName: table.name,
+      tableZone: table.zone || 'Floor 1',
+      waiter: table.waiter || 'Staff',
+      customer: table.customer || 'Walk-in Customer',
+      invoiceNo,
+      dateTime,
+      slips: slipsToPrint
+    };
+
+    // 1. Direct local bridge (0ms instant hardware print)
+    fetch('http://127.0.0.1:9123/api/hardware/print-kot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(kotHardwarePayload)
+    }).catch(() => {});
+
+    // 2. Cloud server endpoint (Queues for polling print bridge)
     fetch('/api/hardware/print-kot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tableName: table.name,
-        tableZone: table.zone || 'Floor 1',
-        waiter: table.waiter || 'Staff',
-        customer: table.customer || 'Walk-in Customer',
-        invoiceNo,
-        dateTime,
-        slips: slipsToPrint
-      })
+      body: JSON.stringify(kotHardwarePayload)
     }).catch(err => console.warn('Direct KOT hardware print dispatch error:', err));
   };
 
@@ -3269,21 +3279,30 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setPrintableReceipt(billPayload);
     }
 
-    // Also dispatch directly to hardware bill printer in background
+    const billHardwarePayload = {
+      ...billPayload,
+      items: table.cart.map(i => ({
+        name: i.name,
+        qty: i.qty,
+        price: i.price,
+        variation: i.selectedVariation?.name,
+        addons: i.selectedAddons?.map(a => a.name),
+        notes: i.notes
+      }))
+    };
+
+    // 1. Direct local bridge (0ms instant hardware print)
+    fetch('http://127.0.0.1:9123/api/hardware/print-bill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(billHardwarePayload)
+    }).catch(() => {});
+
+    // 2. Cloud server endpoint (Queues for polling print bridge)
     fetch('/api/hardware/print-bill', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...billPayload,
-        items: table.cart.map(i => ({
-          name: i.name,
-          qty: i.qty,
-          price: i.price,
-          variation: i.selectedVariation?.name,
-          addons: i.selectedAddons?.map(a => a.name),
-          notes: i.notes
-        }))
-      })
+      body: JSON.stringify(billHardwarePayload)
     }).catch(err => console.warn('Direct bill hardware print error:', err));
   };
 
