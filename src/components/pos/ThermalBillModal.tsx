@@ -510,18 +510,37 @@ export const ThermalBillModal: React.FC = () => {
   };
 
   const handleExportPdf = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      window.print();
-      return;
+    const htmlContent = generateReceiptHtml();
+    if (!htmlContent) return;
+
+    let iframe = document.getElementById('receipt-print-frame') as HTMLIFrameElement;
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'receipt-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.opacity = '0';
+      document.body.appendChild(iframe);
     }
-    printWindow.document.write(generateReceiptHtml());
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 350);
+
+    try {
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+        iframe.contentWindow?.focus();
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+        }, 200);
+      }
+    } catch (e) {
+      window.print();
+    }
   };
 
   // Reusable layout for rendering single KOT slip or individual department slips in split mode
