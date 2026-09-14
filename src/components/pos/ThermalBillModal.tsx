@@ -271,11 +271,11 @@ export const ThermalBillModal: React.FC = () => {
     setIsPrinting(false);
     setHardwarePrintStatus(null);
 
-    // 2. Open clean standalone print window that stays open until printed
+    // 2. Open clean standalone print window that NEVER auto-closes
     const html = generateReceiptHtml();
     if (!html) return;
 
-    const printWin = window.open('', '_blank', 'width=420,height=600,left=200,top=100');
+    const printWin = window.open('', '_blank', 'width=440,height=680,left=150,top=80,menubar=no,toolbar=no,location=no,status=no');
     if (!printWin) {
       window.print();
       return;
@@ -286,19 +286,13 @@ export const ThermalBillModal: React.FC = () => {
     printWin.document.close();
     printWin.focus();
 
-    printWin.onafterprint = () => {
-      try {
-        printWin.close();
-      } catch (e) {}
-    };
-
     setTimeout(() => {
       try {
         printWin.print();
       } catch (e) {
-        window.print();
+        console.warn('Print trigger warning:', e);
       }
-    }, 250);
+    }, 400);
   };
 
   const generateReceiptHtml = () => {
@@ -350,6 +344,14 @@ export const ThermalBillModal: React.FC = () => {
           </style>
         </head>
         <body>
+          <div class="no-print" style="position: sticky; top: 0; background: #0f172a; color: white; padding: 10px; margin: -6px -6px 12px -6px; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; z-index: 9999;">
+            <button onclick="window.print()" style="background: #2563eb; color: #ffffff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer;">
+              🖨️ Print Now (Ctrl+P)
+            </button>
+            <button onclick="window.close()" style="background: #475569; color: #ffffff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer;">
+              ✕ Close
+            </button>
+          </div>
           <div class="header">
             <div class="station">STATION: ${selectedDeptFilter === 'ALL' ? 'MAIN KITCHEN' : selectedDeptFilter.toUpperCase()}</div>
             <div class="kot-no">${isCancelKot ? 'VOID KOT #' : 'KOT #'} ${printableReceipt.invoiceNo}</div>
@@ -442,6 +444,14 @@ export const ThermalBillModal: React.FC = () => {
         </style>
       </head>
       <body>
+        <div class="no-print" style="position: sticky; top: 0; background: #0f172a; color: white; padding: 10px; margin: -2mm -1mm 12px -1mm; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; z-index: 9999;">
+          <button onclick="window.print()" style="background: #2563eb; color: #ffffff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer;">
+            🖨️ Print Now (Ctrl+P)
+          </button>
+          <button onclick="window.close()" style="background: #475569; color: #ffffff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer;">
+            ✕ Close
+          </button>
+        </div>
         <div class="header">
           <div class="res-name">${restaurantName}</div>
           <div class="res-sub">${restaurantAddress}</div>
