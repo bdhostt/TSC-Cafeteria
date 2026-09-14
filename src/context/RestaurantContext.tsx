@@ -3471,21 +3471,30 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isDirectPrint: false
     };
 
-    // Direct hardware print without opening any receipt preview modal
+    const memoPayload = {
+      ...memoReceipt,
+      items: table.cart.map(i => ({
+        name: i.name,
+        qty: i.qty,
+        price: i.price,
+        variation: i.selectedVariation?.name,
+        addons: i.selectedAddons?.map(a => a.name),
+        notes: i.notes
+      }))
+    };
+
+    // 1. Direct local bridge (0ms instant hardware print)
+    fetch('http://127.0.0.1:9123/api/hardware/print-bill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(memoPayload)
+    }).catch(() => {});
+
+    // 2. Cloud server endpoint (Queues for polling print bridge)
     fetch('/api/hardware/print-bill', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...memoReceipt,
-        items: table.cart.map(i => ({
-          name: i.name,
-          qty: i.qty,
-          price: i.price,
-          variation: i.selectedVariation?.name,
-          addons: i.selectedAddons?.map(a => a.name),
-          notes: i.notes
-        }))
-      })
+      body: JSON.stringify(memoPayload)
     }).catch(err => console.warn('Direct paid memo hardware print error:', err));
 
     setPrintableReceipt(memoReceipt);
