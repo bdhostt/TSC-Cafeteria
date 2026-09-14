@@ -43,7 +43,7 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
     }, 150);
   };
 
-  const [currentDateTime, setCurrentDateTime] = useState('');
+  const clockRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -60,7 +60,9 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
         second: '2-digit',
         hour12: true
       });
-      setCurrentDateTime(`${dateStr} • ${timeStr}`);
+      if (clockRef.current) {
+        clockRef.current.textContent = `${dateStr} • ${timeStr}`;
+      }
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
@@ -101,7 +103,7 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
             </div>
             <div className="text-[7.5px] sm:text-[8.5px] text-slate-400 font-medium flex items-center gap-1 tracking-tight mt-0.5 select-none">
               <Clock className="w-2 h-2 text-[#004b9b] shrink-0" />
-              <span>{currentDateTime}</span>
+              <span ref={clockRef}></span>
             </div>
           </div>
         </div>

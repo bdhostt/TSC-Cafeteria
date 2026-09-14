@@ -1567,8 +1567,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [selectedZReportSession, setSelectedZReportSessionState] = useState<PosSessionRecord | null>(null);
   const [selectedDayEndPreview, setSelectedDayEndPreviewState] = useState<ConsolidatedDayReportData | null>(null);
   const [pendingLogoutAfterShiftClose, setPendingLogoutAfterShiftClose] = useState(false);
-  const [activeSettlingTable, setActiveSettlingTable] = useState<Table | null>(null);
   const [printableReceipt, setPrintableReceipt] = useState<PrintableReceipt | null>(null);
+  const printableReceiptRef = useRef<PrintableReceipt | null>(null);
+  useEffect(() => {
+    printableReceiptRef.current = printableReceipt;
+  }, [printableReceipt]);
 
   // User Authentication & Session
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
@@ -1660,6 +1663,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       const result = await res.json();
       if (result.success && result.data) {
+        if (!isInitial && printableReceiptRef.current) {
+          // Do not mutate state while reviewing or printing a receipt
+          return;
+        }
         if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
           result.data.tableDimensions = { width: 147, height: 98 };
         }
