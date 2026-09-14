@@ -1,0 +1,6 @@
+{
+  "name": "Barcode Cafe Banani - Restaurant POS & ERP",
+  "description": "Comprehensive Restaurant POS, Live Floor Management, Recipe BOM Auto Inventory Deductions, Vendor Payables, Customer Receivables and AI Chef Costing Advisor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

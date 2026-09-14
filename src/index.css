@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-blue: #004b9b;
+  --color-brand-blue-hover: #005bb8;
+  --color-brand-blue-dark: #002b59;
+  --color-brand-blue-light: #e6f0fa;
+  --color-brand-black: #000000;
+  --color-brand-black-surface: #0a0a0a;
+  --color-brand-red: #9c1611;
+  --color-brand-red-hover: #b31913;
+  --color-brand-red-dark: #7a110d;
+}
+
+:root {
+  --brand-blue: #004b9b;
+  --brand-blue-hover: #005bb8;
+  --brand-blue-dark: #002b59;
+  --brand-blue-light: #e6f0fa;
+  --brand-black: #000000;
+  --brand-black-surface: #0a0a0a;
+  --brand-red: #9c1611;
+  --brand-red-hover: #b31913;
+  --brand-red-dark: #7a110d;
+}
+
+.site-container {
+  width: 100%;
+  max-width: 1920px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .site-container {
+    padding-left: 1.25rem; /* sm:px-5 */
+    padding-right: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .site-container {
+    padding-left: 1.5rem;  /* lg:px-6 */
+    padding-right: 1.5rem;
+  }
+}
+
+/* Custom Sleek Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Hide spin buttons / stepper arrows on number inputs */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

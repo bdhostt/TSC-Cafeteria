@@ -1,0 +1,1585 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useRestaurant } from '../../context/RestaurantContext';
+import { 
+  Search, 
+  Utensils, 
+  ArrowLeft, 
+  Plus, 
+  Minus, 
+  Trash2, 
+  Printer, 
+  CreditCard, 
+  PauseCircle, 
+  User, 
+  Percent, 
+  Coins, 
+  Layers, 
+  Check, 
+  Sparkles,
+  ChevronRight,
+  ChefHat,
+  MapPin,
+  Filter,
+  Building2,
+  ReceiptText,
+  LayoutGrid,
+  Grid3X3,
+  Maximize2,
+  SlidersHorizontal,
+  Power,
+  RotateCcw,
+  RefreshCw,
+  ShieldAlert,
+  Ban,
+  ShieldCheck,
+  CheckCircle2,
+  CheckCheck,
+  Scaling,
+  MoveDiagonal,
+  Wand2,
+  X,
+  FileText,
+  Edit2,
+  UserCheck,
+  BookOpen,
+  ArrowRightLeft,
+  Sun,
+  Moon,
+  LogOut,
+  Clock,
+  Timer
+} from 'lucide-react';
+import { DiscountType, Table, TableCartItem, MenuItem } from '../../types';
+import { VoidItemModal } from './VoidItemModal';
+import { ReleaseTableModal } from './ReleaseTableModal';
+import { ItemVariationModal } from './ItemVariationModal';
+import { SelectWaiterCustomerModal } from './SelectWaiterCustomerModal';
+
+export interface TableDimensions {
+  width: number;
+  height: number;
+}
+
+const TABLE_SIZE_PRESETS: Record<'compact' | 'medium' | 'large' | 'xl', TableDimensions> = {
+  compact: { width: 110, height: 75 },
+  medium: { width: 150, height: 100 },
+  large: { width: 200, height: 135 },
+  xl: { width: 260, height: 175 },
+};
+
+export const PosBillingView: React.FC = () => {
+  const { 
+    data, 
+    activeTableId, 
+    setActiveTableId, 
+    posView, 
+    setPosView,
+    selectTable,
+    addToCart,
+    updateCartQty,
+    updateCartItemQty,
+    updateCartItemNotes,
+    removeCartItem,
+    voidCartItem,
+    releaseTable,
+    clearCart,
+    setTableDiscount,
+    setTableWaiter,
+    setTableCustomer,
+    setTableZone,
+    holdTableOrder,
+    updateGlobalTableDimensions,
+    openPrintBill,
+    openPrintKot,
+    directSubmitKotAndHold,
+    directPrintBill,
+    openSettleModal,
+    addCustomTable,
+    addTableZone,
+    setIsStartSessionModalOpen,
+    setIsCloseSessionModalOpen,
+    setIsWaiterShiftModalOpen,
+    activeSessionStats,
+    businessDay,
+    endSession,
+    currentUser,
+    setActiveTab,
+    canAccessTab,
+    language,
+    t
+  } = useRestaurant();
+
+  // Void and Release Modals state
+  const [voidingItem, setVoidingItem] = useState<{ item: TableCartItem; index: number } | null>(null);
+  const [releasingTable, setReleasingTable] = useState<Table | null>(null);
+  const [selectedDishForCustomization, setSelectedDishForCustomization] = useState<MenuItem | null>(null);
+  const [assigningTable, setAssigningTable] = useState<Table | null>(null);
+
+  // Special Note for Cart Item
+  const [editingNoteItem, setEditingNoteItem] = useState<{ item: TableCartItem; index: number } | null>(null);
+  const [itemNoteInput, setItemNoteInput] = useState<string>('');
+
+  // Direct Bill Print Feedback State
+  const [isPrintingBill, setIsPrintingBill] = useState(false);
+  const [billPrintedSuccess, setBillPrintedSuccess] = useState(false);
+
+  // Live Clock Tick for Order Elapsed Minutes Tracking
+  const [nowTime, setNowTime] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Floor Plan Filters
+  const [selectedFloorZone, setSelectedFloorZone] = useState<string>('ALL');
+  const [tableStatusFilter, setTableStatusFilter] = useState<'ALL' | 'free' | 'hold' | 'billed'>('ALL');
+  const [tableSearchQuery, setTableSearchQuery] = useState<string>('');
+
+  // Global Table Card Dimensions & Custom Table Overrides
+  const [globalTableDimensions, setGlobalTableDimensions] = useState<TableDimensions>(() => {
+    if (data.tableDimensions && data.tableDimensions.width && data.tableDimensions.height) {
+      if (
+        (data.tableDimensions.width === 210 && data.tableDimensions.height === 140) ||
+        (data.tableDimensions.width === 147 && data.tableDimensions.height === 98)
+      ) {
+        return TABLE_SIZE_PRESETS.compact;
+      }
+      return data.tableDimensions;
+    }
+    try {
+      const saved = localStorage.getItem('pos_table_global_dims');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          (parsed.width === 210 && parsed.height === 140) ||
+          (parsed.width === 147 && parsed.height === 98)
+        ) {
+          return TABLE_SIZE_PRESETS.compact;
+        }
+        if (parsed.width && parsed.height) return parsed;
+      }
+      const legacySize = localStorage.getItem('pos_table_card_size');
+      if (legacySize === 'medium') return TABLE_SIZE_PRESETS.medium;
+      if (legacySize === 'large') return TABLE_SIZE_PRESETS.large;
+    } catch {
+      // fallback
+    }
+    return TABLE_SIZE_PRESETS.compact;
+  });
+
+  // Keep globalTableDimensions in sync when server state updates tableDimensions
+  useEffect(() => {
+    if (data.tableDimensions && data.tableDimensions.width && data.tableDimensions.height) {
+      if (
+        (data.tableDimensions.width === 210 && data.tableDimensions.height === 140) ||
+        (data.tableDimensions.width === 147 && data.tableDimensions.height === 98)
+      ) {
+        setGlobalTableDimensions(TABLE_SIZE_PRESETS.compact);
+        updateGlobalTableDimensions(TABLE_SIZE_PRESETS.compact);
+      } else {
+        setGlobalTableDimensions(data.tableDimensions);
+      }
+      setCustomTableDimensions({});
+    }
+  }, [data.tableDimensions]);
+
+  // Listen to immediate custom dimension updates dispatched from TableZoneEditModal
+  useEffect(() => {
+    const handleDimensionsUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<TableDimensions>;
+      if (customEvent.detail) {
+        setGlobalTableDimensions(customEvent.detail);
+        setCustomTableDimensions({});
+      }
+    };
+    window.addEventListener('pos_table_dimensions_updated', handleDimensionsUpdated);
+    return () => {
+      window.removeEventListener('pos_table_dimensions_updated', handleDimensionsUpdated);
+    };
+  }, []);
+
+  const effectiveGlobalDimensions: TableDimensions = 
+    ((data.tableDimensions?.width === 210 && data.tableDimensions?.height === 140) || (data.tableDimensions?.width === 147 && data.tableDimensions?.height === 98))
+      ? TABLE_SIZE_PRESETS.compact
+      : (data.tableDimensions || globalTableDimensions || TABLE_SIZE_PRESETS.compact);
+
+  const [customTableDimensions, setCustomTableDimensions] = useState<{ [tableId: string]: TableDimensions }>(() => {
+    try {
+      const saved = localStorage.getItem('pos_table_custom_dims');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return {};
+  });
+
+  // Active dragging state while resizing table card corner
+  const [resizingState, setResizingState] = useState<{
+    tableId: string;
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+    currentWidth: number;
+    currentHeight: number;
+  } | null>(null);
+
+  // Floating prompt when a table is resized with mouse
+  const [lastResizedPrompt, setLastResizedPrompt] = useState<{
+    tableId: string;
+    tableName: string;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const [appliedFeedback, setAppliedFeedback] = useState<string | null>(null);
+  const [showCustomSizePanel, setShowCustomSizePanel] = useState<boolean>(false);
+
+  const handlePresetSelect = (presetKey: 'compact' | 'medium' | 'large' | 'xl') => {
+    const preset = TABLE_SIZE_PRESETS[presetKey];
+    setGlobalTableDimensions(preset);
+    setCustomTableDimensions({});
+    setLastResizedPrompt(null);
+    updateGlobalTableDimensions(preset);
+    try {
+      localStorage.setItem('pos_table_global_dims', JSON.stringify(preset));
+      localStorage.removeItem('pos_table_custom_dims');
+      localStorage.setItem('pos_table_card_size', presetKey);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleApplyAll = (targetWidth?: number, targetHeight?: number) => {
+    const widthToApply = targetWidth || lastResizedPrompt?.width || effectiveGlobalDimensions.width;
+    const heightToApply = targetHeight || lastResizedPrompt?.height || effectiveGlobalDimensions.height;
+
+    const newDims = { width: widthToApply, height: heightToApply };
+    setGlobalTableDimensions(newDims);
+    setCustomTableDimensions({});
+    setLastResizedPrompt(null);
+    updateGlobalTableDimensions(newDims);
+
+    try {
+      localStorage.setItem('pos_table_global_dims', JSON.stringify(newDims));
+      localStorage.removeItem('pos_table_custom_dims');
+    } catch {
+      // ignore
+    }
+
+    setAppliedFeedback(`✅ Size (${widthToApply}px × ${heightToApply}px) applied to all ${data.tables.length} tables!`);
+    setTimeout(() => setAppliedFeedback(null), 4000);
+  };
+
+  const handleResetTableSizes = () => {
+    setGlobalTableDimensions(TABLE_SIZE_PRESETS.compact);
+    setCustomTableDimensions({});
+    setLastResizedPrompt(null);
+    updateGlobalTableDimensions(TABLE_SIZE_PRESETS.compact);
+    try {
+      localStorage.setItem('pos_table_global_dims', JSON.stringify(TABLE_SIZE_PRESETS.compact));
+      localStorage.removeItem('pos_table_custom_dims');
+      localStorage.setItem('pos_table_card_size', 'compact');
+    } catch {
+      // ignore
+    }
+    setAppliedFeedback('🔄 Table size reset to standard default!');
+    setTimeout(() => setAppliedFeedback(null), 3000);
+  };
+
+  // Mouse Drag Resize Start on table corner
+  const handleResizeStart = (e: React.MouseEvent, tableId: string, currentW: number, currentH: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+
+    setResizingState({
+      tableId,
+      startX,
+      startY,
+      startWidth: currentW,
+      startHeight: currentH,
+      currentWidth: currentW,
+      currentHeight: currentH,
+    });
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      const newW = Math.max(175, Math.min(550, Math.round(currentW + deltaX)));
+      const newH = Math.max(120, Math.min(420, Math.round(currentH + deltaY)));
+
+      setResizingState({
+        tableId,
+        startX,
+        startY,
+        startWidth: currentW,
+        startHeight: currentH,
+        currentWidth: newW,
+        currentHeight: newH,
+      });
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      const deltaX = upEvent.clientX - startX;
+      const deltaY = upEvent.clientY - startY;
+      const finalW = Math.max(175, Math.min(550, Math.round(currentW + deltaX)));
+      const finalH = Math.max(120, Math.min(420, Math.round(currentH + deltaY)));
+
+      setResizingState(null);
+
+      // Save for this specific table
+      setCustomTableDimensions(prev => {
+        const updated = { ...prev, [tableId]: { width: finalW, height: finalH } };
+        try {
+          localStorage.setItem('pos_table_custom_dims', JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return updated;
+      });
+
+      const tbl = data.tables.find(t => t.id === tableId);
+      setLastResizedPrompt({
+        tableId,
+        tableName: tbl?.name || tableId,
+        width: finalW,
+        height: finalH,
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // POS Order View Filters
+  const [selectedDept, setSelectedDept] = useState<string>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const activeTable = data.tables.find(t => t.id === activeTableId) || data.tables[0];
+  const allZones = data.tableZones && data.tableZones.length > 0 
+    ? data.tableZones 
+    : ['Floor 1', 'Floor 2', 'VIP Lounge', 'Rooftop Garden'];
+
+  // Filtered menu items
+  const filteredMenuItems = data.menuItems.filter(item => {
+    if (selectedDept !== 'ALL' && item.department !== selectedDept) return false;
+    if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = item.name.toLowerCase().includes(q);
+      const matchCat = item.category.toLowerCase().includes(q);
+      if (!matchName && !matchCat) return false;
+    }
+    return true;
+  });
+
+  // Financial calculations for active table
+  const subtotal = activeTable?.cart?.reduce((sum, item) => sum + (item.price * item.qty), 0) || 0;
+  const discountDeduction = activeTable?.discountType === 'percent'
+    ? (subtotal * (activeTable?.discountVal || 0)) / 100
+    : (activeTable?.discountVal || 0);
+  const netTotal = Math.round(Math.max(0, subtotal - discountDeduction));
+
+  // Filtered floor plan tables
+  const filteredTables = data.tables.filter(table => {
+    const tableZone = table.zone || 'Floor 1';
+    if (selectedFloorZone !== 'ALL' && tableZone !== selectedFloorZone) {
+      return false;
+    }
+    if (tableStatusFilter !== 'ALL' && table.status !== tableStatusFilter) {
+      return false;
+    }
+    if (tableSearchQuery.trim()) {
+      const q = tableSearchQuery.toLowerCase().trim();
+      const matchName = table.name.toLowerCase().includes(q);
+      const matchId = table.id.toLowerCase().includes(q);
+      const matchZone = tableZone.toLowerCase().includes(q);
+      const matchWaiter = (table.waiter || '').toLowerCase().includes(q);
+      if (!matchName && !matchId && !matchZone && !matchWaiter) return false;
+    }
+    return true;
+  });
+
+  // If on Floor view:
+  if (posView === 'floor') {
+    return (
+      <div className="h-full overflow-y-auto custom-scrollbar space-y-3 pr-1">
+        {/* Floor Header */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+          {/* Floor Plan Zone Selector Tabs & Search */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Zone Pills (All Zone, Floor 1, Floor 2, VIP, etc.) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-[#004b9b]" />
+                Zones:
+              </span>
+
+              {/* ALL ZONES BUTTON */}
+              <button
+                type="button"
+                id="zone-tab-all"
+                onClick={() => setSelectedFloorZone('ALL')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black shrink-0 transition flex items-center gap-1.5 cursor-pointer ${
+                  selectedFloorZone === 'ALL'
+                    ? 'bg-black text-white shadow-sm ring-2 ring-[#004b9b]/50 border border-slate-800'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <span>All Zones</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  selectedFloorZone === 'ALL' ? 'bg-[#004b9b] text-white font-black' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {data.tables.length}
+                </span>
+              </button>
+
+              {/* DYNAMIC ZONE TABS */}
+              {allZones.map(zone => {
+                const countInZone = data.tables.filter(t => (t.zone || 'Floor 1') === zone).length;
+                const activeInZone = data.tables.filter(t => (t.zone || 'Floor 1') === zone && t.status !== 'free').length;
+                const isSelected = selectedFloorZone === zone;
+
+                return (
+                  <button
+                    key={zone}
+                    id={`zone-tab-${zone.replace(/\s+/g, '-').toLowerCase()}`}
+                    onClick={() => setSelectedFloorZone(zone)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold shrink-0 transition flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#004b9b] text-white shadow-sm ring-2 ring-blue-500/30'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>{zone}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      isSelected 
+                        ? 'bg-black text-blue-300 font-bold' 
+                        : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {countInZone}
+                    </span>
+                    {activeInZone > 0 && (
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" title={`${activeInZone} Active`} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Table Search input & Waiter Handover Button */}
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={tableSearchQuery}
+                  onChange={e => setTableSearchQuery(e.target.value)}
+                  placeholder="Search table, zone, or waiter..."
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#004b9b] focus:border-[#004b9b] focus:outline-none"
+                />
+              </div>
+
+              {(currentUser?.role === 'CASHIER' || currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') && (
+                <>
+                  {!businessDay?.isOpen ? (
+                    <button
+                      type="button"
+                      id="btn-pos-day-start"
+                      onClick={() => setIsStartSessionModalOpen(true)}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
+                      title="Start Business Day & Shift 1"
+                    >
+                      <Sun className="w-3.5 h-3.5" />
+                      <span>Day Start (Shift 1)</span>
+                    </button>
+                  ) : !data.session?.isActive ? (
+                    <button
+                      type="button"
+                      id="btn-pos-start-shift"
+                      onClick={() => setIsStartSessionModalOpen(true)}
+                      className="px-3 py-1.5 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
+                      title="Start Shift 2"
+                    >
+                      <Power className="w-3.5 h-3.5" />
+                      <span>{businessDay?.pendingHandoverCashier ? 'Start Shift 2' : 'Open Shift'}</span>
+                    </button>
+                  ) : null}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Applied Feedback Notification */}
+        {appliedFeedback && (
+          <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>{appliedFeedback}</span>
+            </div>
+            <button onClick={() => setAppliedFeedback(null)} className="text-emerald-700 hover:text-emerald-900">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Floating Prompt after Mouse Corner Drag Resize */}
+        {lastResizedPrompt && (
+          <div className="p-3.5 bg-gradient-to-r from-slate-950 via-slate-900 to-[#002652] text-white rounded-2xl border-2 border-[#004b9b] shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#004b9b] text-white flex items-center justify-center font-black shrink-0 shadow-xs">
+                <Scaling className="w-5 h-5" />
+              </div>
+              <div className="text-xs">
+                <div className="font-extrabold text-blue-300 flex items-center gap-1.5">
+                  <span>📐 {lastResizedPrompt.tableName} Table Resized:</span>
+                  <span className="font-mono bg-slate-800 px-2 py-0.5 rounded border border-blue-400/40 text-white">
+                    {lastResizedPrompt.width}px × {lastResizedPrompt.height}px
+                  </span>
+                </div>
+                <div className="text-slate-300 text-[11px] mt-0.5">
+                  Do you want to apply this size to all tables on the floor?
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                id="btn-apply-all-prompt"
+                onClick={() => handleApplyAll(lastResizedPrompt.width, lastResizedPrompt.height)}
+                className="px-4 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white rounded-xl text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <CheckCheck className="w-4 h-4 text-white" />
+                <span>Apply to All Tables</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLastResizedPrompt(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Floor Table Cards Grid */}
+        {filteredTables.length === 0 ? (
+          <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 space-y-3">
+            <Utensils className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="text-base font-bold text-slate-700">No tables found matching this filter</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Try switching to "All Zones" or resetting status filters.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setSelectedFloorZone('ALL'); setTableStatusFilter('ALL'); setTableSearchQuery(''); }}
+              className="px-4 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white rounded-xl text-xs font-bold transition cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          </div>
+        ) : (
+          <div 
+            className="grid gap-3.5 transition-all duration-150"
+            style={{
+              gridTemplateColumns: `repeat(auto-fill, minmax(${effectiveGlobalDimensions.width}px, 1fr))`
+            }}
+          >
+            {filteredTables.map(table => {
+              const tableSubtotal = table.cart.reduce((s, i) => s + (i.price * i.qty), 0);
+              const isFree = table.status === 'free';
+              const isHold = table.status === 'hold';
+              const isBilled = table.status === 'billed';
+              const hasUnprintedKot = table.cart.length > 0 && table.cart.some(item => !item.kotPrinted || item.qty > (item.kotPrintedQty || 0));
+              const isBillPrinted = table.status === 'billed';
+              const zoneLabel = table.zone || 'Floor 1';
+
+              // Sizing specific variables
+              const isBeingResized = resizingState?.tableId === table.id;
+              const customDim = customTableDimensions[table.id];
+              const cardWidth = isBeingResized ? resizingState.currentWidth : (customDim?.width || effectiveGlobalDimensions.width);
+              const cardHeight = isBeingResized ? resizingState.currentHeight : (customDim?.height || effectiveGlobalDimensions.height);
+
+              const isUltraCompact = cardHeight < 115 || cardWidth < 165;
+              const isCompact = cardHeight < 155 || cardWidth < 225;
+              const isLarge = cardHeight >= 215 || cardWidth >= 330;
+
+              const cardPadding = isUltraCompact ? 'p-2.5 rounded-xl' : isCompact ? 'p-3 rounded-xl' : isLarge ? 'p-6 rounded-2xl' : 'p-4 rounded-2xl';
+              const titleSize = isUltraCompact ? 'text-xs font-black' : isCompact ? 'text-sm font-black' : isLarge ? 'text-xl font-black' : 'text-base font-black';
+              const zoneBadgeClass = isUltraCompact
+                ? 'text-[8px] px-1 py-0.2 mt-0.5 rounded'
+                : isCompact 
+                  ? 'text-[9px] px-1.5 py-0.2 mt-0.5 rounded' 
+                  : isLarge 
+                    ? 'text-xs px-2.5 py-1 mt-1.5 rounded-lg' 
+                    : 'text-[10px] px-2 py-0.5 mt-1 rounded-md';
+              const statusBadgeClass = isUltraCompact
+                ? 'px-1 py-0.2 text-[8px] font-black'
+                : isCompact
+                  ? 'px-1.5 py-0.5 text-[9px] font-black'
+                  : isLarge
+                    ? 'px-3 py-1 text-xs font-black'
+                    : 'px-2 py-0.5 text-[11px] font-black';
+
+              return (
+                <div
+                  key={table.id}
+                  id={`table-card-${table.id}`}
+                  style={{
+                    minHeight: `${cardHeight}px`,
+                  }}
+                  onClick={() => {
+                    if (isFree) {
+                      if (!data.session || !data.session.isActive) {
+                        setIsStartSessionModalOpen(true);
+                        return;
+                      }
+                      setAssigningTable(table);
+                    }
+                  }}
+                  className={`${cardPadding} border-2 transition-all duration-150 flex flex-col justify-between relative overflow-hidden group shadow-xs hover:shadow-md select-none ${
+                    isFree ? 'cursor-pointer hover:scale-[1.01] active:scale-[0.99]' : ''
+                  } ${
+                    isBeingResized
+                      ? 'border-[#004b9b] ring-4 ring-blue-400/30 bg-blue-50/70 shadow-lg z-30'
+                      : isFree 
+                        ? 'bg-emerald-500 hover:bg-emerald-600 border-emerald-600 text-white' 
+                        : isHold
+                          ? 'bg-[#004b9b] border-[#002b59] text-white ring-2 ring-blue-400/30'
+                          : 'bg-blue-600 border-blue-700 text-white ring-2 ring-blue-400/30'
+                  }`}
+                >
+                  {/* Active Resizing Overlay & Dimensions Badge */}
+                  {isBeingResized && (
+                    <div className="absolute inset-0 bg-[#004b9b]/10 border-2 border-dashed border-[#004b9b] rounded-2xl pointer-events-none flex items-center justify-center z-30 animate-pulse">
+                      <div className="bg-slate-900 text-blue-300 font-mono font-black text-xs px-3 py-1.5 rounded-xl shadow-lg border border-blue-400/40 flex items-center gap-1.5">
+                        <Scaling className="w-3.5 h-3.5 text-blue-400" />
+                        <span>{cardWidth}px × {cardHeight}px</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {isFree ? (
+                    /* Centered Table Name & Floor (Free Table: No 1 badge, No 2 Take Order button) */
+                    <div className="flex-1 flex flex-col items-center justify-center text-center my-auto p-0.5 select-none">
+                      <h3 className={`${isUltraCompact ? 'text-sm font-black' : isCompact ? 'text-base font-black' : isLarge ? 'text-2xl font-black' : 'text-xl font-black'} text-white tracking-tight drop-shadow-xs`}>
+                        {table.name}
+                      </h3>
+                      <div className={`inline-flex items-center gap-1 font-bold text-emerald-100 mt-0.5 ${isUltraCompact ? 'text-[9px]' : isCompact ? 'text-[10px]' : isLarge ? 'text-xs' : 'text-[11px]'}`}>
+                        <MapPin className={`${isUltraCompact ? 'w-2 h-2' : isCompact ? 'w-2.5 h-2.5' : 'w-3 h-3'} text-emerald-200 shrink-0`} />
+                        <span>{zoneLabel}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Occupied / Hold / Billed Table */
+                    <>
+                      {/* Top: Name and Zone centered */}
+                      <div onClick={() => selectTable(table.id)} className="cursor-pointer flex flex-col items-center text-center">
+                        <h3 className={`${titleSize} font-black text-white truncate`}>
+                          {table.name}
+                        </h3>
+                        <div className={`inline-flex items-center gap-1 font-bold text-blue-100 ${zoneBadgeClass}`}>
+                          <MapPin className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">{zoneLabel}</span>
+                        </div>
+                      </div>
+
+                      {/* Middle: Cart Overview */}
+                      <div onClick={() => selectTable(table.id)} className={`cursor-pointer text-center ${isUltraCompact ? 'my-0.5' : isCompact ? 'my-1' : isLarge ? 'my-3' : 'my-2'}`}>
+                        <div className={`${isUltraCompact ? 'text-xs font-black' : isCompact ? 'text-sm font-black' : isLarge ? 'text-2xl font-black' : 'text-lg font-black'} text-white`}>
+                          ৳ {tableSubtotal.toLocaleString()}
+                        </div>
+                        <div className={`${isUltraCompact ? 'text-[8px]' : 'text-[10px]'} text-blue-100 font-semibold truncate`}>
+                          {table.cart.length} items • <span>{table.waiter || 'Staff'}</span>
+                        </div>
+                      </div>
+
+                      {/* Bottom: Action bar */}
+                      <div className={`border-t border-blue-700/60 flex items-center justify-between gap-1 ${isUltraCompact ? 'pt-1' : isCompact ? 'pt-1.5' : 'pt-2'} relative`}>
+                        <div className="w-full flex items-center gap-1 pr-1.5">
+                          {/* Quick KOT Direct Print */}
+                          {hasUnprintedKot && (
+                            <button
+                              type="button"
+                              title="Direct Print KOT"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await directSubmitKotAndHold(table.id);
+                              }}
+                              className={`flex-1 bg-white/90 hover:bg-white text-slate-900 font-black flex items-center justify-center gap-0.5 transition cursor-pointer shadow-xs active:scale-95 ${
+                                isUltraCompact ? 'py-0.5 px-0.5 rounded text-[8px]' : isCompact ? 'py-1 px-1 rounded-md text-[10px]' : isLarge ? 'py-2 px-2 rounded-xl text-xs' : 'py-1.5 px-1.5 rounded-lg text-[11px]'
+                              }`}
+                            >
+                              <ChefHat className={isUltraCompact ? 'w-2 h-2 text-rose-600' : isCompact ? 'w-2.5 h-2.5 text-rose-600' : 'w-3 h-3 text-rose-600'} />
+                              <span className={isUltraCompact ? 'hidden' : ''}>KOT</span>
+                            </button>
+                          )}
+
+                          {/* Quick Bill Direct Print */}
+                          {!isBillPrinted && (
+                            <button
+                              type="button"
+                              title="Direct Print Bill"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await directPrintBill(table.id);
+                              }}
+                              className={`flex-1 bg-white/90 hover:bg-white text-slate-900 font-bold flex items-center justify-center gap-0.5 transition cursor-pointer shadow-xs active:scale-95 ${
+                                isUltraCompact ? 'py-0.5 px-0.5 rounded text-[8px]' : isCompact ? 'py-1 px-1 rounded-md text-[10px]' : isLarge ? 'py-2 px-2 rounded-xl text-xs' : 'py-1.5 px-1.5 rounded-lg text-[11px]'
+                              }`}
+                            >
+                              <Printer className={isUltraCompact ? 'w-2 h-2 text-slate-600' : isCompact ? 'w-2.5 h-2.5 text-slate-600' : 'w-3 h-3 text-slate-600'} />
+                              <span className={isUltraCompact ? 'hidden' : ''}>Bill</span>
+                            </button>
+                          )}
+
+                          {/* Settle / Pay Button (Visible for all roles on active tables) */}
+                          <button
+                            type="button"
+                            title="Settle Payment & Pay"
+                            onClick={(e) => { e.stopPropagation(); openSettleModal(table.id); }}
+                            className={`flex-1 bg-black hover:bg-slate-900 text-blue-300 font-black flex items-center justify-center gap-0.5 transition cursor-pointer shadow-xs active:scale-95 ${
+                              isUltraCompact ? 'py-0.5 px-0.5 rounded text-[8px]' : isCompact ? 'py-1 px-1 rounded-md text-[10px]' : isLarge ? 'py-2 px-2 rounded-xl text-xs' : 'py-1.5 px-1.5 rounded-lg text-[11px]'
+                            }`}
+                          >
+                            <CreditCard className={isUltraCompact ? 'w-2 h-2' : isCompact ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
+                            <span className={isUltraCompact ? 'hidden' : ''}>Pay</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                    {/* Corner Resize Drag Handle - only visible for ADMIN */}
+                    {currentUser?.role === 'ADMIN' && (
+                      <div
+                        onMouseDown={(e) => handleResizeStart(e, table.id, cardWidth, cardHeight)}
+                        className="absolute -bottom-1 -right-1 w-5 h-5 flex items-end justify-end p-0.5 z-20 cursor-nwse-resize select-none group/resize opacity-40 hover:opacity-100 transition"
+                        title="Drag to resize table card"
+                      >
+                        <div className="w-3 h-3 flex flex-col items-end justify-end gap-[1px] pr-0.5 pb-0.5">
+                          <div className="w-0.5 h-0.5 rounded-full bg-slate-400 group-hover/resize:bg-blue-600 transition-colors" />
+                          <div className="flex gap-[1px]">
+                            <div className="w-0.5 h-0.5 rounded-full bg-slate-400 group-hover/resize:bg-blue-600 transition-colors" />
+                            <div className="w-0.5 h-0.5 rounded-full bg-slate-400 group-hover/resize:bg-blue-600 transition-colors" />
+                          </div>
+                          <div className="flex gap-[1px]">
+                            <div className="w-0.5 h-0.5 rounded-full bg-slate-400 group-hover/resize:bg-blue-600 transition-colors" />
+                            <div className="w-0.5 h-0.5 rounded-full bg-slate-400 group-hover/resize:bg-blue-600 transition-colors" />
+                            <div className="w-0.5 h-0.5 rounded-full bg-slate-400 group-hover/resize:bg-blue-600 transition-colors" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {/* Release Table Modal (if triggered in floor view) */}
+        {releasingTable && (
+          <ReleaseTableModal
+            table={releasingTable}
+            onClose={() => setReleasingTable(null)}
+          />
+        )}
+
+        {/* Waiter & Customer Selection Modal (Step 2 after table click) */}
+        {assigningTable && (
+          <SelectWaiterCustomerModal
+            table={assigningTable}
+            onClose={() => setAssigningTable(null)}
+            onConfirm={(waiter, customer) => {
+              setTableWaiter(assigningTable.id, waiter);
+              setTableCustomer(assigningTable.id, customer);
+              selectTable(assigningTable.id);
+              setAssigningTable(null);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Active Order / POS Terminal View
+  return (
+    <div className="flex-1 h-full min-h-0 flex flex-col lg:flex-row gap-3 overflow-hidden">
+      {/* Left Column: Food Menu catalog, categories, search (takes all remaining space) */}
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden space-y-1.5">
+        {/* Category Tabs & Search Bar (Clean full width for menu navigation) */}
+        <div className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-slate-200/90 shadow-none flex items-center gap-2 shrink-0">
+          <div className="w-36 sm:w-44 relative shrink-0">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              id="search-pos-menu"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search dish..."
+              className="w-full pl-7 pr-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-[#004b9b] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-0.5">
+            <button
+              onClick={() => setSelectedCategory('ALL')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition cursor-pointer ${
+                selectedCategory === 'ALL'
+                  ? 'bg-[#004b9b] text-white font-black shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              All Categories
+            </button>
+            {data.menuCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-[#004b9b] text-white font-black shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Menu Items Grid - Independently scrollable (Maintains optimal card size ~200px-230px on all screen sizes) */}
+        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar min-h-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 auto-rows-max">
+            {filteredMenuItems.map(dish => {
+              const inCart = activeTable?.cart?.find(c => c.id === dish.id);
+              const hasOptions = (dish.variations && dish.variations.length > 0) || (dish.addons && dish.addons.length > 0);
+
+              return (
+                <button
+                  key={dish.id}
+                  id={`menu-item-btn-${dish.id}`}
+                  onClick={() => {
+                    if (hasOptions) {
+                      setSelectedDishForCustomization(dish);
+                    } else {
+                      addToCart(activeTable.id, dish.id);
+                    }
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md hover:scale-[1.02] ${
+                    inCart 
+                      ? 'bg-blue-50/80 border-[#004b9b] ring-2 ring-blue-400/20' 
+                      : 'bg-white border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+                        {dish.category}
+                      </span>
+                      {hasOptions && (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 shrink-0">
+                          Options
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-extrabold text-xs text-slate-900 line-clamp-2 leading-snug">
+                      {dish.name}
+                    </h4>
+                  </div>
+
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="font-extrabold text-sm text-slate-900">
+                      ৳ {dish.price}
+                    </span>
+
+                    {inCart ? (
+                      <span className="w-6 h-6 rounded-full bg-[#004b9b] text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
+                        {inCart.qty}
+                      </span>
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-slate-100 hover:bg-[#004b9b] hover:text-white text-slate-600 text-xs flex items-center justify-center transition">
+                        <Plus className="w-3.5 h-3.5" />
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Right Column: Dedicated POS Cart (Exact compact fixed width like on lg, never bloated on 2xl/3xl/4xl) */}
+      <div className="w-full lg:w-[380px] xl:w-[410px] 2xl:w-[430px] shrink-0 flex flex-col h-full overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-3.5 shadow-sm flex flex-col h-full overflow-hidden">
+          {/* Cart Header with Table Name & Zone */}
+          <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="px-2.5 py-1 rounded-lg bg-[#004b9b] text-white font-black text-xs">
+                {activeTable.name}
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1 border border-slate-200">
+                <MapPin className="w-3 h-3 text-[#004b9b]" />
+                <span>{activeTable.zone || 'Floor 1'}</span>
+              </span>
+              {activeTable.status === 'billed' && (
+                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-[10px] flex items-center gap-1 border border-emerald-300" title="Bill has already been printed for this table">
+                  <Printer className="w-3 h-3 text-emerald-700" />
+                  <span>Billed</span>
+                </span>
+              )}
+              {/* Clickable Staff / Customer badge to change waiter or customer if needed */}
+              <button
+                type="button"
+                onClick={() => setAssigningTable(activeTable)}
+                className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-[10px] flex items-center gap-1 border border-blue-200 cursor-pointer transition"
+                title="Click to edit Waiter or Customer"
+              >
+                <UserCheck className="w-3 h-3 text-[#004b9b]" />
+                <span className="truncate max-w-[110px]">{activeTable.waiter || 'Staff'}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                id="btn-release-table-pos"
+                onClick={() => setReleasingTable(activeTable)}
+                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 px-2 py-1 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                title="Release table back to free"
+              >
+                <RotateCcw className="w-3 h-3 text-blue-700" />
+                <span>Release</span>
+              </button>
+
+              {activeTable?.cart?.length > 0 && (
+                <button
+                  id="btn-clear-cart"
+                  onClick={() => {
+                    const hasKot = activeTable.cart.some(i => i.kotPrinted && (i.kotPrintedQty || 0) > 0);
+                    if (hasKot) {
+                      setReleasingTable(activeTable);
+                    } else {
+                      clearCart(activeTable.id);
+                    }
+                  }}
+                  className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Order Timing Row: Start Time • End Time • Total Duration (Matching mark 1 text size and style) */}
+          {(() => {
+            const orderStartTimestamp = activeTable.orderCreatedAt || (
+              activeTable.cart.length > 0
+                ? activeTable.cart.reduce((earliest, item) => {
+                    const t = item.addedAt || item.kotPrintedTimestamp || null;
+                    return t ? (earliest ? Math.min(earliest, t) : t) : earliest;
+                  }, null as number | null)
+                : null
+            );
+
+            const latestKotTimestamp = activeTable.cart.reduce((max, item) => {
+              const t = item.kotPrintedTimestamp || 0;
+              return t > max ? t : max;
+            }, 0);
+
+            const isBilled = activeTable.status === 'billed';
+            const billedTimestamp = activeTable.billedAt;
+
+            const startTimeDisplay = orderStartTimestamp
+              ? new Date(orderStartTimestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+              : '--:--';
+
+            // End Time:
+            // 1. If billed -> billed time
+            // 2. Else if KOT printed items exist -> latest KOT timestamp
+            // 3. Otherwise -> '--:--'
+            const endTimestamp = isBilled && billedTimestamp
+              ? billedTimestamp
+              : (latestKotTimestamp > 0 ? latestKotTimestamp : null);
+
+            const endTimeDisplay = endTimestamp
+              ? new Date(endTimestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+              : '--:--';
+
+            // Total Duration calculation:
+            // If endTimestamp exists -> duration between start and end (e.g. KOT submit or Billed)
+            // Else if orderStartTimestamp exists -> live elapsed duration from start to nowTime
+            const durationMinutes = (orderStartTimestamp && endTimestamp)
+              ? Math.max(0, Math.floor((endTimestamp - orderStartTimestamp) / 60000))
+              : (orderStartTimestamp ? Math.max(0, Math.floor((nowTime - orderStartTimestamp) / 60000)) : 0);
+
+            const formatDuration = (mins: number) => {
+              if (mins < 1) return '< 1m';
+              if (mins < 60) return `${mins}m`;
+              const h = Math.floor(mins / 60);
+              const m = mins % 60;
+              return `${h}h ${m}m`;
+            };
+
+            const totalDurationDisplay = orderStartTimestamp ? formatDuration(durationMinutes) : '--';
+            const liveDiningMinutes = orderStartTimestamp ? Math.max(0, Math.floor((nowTime - orderStartTimestamp) / 60000)) : 0;
+
+            return (
+              <div 
+                className="py-1.5 px-2 border-b border-slate-100 flex items-center justify-between text-[8.5px] text-slate-400 font-medium select-none tracking-tight shrink-0"
+                title={orderStartTimestamp ? `Start Time: ${startTimeDisplay} • End Time: ${endTimeDisplay} • Total Duration: ${totalDurationDisplay}${!isBilled && liveDiningMinutes > durationMinutes ? ` (Live table duration: ${formatDuration(liveDiningMinutes)})` : ''}` : 'Order timing'}
+              >
+                <div className="inline-flex items-center gap-1">
+                  <Clock className="w-2 h-2 text-[#004b9b] shrink-0" />
+                  <span className="text-slate-500">Start Time:</span>
+                  <span className="font-semibold text-slate-700">{startTimeDisplay}</span>
+                </div>
+
+                <span className="text-slate-300">•</span>
+
+                <div className="inline-flex items-center gap-1">
+                  <Clock className="w-2 h-2 text-[#004b9b] shrink-0" />
+                  <span className="text-slate-500">End Time:</span>
+                  <span className="font-semibold text-slate-700">{endTimeDisplay}</span>
+                </div>
+
+                <span className="text-slate-300">•</span>
+
+                <div className="inline-flex items-center gap-1">
+                  <Timer className="w-2 h-2 text-[#004b9b] shrink-0" />
+                  <span className="text-slate-500">Total Duration:</span>
+                  <span className="font-bold text-slate-800">{totalDurationDisplay}</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Cart Items List */}
+          <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-slate-100 my-2 pr-1 custom-scrollbar">
+            {activeTable?.cart?.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-medium">
+                Cart is empty. Click items from the menu to add dishes.
+              </div>
+            ) : (
+              activeTable.cart.map((item, idx) => {
+                const isItemKotPrinted = item.kotPrinted && (item.kotPrintedQty || 0) > 0;
+                const unsentQty = Math.max(0, item.qty - (item.kotPrintedQty || 0));
+
+                const kotTimestamp = item.kotPrintedTimestamp || item.addedAt || activeTable.orderCreatedAt || null;
+                const kotElapsedMinutes = (isItemKotPrinted && kotTimestamp) ? Math.max(0, Math.floor((nowTime - kotTimestamp) / 60000)) : 0;
+
+                return (
+                  <div key={item.cartItemId || `${item.id}-${idx}`} className="py-2.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h5 className="text-xs font-bold text-slate-900 truncate">{item.name}</h5>
+                        {unsentQty > 0 && isItemKotPrinted && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-900 border border-blue-200 shrink-0">
+                            +{unsentQty} Unsent
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500 mt-0.5">
+                        <span className="font-semibold text-slate-700">৳{item.price} × {item.qty}</span>
+                        {item.selectedVariation && <span className="text-slate-400 font-medium">({item.selectedVariation.name})</span>}
+
+                        {/* KOT Submitted Time & Live Elapsed Minutes (Matching top-left #2 size and color) */}
+                        {isItemKotPrinted && item.kotPrintedAt && (
+                          <span 
+                            className="text-[8.5px] text-slate-400 font-medium inline-flex items-center gap-1 tracking-tight select-none ml-0.5"
+                            title={`KOT sent to kitchen at ${item.kotPrintedAt} (${kotElapsedMinutes} minutes elapsed)`}
+                          >
+                            <Clock className="w-2 h-2 text-[#004b9b] shrink-0" />
+                            <span>{item.kotPrintedAt}</span>
+                            <span>({kotElapsedMinutes}m)</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Special Instruction / Item Note */}
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        {item.notes ? (
+                          <div 
+                            onClick={() => {
+                              setEditingNoteItem({ item, index: idx });
+                              setItemNoteInput(item.notes || '');
+                            }}
+                            className="group flex items-center gap-1 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5 cursor-pointer transition"
+                            title="Click to edit special instruction"
+                          >
+                            <FileText className="w-2.5 h-2.5 text-blue-700" />
+                            <span className="font-semibold italic truncate max-w-[140px]">{item.notes}</span>
+                            <Edit2 className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 text-blue-700 ml-0.5" />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingNoteItem({ item, index: idx });
+                              setItemNoteInput('');
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] text-slate-400 hover:text-[#004b9b] hover:bg-blue-50 px-1.5 py-0.5 rounded transition cursor-pointer border border-dashed border-slate-200 hover:border-blue-300"
+                            title="Add special cooking note / instruction (prints on KOT)"
+                          >
+                            <FileText className="w-2.5 h-2.5" />
+                            <span>+ Note</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Decrement or Void */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)) {
+                            // Cannot decrement below printed KOT qty without void authorization
+                            setVoidingItem({ item, index: idx });
+                          } else {
+                            updateCartItemQty(activeTable.id, item.cartItemId || idx, -1);
+                          }
+                        }}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ${
+                          isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
+                            ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                        title={
+                          isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
+                            ? 'Void Item (KOT already sent to kitchen - authorization required)'
+                            : 'Decrease quantity'
+                        }
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+
+                      <span className="w-7 text-center font-extrabold text-xs text-slate-900">{item.qty}</span>
+
+                      {/* Increment */}
+                      <button
+                        type="button"
+                        onClick={() => updateCartItemQty(activeTable.id, item.cartItemId || idx, 1)}
+                        className="w-6 h-6 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 flex items-center justify-center font-bold transition cursor-pointer"
+                        title="Increase quantity"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+
+                      {/* Void / Delete Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isItemKotPrinted) {
+                            setVoidingItem({ item, index: idx });
+                          } else {
+                            removeCartItem(activeTable.id, item.cartItemId || idx);
+                          }
+                        }}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ml-0.5 ${
+                          isItemKotPrinted
+                            ? 'bg-rose-100 hover:bg-rose-200 text-rose-700'
+                            : 'hover:bg-slate-100 text-slate-400 hover:text-rose-600'
+                        }`}
+                        title={
+                          isItemKotPrinted
+                            ? 'Void KOT Item (Admin/Manager Permission Required)'
+                            : 'Remove from cart'
+                        }
+                      >
+                        {isItemKotPrinted ? (
+                          <Ban className="w-3 h-3 text-rose-700" />
+                        ) : (
+                          <Trash2 className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="w-14 text-right font-extrabold text-xs text-slate-900 shrink-0">
+                      ৳{item.price * item.qty}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Discount and Summary calculation */}
+          <div className="pt-2 border-t border-slate-200 space-y-1.5 text-xs shrink-0">
+            {/* Discount Form Row */}
+            <div className="flex items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+              <span className="font-bold text-slate-700 text-[11px] shrink-0">Discount:</span>
+              
+              <div className="flex items-center gap-1.5 flex-1 justify-end">
+                <div className="flex rounded-lg overflow-hidden border border-slate-300">
+                  <button
+                    type="button"
+                    onClick={() => setTableDiscount(activeTable.id, 'taka', activeTable.discountVal)}
+                    className={`px-2 py-0.5 text-[10px] font-bold cursor-pointer transition ${
+                      activeTable.discountType === 'taka' ? 'bg-black text-blue-300' : 'bg-white text-slate-600'
+                    }`}
+                  >
+                    ৳ BDT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTableDiscount(activeTable.id, 'percent', activeTable.discountVal)}
+                    className={`px-2 py-0.5 text-[10px] font-bold cursor-pointer transition ${
+                      activeTable.discountType === 'percent' ? 'bg-black text-blue-300' : 'bg-white text-slate-600'
+                    }`}
+                  >
+                    % Percent
+                  </button>
+                </div>
+
+                <input
+                  type="number"
+                  min="0"
+                  value={activeTable.discountVal === 0 ? '' : activeTable.discountVal}
+                  onChange={e => setTableDiscount(activeTable.id, activeTable.discountType, parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-16 px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#004b9b]"
+                />
+              </div>
+            </div>
+
+            {/* Subtotal & Net Total */}
+            <div className="flex justify-between text-slate-600 font-medium text-[11px]">
+              <span>Subtotal:</span>
+              <span className="font-bold text-slate-900 font-mono">৳{subtotal.toLocaleString()}</span>
+            </div>
+
+            {discountDeduction > 0 && (
+              <div className="flex justify-between text-emerald-700 font-medium text-[11px]">
+                <span>Discount:</span>
+                <span>- ৳{discountDeduction.toLocaleString()}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-200">
+              <span>Total Payable:</span>
+              <span className="text-[#004b9b] text-base font-black font-mono">৳{netTotal.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons: Dynamically adapts to POS order lifecycle */}
+          {(() => {
+            const isCartEmpty = (activeTable?.cart?.length || 0) === 0;
+            const hasUnprintedKotItems = !isCartEmpty && activeTable!.cart.some(
+              item => !item.kotPrinted || item.qty > (item.kotPrintedQty || 0)
+            );
+
+            const cancelBtn = (fullWidth = false) => (
+              <button
+                id="btn-cancel-pos-order"
+                type="button"
+                onClick={() => setPosView('floor')}
+                className={`py-2.5 px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
+                title="Cancel and return to Floor Plan"
+              >
+                <X className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="truncate">Cancel</span>
+              </button>
+            );
+
+            const submitKotBtn = (
+              <button
+                id="btn-submit-pos-order"
+                type="button"
+                disabled={activeTable.cart.length === 0}
+                onClick={() => {
+                  directSubmitKotAndHold(activeTable.id);
+                }}
+                className="py-2.5 px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer w-full"
+                title="Submit Order: Sends KOT to Kitchen & Holds Order on Table"
+              >
+                <ChefHat className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Submit (KOT & Hold)</span>
+              </button>
+            );
+
+            const printBillBtn = (fullWidth = false) => (
+              <button
+                id="btn-print-table-bill"
+                type="button"
+                disabled={activeTable.cart.length === 0 || isPrintingBill}
+                onClick={async () => {
+                  setIsPrintingBill(true);
+                  await directPrintBill(activeTable.id);
+                  setIsPrintingBill(false);
+                  setBillPrintedSuccess(true);
+                  setTimeout(() => setBillPrintedSuccess(false), 2000);
+                }}
+                className={`py-2.5 px-1.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1 shadow-sm disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''} ${
+                  billPrintedSuccess
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-black hover:bg-slate-900 text-white'
+                }`}
+                title="Print Guest Bill"
+              >
+                {isPrintingBill ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className="truncate">Printing...</span>
+                  </>
+                ) : billPrintedSuccess ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                    <span className="truncate">Printed!</span>
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Print Bill</span>
+                  </>
+                )}
+              </button>
+            );
+
+            const settlePayBtn = (fullWidth = false) => (
+              <button
+                id="btn-open-settle-modal"
+                type="button"
+                disabled={activeTable.cart.length === 0}
+                onClick={() => openSettleModal(activeTable.id)}
+                className={`py-2.5 px-1.5 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''}`}
+                title="Settle Payment & Pay"
+              >
+                <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Settle & Pay</span>
+              </button>
+            );
+
+            const isBillAlreadyPrinted = activeTable?.status === 'billed';
+
+            // State 1: Cart is empty -> Only Cancel button view hobe
+            if (isCartEmpty) {
+              return (
+                <div className="pt-2 shrink-0">
+                  {cancelBtn(true)}
+                </div>
+              );
+            }
+
+            // State 2 (Picture 1): Cart has unprinted items -> Cancel & Submit (KOT & Hold) + Settle & Pay
+            if (hasUnprintedKotItems) {
+              return (
+                <div className="pt-2 shrink-0">
+                  <div className="grid grid-cols-3 gap-2">
+                    {cancelBtn(false)}
+                    {submitKotBtn}
+                    {settlePayBtn(false)}
+                  </div>
+                </div>
+              );
+            }
+
+            // State 3 (Picture 4 when bill ALREADY printed in 3 or 4): Hide Print Bill -> Only Cancel & Settle & Pay
+            if (isBillAlreadyPrinted) {
+              return (
+                <div className="pt-2 shrink-0">
+                  <div className="grid grid-cols-2 gap-2">
+                    {cancelBtn(false)}
+                    {settlePayBtn(false)}
+                  </div>
+                </div>
+              );
+            }
+
+            // State 4 (When bill NOT yet printed): Show Cancel, Print Bill, Settle & Pay
+            return (
+              <div className="pt-2 shrink-0">
+                <div className="grid grid-cols-3 gap-2">
+                  {cancelBtn(false)}
+                  {printBillBtn(false)}
+                  {settlePayBtn(false)}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* Void Cart Item Modal */}
+      {voidingItem && (
+        <VoidItemModal
+          tableId={activeTable.id}
+          tableName={activeTable.name}
+          item={voidingItem.item}
+          itemIndex={voidingItem.index}
+          onClose={() => setVoidingItem(null)}
+        />
+      )}
+
+      {/* Release Table Modal */}
+      {releasingTable && (
+        <ReleaseTableModal
+          table={releasingTable}
+          onClose={() => setReleasingTable(null)}
+        />
+      )}
+
+      {/* Item Variation & Add-on Customization Modal */}
+      {selectedDishForCustomization && (
+        <ItemVariationModal
+          item={selectedDishForCustomization}
+          tableName={activeTable.name}
+          channelOrAgentName={
+            activeTable.channelOrAgentId && activeTable.channelOrAgentId !== 'dine_in'
+              ? data.commissionAgents?.find(a => a.id === activeTable.channelOrAgentId)?.name
+              : undefined
+          }
+          channelMultiplier={
+            activeTable.channelOrAgentId && activeTable.channelOrAgentId !== 'dine_in'
+              ? data.commissionAgents?.find(a => a.id === activeTable.channelOrAgentId)?.priceListMultiplier || 1
+              : 1
+          }
+          channelPrice={
+            activeTable.channelOrAgentId && activeTable.channelOrAgentId !== 'dine_in'
+              ? selectedDishForCustomization.channelPrices?.[activeTable.channelOrAgentId]
+              : undefined
+          }
+          onAddToCart={(dish, variation, addons, quantity, itemNotes) => {
+            addToCart(activeTable.id, dish.id, variation, addons, itemNotes, quantity);
+          }}
+          onClose={() => setSelectedDishForCustomization(null)}
+        />
+      )}
+
+      {/* Item Cooking Note / Special Instruction Modal */}
+      {editingNoteItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-[#004b9b] flex items-center justify-center">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Special Cooking Instruction</h4>
+                  <p className="text-[11px] text-slate-500 truncate max-w-[240px]">
+                    {editingNoteItem.item.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingNoteItem(null)}
+                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Instruction Note (prints on KOT):
+              </label>
+              <textarea
+                value={itemNoteInput}
+                onChange={(e) => setItemNoteInput(e.target.value)}
+                placeholder="e.g. Less spicy, Extra crispy, No onion, Parcel..."
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#004b9b] focus:outline-none transition resize-none h-20"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (activeTable) {
+                      updateCartItemNotes(activeTable.id, editingNoteItem.item.cartItemId || editingNoteItem.index, itemNoteInput.trim());
+                    }
+                    setEditingNoteItem(null);
+                  }
+                }}
+              />
+            </div>
+
+            {/* Quick preset tags */}
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Quick Suggestions:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {['Less Spicy', 'Extra Spicy', 'No Onion', 'Extra Crispy', 'Takeaway / Parcel', 'Less Salt', 'Sugar Free'].map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => {
+                      setItemNoteInput(prev => prev ? `${prev}, ${tag}` : tag);
+                    }}
+                    className="px-2 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#004b9b] hover:border-blue-300 border border-slate-200 text-slate-700 text-[11px] rounded-lg font-medium transition cursor-pointer"
+                  >
+                    + {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              {editingNoteItem.item.notes ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeTable) {
+                      updateCartItemNotes(activeTable.id, editingNoteItem.item.cartItemId || editingNoteItem.index, '');
+                    }
+                    setEditingNoteItem(null);
+                  }}
+                  className="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                >
+                  Clear Note
+                </button>
+              ) : <div />}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingNoteItem(null)}
+                  className="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeTable) {
+                      updateCartItemNotes(activeTable.id, editingNoteItem.item.cartItemId || editingNoteItem.index, itemNoteInput.trim());
+                    }
+                    setEditingNoteItem(null);
+                  }}
+                  className="px-4 py-2 text-xs font-bold bg-[#004b9b] hover:bg-[#005bb8] text-white rounded-xl transition shadow-xs cursor-pointer"
+                >
+                  Save Note
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waiter & Customer Selection Modal (if triggered from order view) */}
+      {assigningTable && (
+        <SelectWaiterCustomerModal
+          table={assigningTable}
+          onClose={() => setAssigningTable(null)}
+          onConfirm={(waiter, customer) => {
+            setTableWaiter(assigningTable.id, waiter);
+            setTableCustomer(assigningTable.id, customer);
+            setAssigningTable(null);
+          }}
+        />
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,201 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useRestaurant } from '../context/RestaurantContext';
+import { 
+  Clock, 
+  LogOut, 
+  ChevronDown, 
+  LayoutGrid,
+  Home
+} from 'lucide-react';
+import logo4 from '../image/logo4.png';
+
+export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({ 
+  onOpenMobileSidebar = () => {} 
+}) => {
+  const { 
+    data, 
+    activeTab,
+    setActiveTab, 
+    currentUser, 
+    logout,
+    language,
+    t,
+    setIsTableZoneModalOpen
+  } = useRestaurant();
+
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const userDropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnterUser = () => {
+    if (userDropdownTimeoutRef.current) {
+      clearTimeout(userDropdownTimeoutRef.current);
+      userDropdownTimeoutRef.current = null;
+    }
+    setIsUserDropdownOpen(true);
+  };
+
+  const handleMouseLeaveUser = () => {
+    if (userDropdownTimeoutRef.current) {
+      clearTimeout(userDropdownTimeoutRef.current);
+    }
+    userDropdownTimeoutRef.current = setTimeout(() => {
+      setIsUserDropdownOpen(false);
+    }, 150);
+  };
+
+  const [currentDateTime, setCurrentDateTime] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      const timeStr = now.toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      setCurrentDateTime(`${dateStr} • ${timeStr}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [language]);
+
+  const getRoleBadgeStyle = (role?: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'MANAGER':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'CASHIER':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'WAITER':
+        return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'CHEF':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  return (
+    <header className="h-16 shrink-0 bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+      <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-5 lg:px-6 h-full flex items-center justify-between">
+        {/* Left: Brand info & Small Time Display (Aligned with Body left edge) */}
+        <div className="flex items-center">
+          <div className="flex flex-col">
+            <div className="font-bold text-xs text-slate-900 uppercase tracking-tight flex items-center gap-2">
+              <img 
+                src={logo4} 
+                alt="BD HOSTT" 
+                className="h-5 sm:h-6 w-auto object-contain select-none" 
+              />
+              <span className="text-slate-300 font-normal">/</span>
+              <span className="text-slate-700 font-bold">{data.restaurantProfile?.name || 'Barcode Cafe Banani'}</span>
+            </div>
+            <div className="text-[7.5px] sm:text-[8.5px] text-slate-400 font-medium flex items-center gap-1 tracking-tight mt-0.5 select-none">
+              <Clock className="w-2 h-2 text-[#004b9b] shrink-0" />
+              <span>{currentDateTime}</span>
+            </div>
+          </div>
+        </div>
+
+      {/* Right: Actions & Session */}
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Return to Main Launchpad Home Button */}
+        <button
+          type="button"
+          id="btn-nav-launcher-home"
+          onClick={() => setActiveTab('launcher')}
+          className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold shadow-2xs transition cursor-pointer"
+          title="Return to Main Launchpad / Home Grid"
+        >
+          <Home className="w-3.5 h-3.5 text-[#004b9b]" />
+          <span className="hidden md:inline">Main Menu</span>
+        </button>
+
+        {/* Table & Zone Edit button (only shown to admin) */}
+        {currentUser?.role === 'ADMIN' && (
+          <button
+            type="button"
+            id="btn-table-zone-edit-header"
+            onClick={() => setIsTableZoneModalOpen(true)}
+            className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-blue-700/40 bg-[#004b9b] hover:bg-[#005bb8] text-white text-xs font-bold shadow-xs transition cursor-pointer animate-in fade-in"
+          >
+            <LayoutGrid className="w-3.5 h-3.5 text-white" />
+            <span>Table & Zone Edit</span>
+          </button>
+        )}
+
+        {/* User Account / Profile Menu (Opens on hover, collapses on mouse off) */}
+        <div 
+          className="relative"
+          onMouseEnter={handleMouseEnterUser}
+          onMouseLeave={handleMouseLeaveUser}
+        >
+          <button
+            type="button"
+            id="btn-user-switcher"
+            onClick={() => setIsUserDropdownOpen(prev => !prev)}
+            className="h-8 flex items-center gap-2 px-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition text-slate-700 text-xs font-bold cursor-pointer shadow-2xs"
+          >
+            <div className="w-5 h-5 rounded-md bg-[#004b9b] text-white font-black flex items-center justify-center text-[10px] shadow-xs shrink-0">
+              {currentUser?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="flex items-center gap-1.5 text-left hidden md:flex">
+              <span className="text-xs font-bold text-slate-800 truncate max-w-[130px]">
+                {currentUser?.name || 'Guest'}
+              </span>
+              <span className="text-[10px] text-[#004b9b] font-black uppercase tracking-tight bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60 leading-none">
+                {currentUser?.role || 'NO ROLE'}
+              </span>
+            </div>
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${isUserDropdownOpen ? 'rotate-180 text-[#004b9b]' : ''}`} />
+          </button>
+
+          {/* Hover / Click Dropdown Prompt (Short, Compact & Auto-collapsing) */}
+          {isUserDropdownOpen && (
+            <div 
+              role="menu"
+              className="absolute right-0 top-full pt-1 z-50 animate-in fade-in zoom-in-95 duration-150"
+            >
+              <div className="w-48 bg-white rounded-xl shadow-xl border border-slate-200 p-2 space-y-2">
+                {/* Short Compact User Info */}
+                <div className="flex items-center gap-2 px-1.5 py-1 bg-slate-50 rounded-lg border border-slate-100">
+                  <div className="w-6 h-6 rounded-md bg-[#004b9b] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    {currentUser?.name?.charAt(0) || 'U'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-800 truncate">
+                      {currentUser?.name}
+                    </div>
+                    <div className="text-[9px] font-semibold text-[#004b9b] uppercase">
+                      {currentUser?.role}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Direct Log Out Button */}
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-1.5 cursor-pointer transition"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{t.logout}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
+    </header>
+  );
+};
