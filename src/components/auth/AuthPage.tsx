@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRestaurant, DEFAULT_USERS } from '../../context/RestaurantContext';
 import { AppUser } from '../../types';
 import Bg from '../../image/bg7.png';
-import logo4 from '../../image/logo4.PNG';
+import logo4 from '../../image/logo4.png';
 
 
 interface AuthPageProps {
