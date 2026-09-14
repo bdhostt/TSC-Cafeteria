@@ -271,28 +271,45 @@ export const ThermalBillModal: React.FC = () => {
     setIsPrinting(false);
     setHardwarePrintStatus(null);
 
-    // 2. Open clean standalone print window that NEVER auto-closes
+    // 2. Direct clean Iframe Print (Stays open indefinitely on screen, never closes prematurely)
     const html = generateReceiptHtml();
     if (!html) return;
 
-    const printWin = window.open('', '_blank', 'width=440,height=680,left=150,top=80,menubar=no,toolbar=no,location=no,status=no');
-    if (!printWin) {
-      window.print();
-      return;
+    let iframe = document.getElementById('thermal-print-frame') as HTMLIFrameElement;
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'thermal-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.top = '-9999px';
+      iframe.style.left = '-9999px';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      iframe.style.border = 'none';
+      iframe.style.visibility = 'hidden';
+      document.body.appendChild(iframe);
     }
 
-    printWin.document.open();
-    printWin.document.write(html);
-    printWin.document.close();
-    printWin.focus();
-
-    setTimeout(() => {
-      try {
-        printWin.print();
-      } catch (e) {
-        console.warn('Print trigger warning:', e);
+    try {
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(html);
+        doc.close();
+        setTimeout(() => {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          } else {
+            window.print();
+          }
+        }, 250);
+      } else {
+        window.print();
       }
-    }, 400);
+    } catch (err) {
+      console.warn('Print iframe error, fallback to window.print:', err);
+      window.print();
+    }
   };
 
   const generateReceiptHtml = () => {

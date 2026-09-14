@@ -102,10 +102,11 @@ input[type="number"] {
   body * {
     visibility: hidden !important;
   }
-  #printReceiptModal, #printReceiptModal * {
+  #printReceiptModal, #printReceiptModal *,
+  #printModalContainer, #printModalContainer * {
     visibility: visible !important;
   }
-  #printReceiptModal {
+  #printReceiptModal, #printModalContainer {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
