@@ -317,16 +317,16 @@ export const ThermalBillModal: React.FC = () => {
 
     if (isKot) {
       const kotItemsHtml = displayedItems.map(item => `
-        <tr style="border-bottom: 1px dashed #cbd5e1; font-size: 11.5px;">
-          <td style="padding: 6px 0; text-align: left; vertical-align: top;">
-            <div style="font-weight: bold; font-size: 13px; color: ${isCancelKot ? '#b91c1c; text-decoration: line-through;' : '#0f172a;'}">${item.name}</div>
-            ${item.selectedVariation?.name ? `<div style="font-size: 10px; color: #1d4ed8; font-weight: 600;">• Cut: ${item.selectedVariation.name}</div>` : ''}
-            ${item.selectedAddons && item.selectedAddons.length > 0 ? `<div style="font-size: 9.5px; color: #92400e;">+ Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
-            ${item.notes ? `<div style="font-size: 9.5px; color: #dc2626; font-style: italic; font-weight: 600;">📝 Note: ${item.notes}</div>` : ''}
-          </td>
-          <td style="padding: 6px 0; text-align: right; vertical-align: top; font-weight: 900; font-size: 14px; color: #0f172a;">${item.qty}x</td>
-        </tr>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin: 3px 0; font-size: 13px; font-weight: bold;">
+          <span style="${isCancelKot ? 'text-decoration: line-through;' : ''}">${item.name}</span>
+          <span>${item.qty}x</span>
+        </div>
+        ${item.selectedVariation?.name ? `<div style="font-size: 11px; font-weight: normal; padding-left: 10px;">• Cut: ${item.selectedVariation.name}</div>` : ''}
+        ${item.selectedAddons && item.selectedAddons.length > 0 ? `<div style="font-size: 11px; font-weight: normal; padding-left: 10px;">+ Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
+        ${item.notes ? `<div style="font-size: 11px; font-weight: bold; padding-left: 10px;">📝 Note: ${item.notes}</div>` : ''}
       `).join('');
+
+      const stationName = selectedDeptFilter === 'ALL' ? 'MAIN KITCHEN' : selectedDeptFilter.toUpperCase();
 
       return `
         <!DOCTYPE html>
@@ -336,93 +336,103 @@ export const ThermalBillModal: React.FC = () => {
           <title>${isCancelKot ? 'VOID_KOT' : 'KOT'}_${printableReceipt.invoiceNo}</title>
           <style>
             @page {
-              size: ${paperWidth === '58mm' ? '58mm' : '80mm'} auto;
+              size: 80mm auto;
               margin: 0mm !important;
             }
             @media print {
-              body { margin: 0; padding: 1mm 2mm; }
+              body { margin: 0; padding: 1mm 1mm; width: 72mm; max-width: 72mm; }
               .no-print { display: none !important; }
             }
             *, *::before, *::after {
               color: #000000 !important;
+              box-sizing: border-box;
             }
             body {
-              font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif;
-              color: #000;
+              font-family: 'Courier New', Courier, monospace !important;
+              color: #000000;
               margin: 0 auto;
-              padding: 6px;
-              max-width: ${paperWidth === '58mm' ? '54mm' : '74mm'};
-              background: #fff;
-              font-size: 11px;
+              padding: 2mm 1.5mm;
+              width: 72mm;
+              max-width: 72mm;
+              background: #ffffff;
+              font-size: 12px;
               line-height: 1.35;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-            .header { text-align: center; border-bottom: 1.5px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
-            .station { font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 0 0 2px 0; }
-            .kot-no { font-size: 12px; font-weight: 700; color: #000; }
-            .badge { display: inline-block; padding: 3px 8px; background: #000; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 900; text-transform: uppercase; margin-top: 4px; }
-            .cancel-badge { background: #dc2626; color: #fff; }
-            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 4px; font-size: 11px; }
-            .info-table td { padding: 1.5px 0; }
-            .table-highlight { font-size: 13px; font-weight: 900; color: #000; }
-            .items-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-            .items-table th { border-bottom: 1.5px dashed #000; padding: 3px 0; font-size: 11px; text-transform: uppercase; }
-            .footer { text-align: center; font-size: 10px; color: #000; margin-top: 8px; border-top: 1px dashed #000; padding-top: 4px; font-weight: bold; }
+            .sep {
+              border-top: 1px dashed #000000;
+              margin: 4px 0;
+              height: 0;
+            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .row {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin: 2px 0;
+            }
           </style>
         </head>
         <body>
-          <div class="no-print" style="position: sticky; top: 0; background: #0f172a; color: white; padding: 10px; margin: -6px -6px 12px -6px; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; z-index: 9999;">
-            <button onclick="window.print()" style="background: #2563eb; color: #ffffff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer;">
-              🖨️ Print Now (Ctrl+P)
-            </button>
-            <button onclick="window.close()" style="background: #475569; color: #ffffff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer;">
-              ✕ Close
-            </button>
+          <div class="sep"></div>
+          <div class="center bold" style="font-size: 13px;">STATION: ${stationName}</div>
+          <div class="center bold" style="font-size: 13px;">${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${printableReceipt.invoiceNo}</div>
+          ${isCancelKot ? '<div class="center bold" style="margin: 2px 0;">*** VOID / CANCELLED ORDER ***</div>' : ''}
+          <div class="sep"></div>
+          <div class="row">
+            <span>TABLE   :</span>
+            <span class="bold">${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}</span>
           </div>
-          <div class="header">
-            <div class="station">STATION: ${selectedDeptFilter === 'ALL' ? 'MAIN KITCHEN' : selectedDeptFilter.toUpperCase()}</div>
-            <div class="kot-no">${isCancelKot ? 'VOID KOT #' : 'KOT #'} ${printableReceipt.invoiceNo}</div>
-            ${isCancelKot ? '<div class="badge cancel-badge">⚠️ CANCELLED / VOID ORDER</div>' : '<div class="badge">KITCHEN ORDER TICKET</div>'}
+          <div class="row">
+            <span>TIME    :</span>
+            <span>${printableReceipt.dateTime || receiptTimeStr || receiptDateStr}</span>
           </div>
-          <table class="info-table">
-            <tr>
-              <td style="font-weight: 600;">TABLE:</td>
-              <td class="table-highlight" style="text-align: right;">${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b;">TIME:</td>
-              <td style="text-align: right; font-weight: 600;">${printableReceipt.dateTime || receiptTimeStr || receiptDateStr}</td>
-            </tr>
-            <tr>
-              <td style="color: #64748b;">WAITER:</td>
-              <td style="text-align: right; font-weight: 600;">${printableReceipt.waiter || 'Staff'}</td>
-            </tr>
-            ${printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer' ? `
-            <tr>
-              <td style="color: #64748b;">CUSTOMER:</td>
-              <td style="text-align: right; font-weight: 600;">${printableReceipt.customer}</td>
-            </tr>
-            ` : ''}
-          </table>
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th style="text-align: left;">FOOD ITEM</th>
-                <th style="text-align: right;">QTY</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${kotItemsHtml}
-            </tbody>
-          </table>
-          <div class="footer">
-            *** END OF KOT SLIP ***
+          <div class="row">
+            <span>WAITER  :</span>
+            <span>${printableReceipt.waiter || 'Rahim'}</span>
           </div>
+          ${printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer' ? `
+          <div class="row">
+            <span>CUSTOMER:</span>
+            <span>${printableReceipt.customer}</span>
+          </div>
+          ` : ''}
+          <div class="sep"></div>
+          <div class="row bold">
+            <span>ITEM NAME</span>
+            <span>QTY</span>
+          </div>
+          <div class="sep"></div>
+          ${kotItemsHtml}
+          <div class="sep"></div>
         </body>
         </html>
       `;
     }
+
+    const billItemsHtml = displayedItems.map(item => {
+      const lineTotal = item.price * item.qty;
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin: 3px 0; font-size: 12px;">
+          <span style="font-weight: bold; width: 44%; word-break: break-word;">${item.name}</span>
+          <span style="width: 14%; text-align: center;">${item.qty}x</span>
+          <span style="width: 20%; text-align: right;">${item.price.toFixed(2)}</span>
+          <span style="width: 22%; text-align: right; font-weight: bold;">${lineTotal.toFixed(2)}</span>
+        </div>
+        ${item.selectedVariation?.name ? `<div style="font-size: 10.5px; padding-left: 8px;">• Cut: ${item.selectedVariation.name}</div>` : ''}
+        ${item.selectedAddons && item.selectedAddons.length > 0 ? `<div style="font-size: 10.5px; padding-left: 8px;">+ Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
+      `;
+    }).join('');
+
+    const titleText = printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL';
+    const payments = [];
+    if (printableReceipt.paymentBreakdown?.cash) payments.push(`Cash: Tk ${printableReceipt.paymentBreakdown.cash.toFixed(2)}`);
+    if (printableReceipt.paymentBreakdown?.card) payments.push(`Card: Tk ${printableReceipt.paymentBreakdown.card.toFixed(2)}`);
+    if (printableReceipt.paymentBreakdown?.bkash) payments.push(`bKash: Tk ${printableReceipt.paymentBreakdown.bkash.toFixed(2)}`);
+    if (printableReceipt.paymentBreakdown?.nagad) payments.push(`Nagad: Tk ${printableReceipt.paymentBreakdown.nagad.toFixed(2)}`);
+    if (printableReceipt.paymentBreakdown?.due) payments.push(`Due: Tk ${printableReceipt.paymentBreakdown.due.toFixed(2)}`);
 
     return `
       <!DOCTYPE html>
@@ -432,143 +442,120 @@ export const ThermalBillModal: React.FC = () => {
         <title>Receipt_${printableReceipt.invoiceNo}</title>
         <style>
           @page {
-            size: ${paperWidth === '58mm' ? '58mm' : '80mm'} auto;
+            size: 80mm auto;
             margin: 0mm !important;
           }
           @media print {
-            body { margin: 0; padding: 2mm 1mm; }
+            body { margin: 0; padding: 1mm 1mm; width: 72mm; max-width: 72mm; }
+            .no-print { display: none !important; }
           }
           *, *::before, *::after {
-            color: #000 !important;
+            color: #000000 !important;
+            box-sizing: border-box;
           }
           body {
-            font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif;
-            color: #000;
+            font-family: 'Courier New', Courier, monospace !important;
+            color: #000000;
             margin: 0 auto;
-            padding: 2mm 1mm;
-            max-width: ${paperWidth === '58mm' ? '54mm' : '74mm'};
-            background: #fff;
-            font-size: 11px;
-            line-height: 1.3;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            padding: 2mm 1.5mm;
+            width: 72mm;
+            max-width: 72mm;
+            background: #ffffff;
+            font-size: 12px;
+            line-height: 1.35;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .header { text-align: center; border-bottom: 1px dashed #94a3b8; padding-bottom: 8px; margin-bottom: 8px; }
-          .res-name { font-size: 15px; font-weight: 900; text-transform: uppercase; margin: 0 0 3px 0; color: #0f172a; letter-spacing: 0.3px; }
-          .res-sub { font-size: 10px; color: #475569; margin: 1px 0; }
-          .badge { display: inline-block; padding: 2px 8px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; margin-top: 5px; color: #0f172a; }
-          .info-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 6px; font-size: 10.5px; }
-          .info-table td { padding: 1.5px 0; }
-          .info-label { color: #64748b; }
-          .info-val { font-weight: 600; text-align: right; color: #0f172a; }
-          .table-box { background: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: 800; color: #78350f; }
-          .items-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-          .items-table th { border-bottom: 1px dashed #94a3b8; padding: 4px 0; font-size: 10px; text-transform: uppercase; color: #475569; }
-          .totals-table { width: 100%; border-collapse: collapse; border-top: 1px dashed #94a3b8; border-bottom: 1px dashed #94a3b8; padding: 6px 0; margin-bottom: 8px; }
-          .totals-table td { padding: 2.5px 0; }
-          .net-total-row td { font-size: 13px; font-weight: 900; color: #0f172a; padding-top: 4px; }
-          .payments { border-bottom: 1px dashed #cbd5e1; padding-bottom: 6px; margin-bottom: 8px; font-size: 10px; color: #334155; }
-          .footer { text-align: center; font-size: 9.5px; color: #64748b; margin-top: 10px; }
+          .sep {
+            border-top: 1px dashed #000000;
+            margin: 4px 0;
+            height: 0;
+          }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 2px 0;
+          }
         </style>
       </head>
       <body>
-        <div class="no-print" style="position: sticky; top: 0; background: #0f172a; color: white; padding: 10px; margin: -2mm -1mm 12px -1mm; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; z-index: 9999;">
-          <button onclick="window.print()" style="background: #2563eb; color: #ffffff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer;">
-            🖨️ Print Now (Ctrl+P)
-          </button>
-          <button onclick="window.close()" style="background: #475569; color: #ffffff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer;">
-            ✕ Close
-          </button>
+        <div class="center bold" style="font-size: 14px; text-transform: uppercase;">${restaurantName}</div>
+        <div class="center" style="font-size: 11px;">${restaurantAddress}</div>
+        <div class="center" style="font-size: 11px;">Hotline: ${restaurantHotline}</div>
+        ${restaurantBin ? `<div class="center" style="font-size: 11px;">BIN/VAT Reg: ${restaurantBin}</div>` : ''}
+        <div class="sep"></div>
+        <div class="center bold">${titleText}</div>
+        <div class="sep"></div>
+        <div class="row">
+          <span>Invoice No :</span>
+          <span class="bold">${printableReceipt.invoiceNo}</span>
         </div>
-        <div class="header">
-          <div class="res-name">${restaurantName}</div>
-          <div class="res-sub">${restaurantAddress}</div>
-          <div class="res-sub">Hotline: ${restaurantHotline} • BIN: ${restaurantBin}</div>
-          <div class="badge">${titleText}</div>
+        <div class="row">
+          <span>Date & Time:</span>
+          <span>${printableReceipt.dateTime || receiptDateStr}</span>
         </div>
-
-        <table class="info-table">
-          <tr>
-            <td class="info-label">Invoice No:</td>
-            <td class="info-val font-mono">${printableReceipt.invoiceNo}</td>
-          </tr>
-          <tr>
-            <td class="info-label">Date : ${receiptDateStr}</td>
-            <td class="info-val" style="text-align: right;">Time: ${receiptTimeStr}</td>
-          </tr>
-          <tr>
-            <td class="info-label">Table & Zone:</td>
-            <td class="info-val"><span class="table-box">${printableReceipt.tableName} (${printableReceipt.tableZone || 'Floor 1'})</span></td>
-          </tr>
-          ${printableReceipt.channelOrAgent ? `
-            <tr>
-              <td class="info-label">Channel:</td>
-              <td class="info-val">${printableReceipt.channelOrAgent}</td>
-            </tr>
-          ` : ''}
-          <tr>
-            <td class="info-label">Waiter:</td>
-            <td class="info-val">${printableReceipt.waiter || 'Staff'}</td>
-          </tr>
-          <tr>
-            <td class="info-label">Order Taken By:</td>
-            <td class="info-val">${printableReceipt.orderTakenBy || printableReceipt.waiter || 'Staff'}</td>
-          </tr>
-          <tr>
-            <td class="info-label">Bill Settled By:</td>
-            <td class="info-val">${printableReceipt.isSettled ? (printableReceipt.settleBillRole || 'Cashier') : (printableReceipt.settleBillRole || '')}</td>
-          </tr>
-          <tr>
-            <td class="info-label">Customer:</td>
-            <td class="info-val">${printableReceipt.customer || 'Walk-in Customer'}</td>
-          </tr>
-        </table>
-
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th style="text-align: left; width: 46%;">Item</th>
-              <th style="text-align: center; width: 14%;">Qty</th>
-              <th style="text-align: right; width: 18%;">Price</th>
-              <th style="text-align: right; width: 22%;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-
-        <table class="totals-table">
-          <tr>
-            <td style="color: #475569;">Subtotal:</td>
-            <td style="text-align: right; font-family: monospace; font-weight: bold;">৳${Number(displayedSubtotal).toFixed(2)}</td>
-          </tr>
-          ${printableReceipt.discountDeduction > 0 ? `
-            <tr style="color: #059669;">
-              <td>Discount ${printableReceipt.discountType === 'percent' ? `(${printableReceipt.discountVal}%)` : ''}:</td>
-              <td style="text-align: right; font-family: monospace;">-৳${Number(printableReceipt.discountDeduction).toFixed(2)}</td>
-            </tr>
-          ` : ''}
-          <tr class="net-total-row">
-            <td>Net Total:</td>
-            <td style="text-align: right; font-family: monospace;">৳${Number(printableReceipt.netTotal).toFixed(2)}</td>
-          </tr>
-        </table>
-
-        ${payments.length > 0 ? `
-          <div class="payments">
-            <div style="font-weight: bold; margin-bottom: 2px;">Payment Breakdown:</div>
-            <div>${payments.join(' • ')}</div>
-            ${printableReceipt.changeReturn !== undefined && printableReceipt.changeReturn > 0 ? `
-              <div style="margin-top: 2px; font-weight: bold; color: #059669;">Change Given: ৳${Number(printableReceipt.changeReturn).toFixed(2)}</div>
-            ` : ''}
-          </div>
+        <div class="row">
+          <span>Table      :</span>
+          <span class="bold">${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}</span>
+        </div>
+        <div class="row">
+          <span>Waiter     :</span>
+          <span>${printableReceipt.waiter || 'Staff'}</span>
+        </div>
+        <div class="row">
+          <span>Customer   :</span>
+          <span>${printableReceipt.customer || 'Walk-in Customer'}</span>
+        </div>
+        ${printableReceipt.channelOrAgent ? `
+        <div class="row">
+          <span>Channel    :</span>
+          <span>${printableReceipt.channelOrAgent}</span>
+        </div>
         ` : ''}
-
-        <div class="footer">
-          <p style="margin: 0; font-weight: 600;">${activeTemplate?.footerMessage || `Thank you for dining at ${restaurantName}!`}</p>
-          <p style="margin: 2px 0 0 0; font-size: 8.5px;">${activeTemplate?.footerNotes || 'Powered by Barcode Cafe ERP • All VAT & Taxes Included'}</p>
+        <div class="sep"></div>
+        <div class="row bold" style="font-size: 11.5px;">
+          <span style="width: 44%;">ITEM NAME</span>
+          <span style="width: 14%; text-align: center;">QTY</span>
+          <span style="width: 20%; text-align: right;">PRICE</span>
+          <span style="width: 22%; text-align: right;">TOTAL</span>
         </div>
+        <div class="sep"></div>
+        ${billItemsHtml}
+        <div class="sep"></div>
+        <div class="row">
+          <span>Subtotal:</span>
+          <span class="bold">Tk ${Number(displayedSubtotal).toFixed(2)}</span>
+        </div>
+        ${printableReceipt.discountDeduction > 0 ? `
+        <div class="row">
+          <span>Discount ${printableReceipt.discountType === 'percent' ? `(${printableReceipt.discountVal}%)` : ''}:</span>
+          <span>-Tk ${Number(printableReceipt.discountDeduction).toFixed(2)}</span>
+        </div>
+        ` : ''}
+        <div class="sep"></div>
+        <div class="row bold" style="font-size: 13.5px;">
+          <span>NET TOTAL:</span>
+          <span>Tk ${Number(printableReceipt.netTotal).toFixed(2)}</span>
+        </div>
+        <div class="sep"></div>
+        ${payments.length > 0 ? `
+        <div class="row" style="font-size: 11px;">
+          <span>Payment:</span>
+          <span>${payments.join(' • ')}</span>
+        </div>
+        ` : ''}
+        ${printableReceipt.changeReturn !== undefined && printableReceipt.changeReturn > 0 ? `
+        <div class="row bold" style="font-size: 11px;">
+          <span>Change Given:</span>
+          <span>Tk ${Number(printableReceipt.changeReturn).toFixed(2)}</span>
+        </div>
+        ` : ''}
+        <div class="sep"></div>
+        <div class="center" style="font-size: 10.5px; margin-top: 4px;">Thank you for dining at ${restaurantName}!</div>
+        <div class="center" style="font-size: 9px;">Powered by Barcode Cafe ERP</div>
       </body>
       </html>
     `;
