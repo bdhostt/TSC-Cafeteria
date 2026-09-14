@@ -318,29 +318,40 @@ export const ThermalBillModal: React.FC = () => {
           <meta charset="utf-8">
           <title>${isCancelKot ? 'VOID_KOT' : 'KOT'}_${printableReceipt.invoiceNo}</title>
           <style>
-            @page { size: ${paperWidth === '58mm' ? '58mm' : '80mm'} auto; margin: 3mm; }
-            @media print { body { margin: 0; padding: 0; } }
+            @page {
+              size: ${paperWidth === '58mm' ? '58mm' : '80mm'} auto;
+              margin: 0mm !important;
+            }
+            @media print {
+              body { margin: 0; padding: 1mm 2mm; }
+              .no-print { display: none !important; }
+            }
+            *, *::before, *::after {
+              color: #000000 !important;
+            }
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-              color: #0f172a;
+              font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif;
+              color: #000;
               margin: 0 auto;
               padding: 6px;
-              max-width: ${paperWidth === '58mm' ? '54mm' : '78mm'};
+              max-width: ${paperWidth === '58mm' ? '54mm' : '74mm'};
               background: #fff;
               font-size: 11px;
               line-height: 1.35;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
             .header { text-align: center; border-bottom: 1.5px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
             .station { font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 0 0 2px 0; }
-            .kot-no { font-size: 12px; font-weight: 700; color: #334155; }
+            .kot-no { font-size: 12px; font-weight: 700; color: #000; }
             .badge { display: inline-block; padding: 3px 8px; background: #000; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 900; text-transform: uppercase; margin-top: 4px; }
             .cancel-badge { background: #dc2626; color: #fff; }
-            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; font-size: 11px; }
+            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 4px; font-size: 11px; }
             .info-table td { padding: 1.5px 0; }
             .table-highlight { font-size: 13px; font-weight: 900; color: #000; }
             .items-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-            .items-table th { border-bottom: 1.5px dashed #000; padding: 3px 0; font-size: 10.5px; text-transform: uppercase; }
-            .footer { text-align: center; font-size: 10px; color: #64748b; margin-top: 8px; border-top: 1px dashed #cbd5e1; padding-top: 4px; }
+            .items-table th { border-bottom: 1.5px dashed #000; padding: 3px 0; font-size: 11px; text-transform: uppercase; }
+            .footer { text-align: center; font-size: 10px; color: #000; margin-top: 8px; border-top: 1px dashed #000; padding-top: 4px; font-weight: bold; }
           </style>
         </head>
         <body>
