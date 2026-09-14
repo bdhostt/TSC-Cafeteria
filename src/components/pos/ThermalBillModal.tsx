@@ -188,10 +188,7 @@ export const ThermalBillModal: React.FC = () => {
   const [hardwarePrintStatus, setHardwarePrintStatus] = useState<string | null>(null);
 
   const handlePrint = async () => {
-    setIsPrinting(true);
-    setHardwarePrintStatus('🖨️ Printing receipt...');
-
-    // Try background hardware print if local server is connected
+    // 1. Try background hardware print if local server is connected
     try {
       if (!isKot) {
         fetch('/api/hardware/print-bill', {
@@ -274,10 +271,34 @@ export const ThermalBillModal: React.FC = () => {
     setIsPrinting(false);
     setHardwarePrintStatus(null);
 
-    // Always trigger browser thermal print
-    setTimeout(() => {
+    // 2. Open clean standalone print window that stays open until printed
+    const html = generateReceiptHtml();
+    if (!html) return;
+
+    const printWin = window.open('', '_blank', 'width=420,height=600,left=200,top=100');
+    if (!printWin) {
       window.print();
-    }, 50);
+      return;
+    }
+
+    printWin.document.open();
+    printWin.document.write(html);
+    printWin.document.close();
+    printWin.focus();
+
+    printWin.onafterprint = () => {
+      try {
+        printWin.close();
+      } catch (e) {}
+    };
+
+    setTimeout(() => {
+      try {
+        printWin.print();
+      } catch (e) {
+        window.print();
+      }
+    }, 250);
   };
 
   const generateReceiptHtml = () => {
@@ -382,20 +403,25 @@ export const ThermalBillModal: React.FC = () => {
         <style>
           @page {
             size: ${paperWidth === '58mm' ? '58mm' : '80mm'} auto;
-            margin: 4mm;
+            margin: 0mm !important;
           }
           @media print {
-            body { margin: 0; padding: 0; }
+            body { margin: 0; padding: 2mm 1mm; }
+          }
+          *, *::before, *::after {
+            color: #000 !important;
           }
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            color: #0f172a;
+            font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif;
+            color: #000;
             margin: 0 auto;
-            padding: 10px 8px;
-            max-width: ${paperWidth === '58mm' ? '54mm' : '78mm'};
+            padding: 2mm 1mm;
+            max-width: ${paperWidth === '58mm' ? '54mm' : '74mm'};
             background: #fff;
             font-size: 11px;
-            line-height: 1.35;
+            line-height: 1.3;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .header { text-align: center; border-bottom: 1px dashed #94a3b8; padding-bottom: 8px; margin-bottom: 8px; }
           .res-name { font-size: 15px; font-weight: 900; text-transform: uppercase; margin: 0 0 3px 0; color: #0f172a; letter-spacing: 0.3px; }
