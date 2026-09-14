@@ -1567,6 +1567,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [selectedZReportSession, setSelectedZReportSessionState] = useState<PosSessionRecord | null>(null);
   const [selectedDayEndPreview, setSelectedDayEndPreviewState] = useState<ConsolidatedDayReportData | null>(null);
   const [pendingLogoutAfterShiftClose, setPendingLogoutAfterShiftClose] = useState(false);
+  const [activeSettlingTable, setActiveSettlingTable] = useState<Table | null>(null);
   const [printableReceipt, setPrintableReceipt] = useState<PrintableReceipt | null>(null);
   const printableReceiptRef = useRef<PrintableReceipt | null>(null);
   useEffect(() => {
