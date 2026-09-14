@@ -188,11 +188,12 @@ export const ThermalBillModal: React.FC = () => {
   const [hardwarePrintStatus, setHardwarePrintStatus] = useState<string | null>(null);
 
   const handlePrint = async () => {
-    // If NOT KOT (e.g. guest bill memo or paid cash memo), send to hardware bill printer first
-    if (!isKot) {
-      setIsPrinting(true);
-      setHardwarePrintStatus('🖨️ Sending to bill printer...');
-      try {
+    setIsPrinting(true);
+    setHardwarePrintStatus('🖨️ Printing receipt...');
+
+    // Try background hardware print if local server is connected
+    try {
+      if (!isKot) {
         fetch('/api/hardware/print-bill', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -223,115 +224,153 @@ export const ThermalBillModal: React.FC = () => {
             discountType: printableReceipt.discountType,
             discountVal: printableReceipt.discountVal,
             netTotal: printableReceipt.netTotal,
-            isSettled: printableReceipt.isPaid || false,
+            isSettled: printableReceipt.isSettled || false,
             paymentBreakdown: printableReceipt.paymentBreakdown,
             changeReturn: printableReceipt.changeReturn
           })
-        }).catch(err => console.warn('Hardware bill print failed:', err));
-      } catch (err) {
-        console.warn('Hardware bill print failed:', err);
-      }
-      setIsPrinting(false);
-      setHardwarePrintStatus('✅ Sent to bill printer');
-      setTimeout(() => setHardwarePrintStatus(null), 2500);
-      return;
-    }
-
-    setIsPrinting(true);
-    setHardwarePrintStatus('🖨️ Sending to printer...');
-
-    // Determine slips to print based on selection
-    const slipsToPrint = (selectedDeptFilter === 'ALL')
-      ? [{
-          station: 'Master KOT (All Stations)',
-          items: displayedItems.map(i => ({
-            name: i.name,
-            qty: i.qty,
-            variation: i.selectedVariation?.name,
-            addons: i.selectedAddons?.map(a => a.name),
-            notes: i.notes
-          }))
-        }]
-      : (selectedDeptFilter === 'SPLIT_ALL')
-        ? orderDepartments.map(dept => {
-            const deptItems = enrichedItems.filter(i => i.department === dept);
-            const deptPrinter = getPrinterForDept(dept);
-            return {
-              station: dept,
-              targetPrinterName: deptPrinter?.name,
-              items: deptItems.map(i => ({
+        }).catch(() => {});
+      } else {
+        const slipsToPrint = (selectedDeptFilter === 'ALL')
+          ? [{
+              station: 'Master KOT (All Stations)',
+              items: displayedItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
                 variation: i.selectedVariation?.name,
                 addons: i.selectedAddons?.map(a => a.name),
                 notes: i.notes
               }))
-            };
-          }).filter(s => s.items.length > 0)
-        : [{
-            station: selectedDeptFilter,
-            targetPrinterName: getPrinterForDept(selectedDeptFilter)?.name,
-            items: displayedItems.map(i => ({
-              name: i.name,
-              qty: i.qty,
-              variation: i.selectedVariation?.name,
-              addons: i.selectedAddons?.map(a => a.name),
-              notes: i.notes
-            }))
-          }];
+            }]
+          : [{
+              station: selectedDeptFilter,
+              targetPrinterName: getPrinterForDept(selectedDeptFilter)?.name,
+              items: displayedItems.map(i => ({
+                name: i.name,
+                qty: i.qty,
+                variation: i.selectedVariation?.name,
+                addons: i.selectedAddons?.map(a => a.name),
+                notes: i.notes
+              }))
+            }];
 
-    try {
-      fetch('/api/hardware/print-kot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tableName: printableReceipt.tableName,
-          tableZone: printableReceipt.tableZone,
-          waiter: printableReceipt.waiter,
-          customer: printableReceipt.customer,
-          invoiceNo: printableReceipt.invoiceNo,
-          dateTime: printableReceipt.dateTime,
-          slips: slipsToPrint
-        })
-      }).catch(err => console.warn("Hardware direct print failed:", err));
+        fetch('/api/hardware/print-kot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tableName: printableReceipt.tableName,
+            tableZone: printableReceipt.tableZone,
+            waiter: printableReceipt.waiter,
+            customer: printableReceipt.customer,
+            invoiceNo: printableReceipt.invoiceNo,
+            dateTime: printableReceipt.dateTime,
+            slips: slipsToPrint
+          })
+        }).catch(() => {});
+      }
     } catch (err) {
-      console.warn("Hardware direct print failed:", err);
+      console.warn('Hardware print dispatch warning:', err);
     }
 
+    // Always trigger formatted browser thermal print
+    handleExportPdf();
+
     setIsPrinting(false);
-    setHardwarePrintStatus('✅ Sent to KOT printer');
+    setHardwarePrintStatus('✅ Sent to printer');
     setTimeout(() => setHardwarePrintStatus(null), 2500);
   };
 
   const generateReceiptHtml = () => {
     if (!printableReceipt) return '';
-    const itemsHtml = displayedItems.map(item => `
-      <tr style="border-bottom: 1px dashed #e2e8f0; font-size: 11px;">
-        <td style="padding: 5px 0; text-align: left; vertical-align: top;">
-          <div style="font-weight: 600; color: #0f172a;">${item.name}</div>
-          ${item.selectedVariation?.name ? `<div style="font-size: 9.5px; color: #2563eb;">${item.selectedVariation.name}</div>` : ''}
-          ${item.selectedAddons && item.selectedAddons.length > 0 ? `<div style="font-size: 9px; color: #64748b;">+${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
-          ${item.notes ? `<div style="font-size: 9px; color: #b45309; font-style: italic;">📝 ${item.notes}</div>` : ''}
-        </td>
-        <td style="padding: 5px 4px; text-align: center; vertical-align: top; font-weight: bold; color: #1e293b;">${item.qty}</td>
-        <td style="padding: 5px 4px; text-align: right; vertical-align: top; font-family: monospace; color: #334155;">৳${Number(item.price).toFixed(2)}</td>
-        <td style="padding: 5px 0; text-align: right; vertical-align: top; font-family: monospace; font-weight: bold; color: #0f172a;">৳${Number(item.price * item.qty).toFixed(2)}</td>
-      </tr>
-    `).join('');
 
-    const payments = printableReceipt.paymentBreakdown ? [
-      printableReceipt.paymentBreakdown.cash ? `Cash: ৳${Number(printableReceipt.paymentBreakdown.cash).toFixed(2)}` : '',
-      printableReceipt.paymentBreakdown.card ? `Card: ৳${Number(printableReceipt.paymentBreakdown.card).toFixed(2)}` : '',
-      printableReceipt.paymentBreakdown.bkash ? `bKash: ৳${Number(printableReceipt.paymentBreakdown.bkash).toFixed(2)}` : '',
-      printableReceipt.paymentBreakdown.nagad ? `Nagad: ৳${Number(printableReceipt.paymentBreakdown.nagad).toFixed(2)}` : '',
-      printableReceipt.paymentBreakdown.due ? `Due: ৳${Number(printableReceipt.paymentBreakdown.due).toFixed(2)}` : ''
-    ].filter(Boolean) : [];
+    if (isKot) {
+      const kotItemsHtml = displayedItems.map(item => `
+        <tr style="border-bottom: 1px dashed #cbd5e1; font-size: 11.5px;">
+          <td style="padding: 6px 0; text-align: left; vertical-align: top;">
+            <div style="font-weight: bold; font-size: 13px; color: ${isCancelKot ? '#b91c1c; text-decoration: line-through;' : '#0f172a;'}">${item.name}</div>
+            ${item.selectedVariation?.name ? `<div style="font-size: 10px; color: #1d4ed8; font-weight: 600;">• Cut: ${item.selectedVariation.name}</div>` : ''}
+            ${item.selectedAddons && item.selectedAddons.length > 0 ? `<div style="font-size: 9.5px; color: #92400e;">+ Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
+            ${item.notes ? `<div style="font-size: 9.5px; color: #dc2626; font-style: italic; font-weight: 600;">📝 Note: ${item.notes}</div>` : ''}
+          </td>
+          <td style="padding: 6px 0; text-align: right; vertical-align: top; font-weight: 900; font-size: 14px; color: #0f172a;">${item.qty}x</td>
+        </tr>
+      `).join('');
 
-    const titleText = isCancelKot 
-      ? 'VOID KOT' 
-      : isKot 
-        ? 'KITCHEN ORDER TICKET' 
-        : (printableReceipt.isSettled ? 'INVOICE / CASH MEMO' : 'TABLE RUNNING BILL');
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${isCancelKot ? 'VOID_KOT' : 'KOT'}_${printableReceipt.invoiceNo}</title>
+          <style>
+            @page { size: ${paperWidth === '58mm' ? '58mm' : '80mm'} auto; margin: 3mm; }
+            @media print { body { margin: 0; padding: 0; } }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              color: #0f172a;
+              margin: 0 auto;
+              padding: 6px;
+              max-width: ${paperWidth === '58mm' ? '54mm' : '78mm'};
+              background: #fff;
+              font-size: 11px;
+              line-height: 1.35;
+            }
+            .header { text-align: center; border-bottom: 1.5px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
+            .station { font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 0 0 2px 0; }
+            .kot-no { font-size: 12px; font-weight: 700; color: #334155; }
+            .badge { display: inline-block; padding: 3px 8px; background: #000; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 900; text-transform: uppercase; margin-top: 4px; }
+            .cancel-badge { background: #dc2626; color: #fff; }
+            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; font-size: 11px; }
+            .info-table td { padding: 1.5px 0; }
+            .table-highlight { font-size: 13px; font-weight: 900; color: #000; }
+            .items-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+            .items-table th { border-bottom: 1.5px dashed #000; padding: 3px 0; font-size: 10.5px; text-transform: uppercase; }
+            .footer { text-align: center; font-size: 10px; color: #64748b; margin-top: 8px; border-top: 1px dashed #cbd5e1; padding-top: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="station">STATION: ${selectedDeptFilter === 'ALL' ? 'MAIN KITCHEN' : selectedDeptFilter.toUpperCase()}</div>
+            <div class="kot-no">${isCancelKot ? 'VOID KOT #' : 'KOT #'} ${printableReceipt.invoiceNo}</div>
+            ${isCancelKot ? '<div class="badge cancel-badge">⚠️ CANCELLED / VOID ORDER</div>' : '<div class="badge">KITCHEN ORDER TICKET</div>'}
+          </div>
+          <table class="info-table">
+            <tr>
+              <td style="font-weight: 600;">TABLE:</td>
+              <td class="table-highlight" style="text-align: right;">${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}</td>
+            </tr>
+            <tr>
+              <td style="color: #64748b;">TIME:</td>
+              <td style="text-align: right; font-weight: 600;">${printableReceipt.dateTime || receiptTimeStr || receiptDateStr}</td>
+            </tr>
+            <tr>
+              <td style="color: #64748b;">WAITER:</td>
+              <td style="text-align: right; font-weight: 600;">${printableReceipt.waiter || 'Staff'}</td>
+            </tr>
+            ${printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer' ? `
+            <tr>
+              <td style="color: #64748b;">CUSTOMER:</td>
+              <td style="text-align: right; font-weight: 600;">${printableReceipt.customer}</td>
+            </tr>
+            ` : ''}
+          </table>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="text-align: left;">FOOD ITEM</th>
+                <th style="text-align: right;">QTY</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${kotItemsHtml}
+            </tbody>
+          </table>
+          <div class="footer">
+            *** END OF KOT SLIP ***
+          </div>
+        </body>
+        </html>
+      `;
+    }
 
     return `
       <!DOCTYPE html>

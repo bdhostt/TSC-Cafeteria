@@ -2958,7 +2958,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const directSubmitKotAndHold = async (tableId: string) => {
-    openPrintKot(tableId, false);
+    openPrintKot(tableId, true);
     setPosView('floor');
   };
 
@@ -3280,7 +3280,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const directPrintBill = async (tableId: string) => {
-    openPrintBill(tableId, false);
+    openPrintBill(tableId, true);
   };
 
   const closePrintReceipt = () => {
@@ -3461,6 +3461,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       })
     }).catch(err => console.warn('Direct paid memo hardware print error:', err));
 
+    setPrintableReceipt(memoReceipt);
     closeSettleModal();
     setPosView('floor');
   };
