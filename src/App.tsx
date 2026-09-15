@@ -169,7 +169,7 @@ const MainLayout: React.FC = () => {
       </div>
 
       {/* Main Container - Always 100% viewport height and overflow-hidden so Header & Footer are firmly fixed */}
-      <div className="flex-1 h-screen max-h-screen flex flex-col min-w-0 w-full overflow-hidden transition-all duration-300 ease-in-out">
+      <div className="flex-1 h-screen h-[100dvh] max-h-[100dvh] flex flex-col min-w-0 w-full overflow-hidden transition-all duration-300 ease-in-out">
         {/* Top Header - Always docked at top */}
         <Header onOpenMobileSidebar={() => setIsSidebarOpen(prev => !prev)} />
 
@@ -185,9 +185,9 @@ const MainLayout: React.FC = () => {
               : 'overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
           } transition-all duration-300 ease-in-out`}
         >
-          <div className={`w-full max-w-[1920px] mx-auto px-3 sm:px-5 lg:px-6 ${
+          <div className={`w-full max-w-[1920px] mx-auto px-2 sm:px-5 lg:px-6 ${
             activeTab === 'pos' 
-              ? 'pt-1.5 pb-2.5 flex flex-col h-full' 
+              ? 'pt-1 pb-1 sm:pt-1.5 sm:pb-2.5 flex flex-col flex-1 min-h-0 h-full' 
               : 'py-3 sm:py-5 lg:py-6'
           }`}>
             {!hasAccess ? (

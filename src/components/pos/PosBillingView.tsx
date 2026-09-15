@@ -883,7 +883,7 @@ export const PosBillingView: React.FC = () => {
       </div>
 
       {/* Left Column: Food Menu catalog, categories, search (takes all remaining space) */}
-      <div className={`${mobilePosTab === 'menu' ? 'flex' : 'hidden'} lg:flex flex-1 min-w-0 flex-col h-full overflow-hidden space-y-1.5`}>
+      <div className={`${mobilePosTab === 'menu' ? 'flex' : 'hidden'} lg:flex flex-1 min-w-0 min-h-0 flex-col h-full overflow-hidden space-y-1.5`}>
         {/* Category Tabs & Search Bar (Clean full width for menu navigation) */}
         <div className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-slate-200/90 shadow-none flex items-center gap-2 shrink-0">
           <div className="w-36 sm:w-44 relative shrink-0">
@@ -1010,10 +1010,10 @@ export const PosBillingView: React.FC = () => {
       </div>
 
       {/* Right Column: Dedicated POS Cart (Exact compact fixed width like on lg, never bloated on 2xl/3xl/4xl) */}
-      <div className={`${mobilePosTab === 'cart' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[380px] xl:w-[410px] 2xl:w-[430px] shrink-0 flex-col h-full overflow-hidden`}>
-        <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-3.5 shadow-sm flex flex-col h-full overflow-hidden">
+      <div className={`${mobilePosTab === 'cart' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[380px] xl:w-[410px] 2xl:w-[430px] flex-1 min-h-0 lg:flex-initial lg:h-full lg:shrink-0 flex-col overflow-hidden`}>
+        <div className="bg-white border border-slate-200 rounded-2xl p-2.5 sm:p-3.5 shadow-sm flex flex-col h-full min-h-0 overflow-hidden">
           {/* Cart Header with Table Name & Zone */}
-          <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+          <div className="pb-2.5 sm:pb-3 border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               {/* Mobile Back to Menu button */}
               <button
@@ -1393,7 +1393,7 @@ export const PosBillingView: React.FC = () => {
                 id="btn-cancel-pos-order"
                 type="button"
                 onClick={() => setPosView('floor')}
-                className={`py-2.5 px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
+                className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] sm:text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
                 title="Cancel and return to Floor Plan"
               >
                 <X className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -1409,11 +1409,11 @@ export const PosBillingView: React.FC = () => {
                 onClick={() => {
                   directSubmitKotAndHold(activeTable.id);
                 }}
-                className="py-2.5 px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer w-full"
+                className="py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] sm:text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer w-full"
                 title="Submit Order: Sends KOT to Kitchen & Holds Order on Table"
               >
                 <ChefHat className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Submit (KOT & Hold)</span>
+                <span className="truncate">Submit (KOT)</span>
               </button>
             );
 
@@ -1429,7 +1429,7 @@ export const PosBillingView: React.FC = () => {
                   setBillPrintedSuccess(true);
                   setTimeout(() => setBillPrintedSuccess(false), 2000);
                 }}
-                className={`py-2.5 px-1.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1 shadow-sm disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''} ${
+                className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl text-[11px] sm:text-xs font-extrabold transition flex items-center justify-center gap-1 shadow-sm disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''} ${
                   billPrintedSuccess
                     ? 'bg-emerald-700 text-white'
                     : 'bg-black hover:bg-slate-900 text-white'
@@ -1461,7 +1461,7 @@ export const PosBillingView: React.FC = () => {
                 type="button"
                 disabled={activeTable.cart.length === 0}
                 onClick={() => openSettleModal(activeTable.id)}
-                className={`py-2.5 px-1.5 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''}`}
+                className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-[11px] sm:text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''}`}
                 title="Settle Payment & Pay"
               >
                 <CreditCard className="w-3.5 h-3.5 shrink-0" />
@@ -1474,7 +1474,7 @@ export const PosBillingView: React.FC = () => {
             // State 1: Cart is empty -> Only Cancel button view hobe
             if (isCartEmpty) {
               return (
-                <div className="pt-2 shrink-0">
+                <div className="pt-1.5 sm:pt-2 shrink-0">
                   {cancelBtn(true)}
                 </div>
               );
@@ -1483,8 +1483,8 @@ export const PosBillingView: React.FC = () => {
             // State 2 (Picture 1): Cart has unprinted items -> Cancel & Submit (KOT & Hold) + Settle & Pay
             if (hasUnprintedKotItems) {
               return (
-                <div className="pt-2 shrink-0">
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="pt-1.5 sm:pt-2 shrink-0">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     {cancelBtn(false)}
                     {submitKotBtn}
                     {settlePayBtn(false)}
@@ -1496,8 +1496,8 @@ export const PosBillingView: React.FC = () => {
             // State 3 (Picture 4 when bill ALREADY printed in 3 or 4): Hide Print Bill -> Only Cancel & Settle & Pay
             if (isBillAlreadyPrinted) {
               return (
-                <div className="pt-2 shrink-0">
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="pt-1.5 sm:pt-2 shrink-0">
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     {cancelBtn(false)}
                     {settlePayBtn(false)}
                   </div>
@@ -1507,8 +1507,8 @@ export const PosBillingView: React.FC = () => {
 
             // State 4 (When bill NOT yet printed): Show Cancel, Print Bill, Settle & Pay
             return (
-              <div className="pt-2 shrink-0">
-                <div className="grid grid-cols-3 gap-2">
+              <div className="pt-1.5 sm:pt-2 shrink-0">
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                   {cancelBtn(false)}
                   {printBillBtn(false)}
                   {settlePayBtn(false)}
