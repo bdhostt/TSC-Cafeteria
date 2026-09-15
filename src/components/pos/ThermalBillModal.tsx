@@ -188,64 +188,60 @@ export const ThermalBillModal: React.FC = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [hardwarePrintStatus, setHardwarePrintStatus] = useState<string | null>(null);
 
-  const printViaIframe = (html: string) => {
-    let iframe = document.getElementById('thermal-print-frame') as HTMLIFrameElement;
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'thermal-print-frame';
-      iframe.style.position = 'fixed';
-      iframe.style.top = '-9999px';
-      iframe.style.left = '-9999px';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
-      iframe.style.border = 'none';
-      iframe.style.visibility = 'hidden';
-      document.body.appendChild(iframe);
-    }
-
-    try {
-      const doc = iframe.contentWindow?.document || iframe.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(html);
-        doc.close();
-        setTimeout(() => {
-          if (iframe.contentWindow) {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-          } else {
-            window.print();
-          }
-        }, 250);
-      } else {
-        window.print();
-      }
-    } catch (err) {
-      console.warn('Print iframe error, fallback to window.print:', err);
-      window.print();
-    }
-  };
 
   const handlePrint = async () => {
     setIsPrinting(true);
     setHardwarePrintStatus(null);
 
-    // 1. Customer Bill / Cash Memo: Direct browser print for 100% pixel-perfect Windows GDI thermal output (Image 2)
+    // 1. Customer Bill / Cash Memo: Dispatch directly to Kot Printer via hardware bridge (No browser PDF dialog)
     if (!isKot) {
-      const html = generateReceiptHtml();
-      if (html) {
-        printViaIframe(html);
+      try {
+        const billPayload = {
+          restaurantName: printableReceipt.restaurantName,
+          restaurantAddress: printableReceipt.restaurantAddress,
+          restaurantHotline: printableReceipt.restaurantHotline,
+          restaurantBin: printableReceipt.restaurantBin,
+          invoiceNo: printableReceipt.invoiceNo,
+          dateTime: printableReceipt.dateTime,
+          tableName: printableReceipt.tableName,
+          tableZone: printableReceipt.tableZone,
+          channelOrAgent: printableReceipt.channelOrAgent,
+          waiter: printableReceipt.waiter,
+          orderTakenBy: printableReceipt.orderTakenBy,
+          settleBillRole: printableReceipt.settleBillRole,
+          customer: printableReceipt.customer,
+          items: displayedItems.map(i => ({
+            name: i.name,
+            qty: i.qty,
+            price: i.price,
+            variation: i.selectedVariation?.name,
+            addons: i.selectedAddons?.map(a => a.name),
+            notes: i.notes
+          })),
+          subtotal: printableReceipt.subtotal,
+          discountDeduction: printableReceipt.discountDeduction,
+          discountType: printableReceipt.discountType,
+          discountVal: printableReceipt.discountVal,
+          netTotal: printableReceipt.netTotal,
+          paymentBreakdown: (printableReceipt as any).paymentBreakdown,
+          changeReturn: (printableReceipt as any).changeReturn,
+          isSettled: printableReceipt.isSettled
+        };
+
+        await dispatchHardwarePrint('/api/hardware/print-bill', billPayload);
+      } catch (err) {
+        console.warn('Hardware bill print error:', err);
       }
+
       setIsPrinting(false);
-      setHardwarePrintStatus('✅ Printing Bill on Thermal Printer...');
+      setHardwarePrintStatus('✅ Bill sent to Kot Printer!');
       setTimeout(() => {
         closePrintReceipt();
-      }, 1000);
+      }, 600);
       return;
     }
 
     // 2. KOT Ticket: Hardware kitchen station print
-    let hardwareDispatched = false;
     try {
       const slipsToPrint = (selectedDeptFilter === 'ALL')
         ? [{
@@ -308,26 +304,16 @@ export const ThermalBillModal: React.FC = () => {
         slips: slipsToPrint
       };
 
-      hardwareDispatched = await dispatchHardwarePrint('/api/hardware/print-kot', kotPayload);
+      await dispatchHardwarePrint('/api/hardware/print-kot', kotPayload);
     } catch (e) {
       console.warn('Hardware KOT print failed:', e);
     }
 
     setIsPrinting(false);
-
-    if (hardwareDispatched) {
-      setHardwarePrintStatus('✅ KOT sent to Kitchen Thermal Printer!');
-      setTimeout(() => {
-        closePrintReceipt();
-      }, 1000);
-      return;
-    }
-
-    // Fallback to browser iframe print if hardware bridge offline
-    const html = generateReceiptHtml();
-    if (html) {
-      printViaIframe(html);
-    }
+    setHardwarePrintStatus('✅ KOT sent to Kitchen Thermal Printer!');
+    setTimeout(() => {
+      closePrintReceipt();
+    }, 600);
   };
 
   const generateReceiptHtml = () => {

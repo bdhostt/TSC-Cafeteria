@@ -2897,72 +2897,71 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         receiptType: 'KOT',
         isDirectPrint: false
       });
-    }
-
-    // Also send directly to hardware printer in background
-    const menuCatalog = Array.isArray(data?.menuItems) ? data.menuItems : [];
-    const enriched = table.cart.map(item => {
-      const itemName = item.name ? String(item.name).trim() : '';
-      const itemId = item.id != null ? String(item.id) : null;
-      const menuObj = menuCatalog.find(m => {
-        if (!m) return false;
-        if (itemId && m.id != null && String(m.id) === itemId) return true;
-        if (itemName && m.name && String(m.name).trim().toLowerCase() === itemName.toLowerCase()) return true;
-        return false;
+    } else {
+      // Direct submit / print: dispatch directly to hardware printer in background
+      const menuCatalog = Array.isArray(data?.menuItems) ? data.menuItems : [];
+      const enriched = table.cart.map(item => {
+        const itemName = item.name ? String(item.name).trim() : '';
+        const itemId = item.id != null ? String(item.id) : null;
+        const menuObj = menuCatalog.find(m => {
+          if (!m) return false;
+          if (itemId && m.id != null && String(m.id) === itemId) return true;
+          if (itemName && m.name && String(m.name).trim().toLowerCase() === itemName.toLowerCase()) return true;
+          return false;
+        });
+        return {
+          ...item,
+          department: item.department || menuObj?.department || 'Main Kitchen'
+        };
       });
-      return {
-        ...item,
-        department: item.department || menuObj?.department || 'Main Kitchen'
+
+      const orderDepartments = Array.from(new Set(enriched.map(i => i.department).filter(Boolean)));
+      const printers = data?.printers || [];
+      const getPrinterForDept = (dept: string) => {
+        const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
+        return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
       };
-    });
 
-    const orderDepartments = Array.from(new Set(enriched.map(i => i.department).filter(Boolean)));
-    const printers = data?.printers || [];
-    const getPrinterForDept = (dept: string) => {
-      const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
-      return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
-    };
-
-    const slipsToPrint = (orderDepartments.length > 1)
-      ? orderDepartments.map(dept => {
-          const deptItems = enriched.filter(i => i.department === dept);
-          const deptPrinter = getPrinterForDept(dept);
-          return {
-            station: dept,
-            targetPrinterName: deptPrinter?.name,
-            items: deptItems.map(i => ({
+      const slipsToPrint = (orderDepartments.length > 1)
+        ? orderDepartments.map(dept => {
+            const deptItems = enriched.filter(i => i.department === dept);
+            const deptPrinter = getPrinterForDept(dept);
+            return {
+              station: dept,
+              targetPrinterName: deptPrinter?.name,
+              items: deptItems.map(i => ({
+                name: i.name,
+                qty: i.qty,
+                variation: i.selectedVariation?.name,
+                addons: i.selectedAddons?.map(a => a.name),
+                notes: i.notes
+              }))
+            };
+          }).filter(s => s.items.length > 0)
+        : [{
+            station: orderDepartments[0] || 'Main Kitchen',
+            targetPrinterName: getPrinterForDept(orderDepartments[0] || 'Main Kitchen')?.name,
+            items: enriched.map(i => ({
               name: i.name,
               qty: i.qty,
               variation: i.selectedVariation?.name,
               addons: i.selectedAddons?.map(a => a.name),
               notes: i.notes
             }))
-          };
-        }).filter(s => s.items.length > 0)
-      : [{
-          station: orderDepartments[0] || 'Main Kitchen',
-          targetPrinterName: getPrinterForDept(orderDepartments[0] || 'Main Kitchen')?.name,
-          items: enriched.map(i => ({
-            name: i.name,
-            qty: i.qty,
-            variation: i.selectedVariation?.name,
-            addons: i.selectedAddons?.map(a => a.name),
-            notes: i.notes
-          }))
-        }];
+          }];
 
-    const kotHardwarePayload = {
-      tableName: table.name,
-      tableZone: table.zone || 'Floor 1',
-      waiter: table.waiter || 'Staff',
-      customer: table.customer || 'Walk-in Customer',
-      invoiceNo,
-      dateTime,
-      slips: slipsToPrint
-    };
+      const kotHardwarePayload = {
+        tableName: table.name,
+        tableZone: table.zone || 'Floor 1',
+        waiter: table.waiter || 'Staff',
+        customer: table.customer || 'Walk-in Customer',
+        invoiceNo,
+        dateTime,
+        slips: slipsToPrint
+      };
 
-    // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
-    dispatchHardwarePrint('/api/hardware/print-kot', kotHardwarePayload);
+      dispatchHardwarePrint('/api/hardware/print-kot', kotHardwarePayload);
+    }
   };
 
   const directSubmitKotAndHold = async (tableId: string) => {
@@ -3262,26 +3261,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     if (showModal) {
       setPrintableReceipt(billPayload);
+    } else {
+      const billHardwarePayload = {
+        ...billPayload,
+        items: table.cart.map(i => ({
+          name: i.name,
+          qty: i.qty,
+          price: i.price,
+          variation: i.selectedVariation?.name,
+          addons: i.selectedAddons?.map(a => a.name),
+          notes: i.notes
+        }))
+      };
+
+      // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
+      dispatchHardwarePrint('/api/hardware/print-bill', billHardwarePayload);
     }
-
-    const billHardwarePayload = {
-      ...billPayload,
-      items: table.cart.map(i => ({
-        name: i.name,
-        qty: i.qty,
-        price: i.price,
-        variation: i.selectedVariation?.name,
-        addons: i.selectedAddons?.map(a => a.name),
-        notes: i.notes
-      }))
-    };
-
-    // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
-    dispatchHardwarePrint('/api/hardware/print-bill', billHardwarePayload);
   };
 
   const directPrintBill = async (tableId: string) => {
-    openPrintBill(tableId, true);
+    openPrintBill(tableId, false);
   };
 
   const closePrintReceipt = () => {
@@ -3460,7 +3459,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
     dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
 
-    setPrintableReceipt(memoReceipt);
     closeSettleModal();
     setPosView('floor');
   };
