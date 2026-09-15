@@ -1044,9 +1044,6 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No bill data provided" });
       }
 
-      // Enqueue for cloud print agent
-      enqueueCloudPrintJob('BILL', billData);
-
       const isWindows = process.platform === 'win32';
       const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
@@ -1063,6 +1060,9 @@ async function startServer() {
           isLocalServer: true
         });
       }
+
+      // Enqueue for cloud print agent on Linux/Cloud deployments
+      enqueueCloudPrintJob('BILL', billData);
 
       console.log(`☁️ [Cloud Bill Queue] Enqueued bill for ${billData.tableName}. Agent online: ${isAgentOnline}`);
       res.json({
@@ -1087,8 +1087,6 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No session report data provided" });
       }
 
-      enqueueCloudPrintJob('ZREPORT', reportData);
-
       const isWindows = process.platform === 'win32';
       const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
@@ -1105,6 +1103,8 @@ async function startServer() {
           isLocalServer: true
         });
       }
+
+      enqueueCloudPrintJob('ZREPORT', reportData);
 
       res.json({
         success: isAgentOnline,
@@ -1125,8 +1125,6 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No waiter slip data provided" });
       }
 
-      enqueueCloudPrintJob('WAITER_SLIP', slipData);
-
       const isWindows = process.platform === 'win32';
       const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
@@ -1143,6 +1141,8 @@ async function startServer() {
           isLocalServer: true
         });
       }
+
+      enqueueCloudPrintJob('WAITER_SLIP', slipData);
 
       res.json({
         success: isAgentOnline,
@@ -1163,8 +1163,6 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No day-end report data provided" });
       }
 
-      enqueueCloudPrintJob('DAYEND', dayData);
-
       const isWindows = process.platform === 'win32';
       const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
@@ -1181,6 +1179,8 @@ async function startServer() {
           isLocalServer: true
         });
       }
+
+      enqueueCloudPrintJob('DAYEND', dayData);
 
       res.json({
         success: isAgentOnline,
@@ -1201,8 +1201,6 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No chef shift data provided" });
       }
 
-      enqueueCloudPrintJob('CHEF_SLIP', shiftData);
-
       const isWindows = process.platform === 'win32';
       const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
@@ -1219,6 +1217,8 @@ async function startServer() {
           isLocalServer: true
         });
       }
+
+      enqueueCloudPrintJob('CHEF_SLIP', shiftData);
 
       res.json({
         success: isAgentOnline,
@@ -1238,9 +1238,6 @@ async function startServer() {
       if (!slips || !Array.isArray(slips) || slips.length === 0) {
         return res.status(400).json({ success: false, error: "No slips provided to print" });
       }
-
-      // Enqueue for cloud print agent
-      enqueueCloudPrintJob('KOT', req.body);
 
       const isWindows = process.platform === 'win32';
       const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
@@ -1283,6 +1280,9 @@ async function startServer() {
           isLocalServer: true
         });
       }
+
+      // Enqueue for cloud print agent on Linux/Cloud deployments
+      enqueueCloudPrintJob('KOT', req.body);
 
       console.log(`☁️ [Cloud KOT Queue] Enqueued ${slips.length} KOT slips for table ${tableName}. Agent online: ${isAgentOnline}`);
       res.json({

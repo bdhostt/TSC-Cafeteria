@@ -643,8 +643,40 @@ function buildDayEndEscPosBuffer(data) {
   return Buffer.concat(chunks);
 }
 
+const recentJobsCache = new Map();
+
+function isDuplicateJob(job) {
+  if (!job) return false;
+  const now = Date.now();
+  for (const [key, timestamp] of recentJobsCache.entries()) {
+    if (now - timestamp > 30000) recentJobsCache.delete(key);
+  }
+
+  let key = job.id;
+  if (job.payload) {
+    const p = job.payload;
+    const inv = p.invoiceNo || p.id || '';
+    const tbl = p.tableName || '';
+    const tot = p.netTotal || (p.slips ? p.slips.length : '');
+    key = (job.type || '') + '_' + inv + '_' + tbl + '_' + tot;
+  }
+
+  if (recentJobsCache.has(key)) {
+    const diff = now - recentJobsCache.get(key);
+    if (diff < 15000) {
+      console.log('⚠️ [Deduplication] Blocked duplicate print job (' + key + ') received within ' + diff + 'ms.');
+      return true;
+    }
+  }
+
+  recentJobsCache.set(key, now);
+  return false;
+}
+
 async function processPrintJob(job) {
   if (!job || !job.type) return false;
+  if (isDuplicateJob(job)) return true;
+
   const installedPrinters = await getWindowsPrinters();
   const defaultKotPrinter = resolveThermalPrinter(installedPrinters);
 
