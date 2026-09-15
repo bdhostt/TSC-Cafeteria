@@ -21,6 +21,7 @@ import {
   Download
 } from 'lucide-react';
 import { PrinterConfig, PrintTemplate, ThermalPaperWidth } from '../../types';
+import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
 
 export const ThermalBillModal: React.FC = () => {
   const { printableReceipt, closePrintReceipt, data } = useRestaurant();
@@ -187,94 +188,7 @@ export const ThermalBillModal: React.FC = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [hardwarePrintStatus, setHardwarePrintStatus] = useState<string | null>(null);
 
-  const handlePrint = async () => {
-    // 1. Try background hardware print if local server is connected
-    try {
-      if (!isKot) {
-        fetch('/api/hardware/print-bill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            restaurantName: printableReceipt.restaurantName || restaurantName,
-            restaurantAddress: printableReceipt.restaurantAddress || restaurantAddress,
-            restaurantHotline: printableReceipt.restaurantHotline || restaurantHotline,
-            restaurantBin: printableReceipt.restaurantBin || restaurantBin,
-            invoiceNo: printableReceipt.invoiceNo,
-            dateTime: printableReceipt.dateTime,
-            tableName: printableReceipt.tableName,
-            tableZone: printableReceipt.tableZone,
-            channelOrAgent: printableReceipt.channelOrAgent,
-            waiter: printableReceipt.waiter,
-            orderTakenBy: printableReceipt.orderTakenBy,
-            settleBillRole: printableReceipt.settleBillRole,
-            customer: printableReceipt.customer,
-            items: displayedItems.map(i => ({
-              name: i.name,
-              qty: i.qty,
-              price: i.price,
-              variation: i.selectedVariation?.name,
-              addons: i.selectedAddons?.map(a => a.name),
-              notes: i.notes
-            })),
-            subtotal: displayedSubtotal,
-            discountDeduction: printableReceipt.discountDeduction,
-            discountType: printableReceipt.discountType,
-            discountVal: printableReceipt.discountVal,
-            netTotal: printableReceipt.netTotal,
-            isSettled: printableReceipt.isSettled || false,
-            paymentBreakdown: printableReceipt.paymentBreakdown,
-            changeReturn: printableReceipt.changeReturn
-          })
-        }).catch(() => {});
-      } else {
-        const slipsToPrint = (selectedDeptFilter === 'ALL')
-          ? [{
-              station: 'Master KOT (All Stations)',
-              items: displayedItems.map(i => ({
-                name: i.name,
-                qty: i.qty,
-                variation: i.selectedVariation?.name,
-                addons: i.selectedAddons?.map(a => a.name),
-                notes: i.notes
-              }))
-            }]
-          : [{
-              station: selectedDeptFilter,
-              targetPrinterName: getPrinterForDept(selectedDeptFilter)?.name,
-              items: displayedItems.map(i => ({
-                name: i.name,
-                qty: i.qty,
-                variation: i.selectedVariation?.name,
-                addons: i.selectedAddons?.map(a => a.name),
-                notes: i.notes
-              }))
-            }];
-
-        fetch('/api/hardware/print-kot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tableName: printableReceipt.tableName,
-            tableZone: printableReceipt.tableZone,
-            waiter: printableReceipt.waiter,
-            customer: printableReceipt.customer,
-            invoiceNo: printableReceipt.invoiceNo,
-            dateTime: printableReceipt.dateTime,
-            slips: slipsToPrint
-          })
-        }).catch(() => {});
-      }
-    } catch (e) {
-      console.warn('Hardware print dispatch warning:', e);
-    }
-
-    setIsPrinting(false);
-    setHardwarePrintStatus(null);
-
-    // 2. Direct clean Iframe Print (Stays open indefinitely on screen, never closes prematurely)
-    const html = generateReceiptHtml();
-    if (!html) return;
-
+  const printViaIframe = (html: string) => {
     let iframe = document.getElementById('thermal-print-frame') as HTMLIFrameElement;
     if (!iframe) {
       iframe = document.createElement('iframe');
@@ -312,253 +226,414 @@ export const ThermalBillModal: React.FC = () => {
     }
   };
 
+  const handlePrint = async () => {
+    setIsPrinting(true);
+    setHardwarePrintStatus(null);
+
+    // 1. Customer Bill / Cash Memo: Direct browser print for 100% pixel-perfect Windows GDI thermal output (Image 2)
+    if (!isKot) {
+      const html = generateReceiptHtml();
+      if (html) {
+        printViaIframe(html);
+      }
+      setIsPrinting(false);
+      setHardwarePrintStatus('✅ Printing Bill on Thermal Printer...');
+      setTimeout(() => {
+        closePrintReceipt();
+      }, 1000);
+      return;
+    }
+
+    // 2. KOT Ticket: Hardware kitchen station print
+    let hardwareDispatched = false;
+    try {
+      const slipsToPrint = (selectedDeptFilter === 'ALL')
+        ? [{
+            station: 'Master KOT (All Stations)',
+            items: displayedItems.map(i => ({
+              name: i.name,
+              qty: i.qty,
+              variation: i.selectedVariation?.name,
+              addons: i.selectedAddons?.map(a => a.name),
+              notes: i.notes
+            }))
+          }]
+        : (selectedDeptFilter === 'SPLIT_ALL')
+          ? (orderDepartments.length > 0 
+              ? orderDepartments.map(dept => {
+                  const deptItems = enrichedItems.filter(i => i.department === dept);
+                  const deptPrinter = getPrinterForDept(dept);
+                  return {
+                    station: dept,
+                    targetPrinterName: deptPrinter?.name || 'Kot Printer',
+                    items: deptItems.map(i => ({
+                      name: i.name,
+                      qty: i.qty,
+                      variation: i.selectedVariation?.name,
+                      addons: i.selectedAddons?.map(a => a.name),
+                      notes: i.notes
+                    }))
+                  };
+                }).filter(s => s.items.length > 0)
+              : [{
+                  station: 'Main Kitchen',
+                  items: displayedItems.map(i => ({
+                    name: i.name,
+                    qty: i.qty,
+                    variation: i.selectedVariation?.name,
+                    addons: i.selectedAddons?.map(a => a.name),
+                    notes: i.notes
+                  }))
+                }])
+          : [{
+              station: selectedDeptFilter,
+              targetPrinterName: activePrinter?.name || 'Kot Printer',
+              items: displayedItems.map(i => ({
+                name: i.name,
+                qty: i.qty,
+                variation: i.selectedVariation?.name,
+                addons: i.selectedAddons?.map(a => a.name),
+                notes: i.notes
+              }))
+            }];
+
+      const kotPayload = {
+        invoiceNo: printableReceipt.invoiceNo,
+        dateTime: printableReceipt.dateTime,
+        tableName: printableReceipt.tableName,
+        tableZone: printableReceipt.tableZone,
+        waiter: printableReceipt.waiter,
+        customer: printableReceipt.customer,
+        isCancelKot,
+        slips: slipsToPrint
+      };
+
+      hardwareDispatched = await dispatchHardwarePrint('/api/hardware/print-kot', kotPayload);
+    } catch (e) {
+      console.warn('Hardware KOT print failed:', e);
+    }
+
+    setIsPrinting(false);
+
+    if (hardwareDispatched) {
+      setHardwarePrintStatus('✅ KOT sent to Kitchen Thermal Printer!');
+      setTimeout(() => {
+        closePrintReceipt();
+      }, 1000);
+      return;
+    }
+
+    // Fallback to browser iframe print if hardware bridge offline
+    const html = generateReceiptHtml();
+    if (html) {
+      printViaIframe(html);
+    }
+  };
+
   const generateReceiptHtml = () => {
     if (!printableReceipt) return '';
 
+    // Monospace alignment helpers (Strict 42 columns for 80mm thermal receipt)
+    const line2Col = (left: string, right: string, width = 42) => {
+      const l = left.trim();
+      const r = right.trim();
+      const maxL = Math.max(0, width - 1 - r.length);
+      const safeL = l.length > maxL ? l.slice(0, maxL) : l;
+      const spaces = Math.max(1, width - safeL.length - r.length);
+      return safeL + ' '.repeat(spaces) + r;
+    };
+
+    const centerLine = (text: string, width = 42) => {
+      const t = text.trim();
+      if (t.length >= width) return t;
+      const leftPad = Math.floor((width - t.length) / 2);
+      return ' '.repeat(leftPad) + t;
+    };
+
     if (isKot) {
-      const kotItemsHtml = displayedItems.map(item => `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin: 3px 0; font-size: 13px; font-weight: bold;">
-          <span style="${isCancelKot ? 'text-decoration: line-through;' : ''}">${item.name}</span>
-          <span>${item.qty}x</span>
-        </div>
-        ${item.selectedVariation?.name ? `<div style="font-size: 11px; font-weight: normal; padding-left: 10px;">• Cut: ${item.selectedVariation.name}</div>` : ''}
-        ${item.selectedAddons && item.selectedAddons.length > 0 ? `<div style="font-size: 11px; font-weight: normal; padding-left: 10px;">+ Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
-        ${item.notes ? `<div style="font-size: 11px; font-weight: bold; padding-left: 10px;">📝 Note: ${item.notes}</div>` : ''}
-      `).join('');
+      const stationName = (!selectedDeptFilter || selectedDeptFilter === 'ALL' || selectedDeptFilter === 'SPLIT_ALL') 
+        ? 'MAIN KITCHEN' 
+        : selectedDeptFilter.toUpperCase();
 
-      const stationName = selectedDeptFilter === 'ALL' ? 'MAIN KITCHEN' : selectedDeptFilter.toUpperCase();
+      const kotLines: string[] = [];
+      kotLines.push('------------------------------------------');
+      kotLines.push(centerLine(`STATION: ${stationName}`));
+      kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${printableReceipt.invoiceNo}`));
+      if (isCancelKot) {
+        kotLines.push(centerLine('*** VOID / CANCELLED ORDER ***'));
+      }
+      kotLines.push('------------------------------------------');
+      kotLines.push(line2Col('Table & Z  :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`));
+      kotLines.push(line2Col('Waiter     :', printableReceipt.waiter || 'Staff'));
+      kotLines.push(line2Col('Date & Time:', printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`));
+      if (printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
+        kotLines.push(line2Col('Customer   :', printableReceipt.customer));
+      }
+      if (isCancelKot && printableReceipt.voidAuthorizedBy) {
+        kotLines.push(line2Col('Auth By    :', printableReceipt.voidAuthorizedBy));
+      }
+      if (isCancelKot && printableReceipt.voidReason) {
+        kotLines.push(line2Col('Reason     :', printableReceipt.voidReason));
+      }
+      kotLines.push('------------------------------------------');
 
-      return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${isCancelKot ? 'VOID_KOT' : 'KOT'}_${printableReceipt.invoiceNo}</title>
-          <style>
-            @page {
-              size: 80mm auto;
-              margin: 0mm !important;
-            }
-            @media print {
-              body { margin: 0; padding: 1mm 1mm; width: 72mm; max-width: 72mm; }
-              .no-print { display: none !important; }
-            }
-            *, *::before, *::after {
-              color: #000000 !important;
-              box-sizing: border-box;
-            }
-            body {
-              font-family: 'Courier New', Courier, monospace !important;
-              color: #000000;
-              margin: 0 auto;
-              padding: 2mm 1.5mm;
-              width: 72mm;
-              max-width: 72mm;
-              background: #ffffff;
-              font-size: 12px;
-              line-height: 1.35;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .sep {
-              border-top: 1px dashed #000000;
-              margin: 4px 0;
-              height: 0;
-            }
-            .center { text-align: center; }
-            .bold { font-weight: bold; }
-            .row {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              margin: 2px 0;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="sep"></div>
-          <div class="center bold" style="font-size: 13px;">STATION: ${stationName}</div>
-          <div class="center bold" style="font-size: 13px;">${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${printableReceipt.invoiceNo}</div>
-          ${isCancelKot ? '<div class="center bold" style="margin: 2px 0;">*** VOID / CANCELLED ORDER ***</div>' : ''}
-          <div class="sep"></div>
-          <div class="row">
-            <span>TABLE   :</span>
-            <span class="bold">${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}</span>
-          </div>
-          <div class="row">
-            <span>TIME    :</span>
-            <span>${printableReceipt.dateTime || receiptTimeStr || receiptDateStr}</span>
-          </div>
-          <div class="row">
-            <span>WAITER  :</span>
-            <span>${printableReceipt.waiter || 'Rahim'}</span>
-          </div>
-          ${printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer' ? `
-          <div class="row">
-            <span>CUSTOMER:</span>
-            <span>${printableReceipt.customer}</span>
-          </div>
-          ` : ''}
-          <div class="sep"></div>
-          <div class="row bold">
-            <span>ITEM NAME</span>
-            <span>QTY</span>
-          </div>
-          <div class="sep"></div>
-          ${kotItemsHtml}
-          <div class="sep"></div>
-        </body>
-        </html>
-      `;
+      // 34 chars item + 1 space + 7 chars qty = 42 chars
+      const kotItemH = 'ITEM'.padEnd(34, ' ');
+      const kotQtyH = 'QTY'.padStart(7, ' ');
+      kotLines.push(`${kotItemH} ${kotQtyH}`);
+      kotLines.push('------------------------------------------');
+
+      for (const item of displayedItems) {
+        const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
+        const nameCol = name.padEnd(34, ' ');
+        const qtyCol = `${item.qty}x`.padStart(7, ' ');
+        kotLines.push(`${nameCol} ${qtyCol}`);
+        if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);
+        if (item.selectedAddons && item.selectedAddons.length > 0) {
+          kotLines.push(`   - Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}`);
+        }
+        if (item.notes) kotLines.push(`   - Note: ${item.notes}`);
+      }
+
+      kotLines.push('------------------------------------------');
+
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${isCancelKot ? 'VOID_KOT' : 'KOT'}_${printableReceipt.invoiceNo}</title>
+  <style>
+    @page {
+      size: 80mm auto;
+      margin: 0mm !important;
+    }
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 72mm !important;
+        max-width: 72mm !important;
+      }
+      .no-print { display: none !important; }
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      color: #000000 !important;
+    }
+    body {
+      margin: 0 auto;
+      padding: 2mm 1mm;
+      width: 72mm;
+      max-width: 72mm;
+      background: #ffffff;
+      color: #000000 !important;
+      font-family: 'Courier New', Courier, monospace !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    pre {
+      margin: 0;
+      padding: 0;
+      font-family: 'Courier New', Courier, monospace !important;
+      font-size: 12.5px !important;
+      line-height: 1.25 !important;
+      letter-spacing: 0px !important;
+      white-space: pre !important;
+      word-break: normal !important;
+      font-weight: 700 !important;
+      color: #000000 !important;
+    }
+  </style>
+</head>
+<body>
+  <pre>${kotLines.join('\n')}</pre>
+</body>
+</html>`;
     }
 
-    const billItemsHtml = displayedItems.map(item => {
-      const lineTotal = item.price * item.qty;
-      return `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin: 3px 0; font-size: 12px;">
-          <span style="font-weight: bold; width: 44%; word-break: break-word;">${item.name}</span>
-          <span style="width: 14%; text-align: center;">${item.qty}x</span>
-          <span style="width: 20%; text-align: right;">${item.price.toFixed(2)}</span>
-          <span style="width: 22%; text-align: right; font-weight: bold;">${lineTotal.toFixed(2)}</span>
-        </div>
-        ${item.selectedVariation?.name ? `<div style="font-size: 10.5px; padding-left: 8px;">• Cut: ${item.selectedVariation.name}</div>` : ''}
-        ${item.selectedAddons && item.selectedAddons.length > 0 ? `<div style="font-size: 10.5px; padding-left: 8px;">+ Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}</div>` : ''}
-      `;
-    }).join('');
-
+    // CUSTOMER BILL / CASH MEMO (Exact 100% match to 'localhost:3000 this is ok' thermal slip)
     const titleText = printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL';
-    const payments = [];
-    if (printableReceipt.paymentBreakdown?.cash) payments.push(`Cash: Tk ${printableReceipt.paymentBreakdown.cash.toFixed(2)}`);
-    if (printableReceipt.paymentBreakdown?.card) payments.push(`Card: Tk ${printableReceipt.paymentBreakdown.card.toFixed(2)}`);
-    if (printableReceipt.paymentBreakdown?.bkash) payments.push(`bKash: Tk ${printableReceipt.paymentBreakdown.bkash.toFixed(2)}`);
-    if (printableReceipt.paymentBreakdown?.nagad) payments.push(`Nagad: Tk ${printableReceipt.paymentBreakdown.nagad.toFixed(2)}`);
-    if (printableReceipt.paymentBreakdown?.due) payments.push(`Due: Tk ${printableReceipt.paymentBreakdown.due.toFixed(2)}`);
+    const lines: string[] = [];
 
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Receipt_${printableReceipt.invoiceNo}</title>
-        <style>
-          @page {
-            size: 80mm auto;
-            margin: 0mm !important;
+    lines.push(centerLine(restaurantName || 'BARCODE CAFE BANANI'));
+    const rawAddress = restaurantAddress || 'House #42, Road #11, Block D, Banani';
+    if (rawAddress) {
+      if (rawAddress.includes(',')) {
+        const parts = rawAddress.split(',').map(p => p.trim());
+        let currentLine = '';
+        for (const part of parts) {
+          if (!currentLine) {
+            currentLine = part;
+          } else if ((currentLine + ', ' + part).length <= 40) {
+            currentLine += ', ' + part;
+          } else {
+            lines.push(centerLine(currentLine));
+            currentLine = part;
           }
-          @media print {
-            body { margin: 0; padding: 1mm 1mm; width: 72mm; max-width: 72mm; }
-            .no-print { display: none !important; }
-          }
-          *, *::before, *::after {
-            color: #000000 !important;
-            box-sizing: border-box;
-          }
-          body {
-            font-family: 'Courier New', Courier, monospace !important;
-            color: #000000;
-            margin: 0 auto;
-            padding: 2mm 1.5mm;
-            width: 72mm;
-            max-width: 72mm;
-            background: #ffffff;
-            font-size: 12px;
-            line-height: 1.35;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .sep {
-            border-top: 1px dashed #000000;
-            margin: 4px 0;
-            height: 0;
-          }
-          .center { text-align: center; }
-          .bold { font-weight: bold; }
-          .row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin: 2px 0;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="center bold" style="font-size: 14px; text-transform: uppercase;">${restaurantName}</div>
-        <div class="center" style="font-size: 11px;">${restaurantAddress}</div>
-        <div class="center" style="font-size: 11px;">Hotline: ${restaurantHotline}</div>
-        ${restaurantBin ? `<div class="center" style="font-size: 11px;">BIN/VAT Reg: ${restaurantBin}</div>` : ''}
-        <div class="sep"></div>
-        <div class="center bold">${titleText}</div>
-        <div class="sep"></div>
-        <div class="row">
-          <span>Invoice No :</span>
-          <span class="bold">${printableReceipt.invoiceNo}</span>
-        </div>
-        <div class="row">
-          <span>Date & Time:</span>
-          <span>${printableReceipt.dateTime || receiptDateStr}</span>
-        </div>
-        <div class="row">
-          <span>Table      :</span>
-          <span class="bold">${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}</span>
-        </div>
-        <div class="row">
-          <span>Waiter     :</span>
-          <span>${printableReceipt.waiter || 'Staff'}</span>
-        </div>
-        <div class="row">
-          <span>Customer   :</span>
-          <span>${printableReceipt.customer || 'Walk-in Customer'}</span>
-        </div>
-        ${printableReceipt.channelOrAgent ? `
-        <div class="row">
-          <span>Channel    :</span>
-          <span>${printableReceipt.channelOrAgent}</span>
-        </div>
-        ` : ''}
-        <div class="sep"></div>
-        <div class="row bold" style="font-size: 11.5px;">
-          <span style="width: 44%;">ITEM NAME</span>
-          <span style="width: 14%; text-align: center;">QTY</span>
-          <span style="width: 20%; text-align: right;">PRICE</span>
-          <span style="width: 22%; text-align: right;">TOTAL</span>
-        </div>
-        <div class="sep"></div>
-        ${billItemsHtml}
-        <div class="sep"></div>
-        <div class="row">
-          <span>Subtotal:</span>
-          <span class="bold">Tk ${Number(displayedSubtotal).toFixed(2)}</span>
-        </div>
-        ${printableReceipt.discountDeduction > 0 ? `
-        <div class="row">
-          <span>Discount ${printableReceipt.discountType === 'percent' ? `(${printableReceipt.discountVal}%)` : ''}:</span>
-          <span>-Tk ${Number(printableReceipt.discountDeduction).toFixed(2)}</span>
-        </div>
-        ` : ''}
-        <div class="sep"></div>
-        <div class="row bold" style="font-size: 13.5px;">
-          <span>NET TOTAL:</span>
-          <span>Tk ${Number(printableReceipt.netTotal).toFixed(2)}</span>
-        </div>
-        <div class="sep"></div>
-        ${payments.length > 0 ? `
-        <div class="row" style="font-size: 11px;">
-          <span>Payment:</span>
-          <span>${payments.join(' • ')}</span>
-        </div>
-        ` : ''}
-        ${printableReceipt.changeReturn !== undefined && printableReceipt.changeReturn > 0 ? `
-        <div class="row bold" style="font-size: 11px;">
-          <span>Change Given:</span>
-          <span>Tk ${Number(printableReceipt.changeReturn).toFixed(2)}</span>
-        </div>
-        ` : ''}
-        <div class="sep"></div>
-        <div class="center" style="font-size: 10.5px; margin-top: 4px;">Thank you for dining at ${restaurantName}!</div>
-        <div class="center" style="font-size: 9px;">Powered by Barcode Cafe ERP</div>
-      </body>
-      </html>
-    `;
+        }
+        if (currentLine) lines.push(centerLine(currentLine));
+      } else {
+        lines.push(centerLine(rawAddress));
+      }
+    }
+    if (restaurantHotline) lines.push(centerLine(`Hotline: ${restaurantHotline}`));
+    if (restaurantBin) lines.push(centerLine(`BIN/VAT Reg: ${restaurantBin}`));
+
+    lines.push('------------------------------------------');
+    lines.push(centerLine(titleText));
+    lines.push('------------------------------------------');
+
+    lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo));
+    let dateStr = receiptDateStr;
+    let timeStr = receiptTimeStr;
+    const rawDt = printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`;
+    if (rawDt.includes(',')) {
+      const parts = rawDt.split(',');
+      dateStr = parts[0].trim();
+      timeStr = parts.slice(1).join(',').trim();
+    } else {
+      const parts = rawDt.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        dateStr = parts[0];
+        timeStr = parts.slice(1).join(' ');
+      }
+    }
+    lines.push(line2Col(`Date : ${dateStr}`, `Time: ${timeStr}`));
+    lines.push(line2Col('Table & Z :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`));
+    if (printableReceipt.channelOrAgent) {
+      lines.push(line2Col('Channel    :', printableReceipt.channelOrAgent));
+    }
+    lines.push(line2Col('Waiter     :', printableReceipt.waiter || 'Staff'));
+    if (printableReceipt.orderTakenBy && printableReceipt.orderTakenBy !== printableReceipt.waiter) {
+      lines.push(line2Col('Order Taken By :', printableReceipt.orderTakenBy));
+    }
+    if (printableReceipt.isSettled) {
+      lines.push(line2Col('Bill Settled By :', printableReceipt.settleBillRole || 'Cashier'));
+    }
+    if (printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
+      lines.push(line2Col('Customer   :', printableReceipt.customer));
+    }
+    lines.push('------------------------------------------');
+
+    // Column Header (Exact 42 columns: 19 + 1 + 3 + 1 + 8 + 1 + 9 = 42)
+    const colItemH = 'ITEM'.padEnd(19, ' ');
+    const colQtyH = 'QTY'.padStart(3, ' ');
+    const colPriceH = 'PRICE'.padStart(8, ' ');
+    const colTotalH = 'TOTAL'.padStart(9, ' ');
+    lines.push(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}`);
+    lines.push('------------------------------------------');
+
+    for (const item of displayedItems) {
+      let firstLineName = item.name.trim();
+      let remainder = '';
+      if (firstLineName.length > 19) {
+        const lastSpace = firstLineName.lastIndexOf(' ', 19);
+        if (lastSpace > 8) {
+          remainder = firstLineName.slice(lastSpace + 1).trim();
+          firstLineName = firstLineName.slice(0, lastSpace);
+        } else {
+          remainder = firstLineName.slice(19).trim();
+          firstLineName = firstLineName.slice(0, 19);
+        }
+      }
+      const colItem = firstLineName.padEnd(19, ' ');
+      const colQty = String(item.qty).padStart(3, ' ');
+      const colPrice = Number(item.price).toFixed(2).padStart(8, ' ');
+      const colTotal = Number(item.price * item.qty).toFixed(2).padStart(9, ' ');
+
+      lines.push(`${colItem} ${colQty} ${colPrice} ${colTotal}`);
+      if (remainder) lines.push(`  ${remainder}`);
+      if (item.selectedVariation?.name) lines.push(`  * Cut: ${item.selectedVariation.name}`);
+      if (item.selectedAddons && item.selectedAddons.length > 0) {
+        lines.push(`  + Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}`);
+      }
+      if (item.notes) lines.push(`  - Note: ${item.notes}`);
+    }
+
+    lines.push('------------------------------------------');
+    lines.push(line2Col('Subtotal:', Number(displayedSubtotal).toFixed(2)));
+    if (printableReceipt.discountDeduction > 0) {
+      const discLbl = printableReceipt.discountType === 'percent' && printableReceipt.discountVal
+        ? `Discount (${printableReceipt.discountVal}%):`
+        : 'Discount:';
+      lines.push(line2Col(discLbl, `-${Number(printableReceipt.discountDeduction).toFixed(2)}`));
+    }
+    lines.push('------------------------------------------');
+    lines.push(line2Col('TOTAL PAYABLE:', Number(printableReceipt.netTotal).toFixed(2)));
+
+    const pb = printableReceipt.paymentBreakdown;
+    if (pb) {
+      lines.push('------------------------------------------');
+      if (pb.cash > 0) lines.push(line2Col('Cash Paid:', Number(pb.cash).toFixed(2)));
+      if (pb.card > 0) lines.push(line2Col('Card Paid:', Number(pb.card).toFixed(2)));
+      if (pb.bkash > 0) lines.push(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2)));
+      if (pb.nagad > 0) lines.push(line2Col('Nagad Paid:', Number(pb.nagad).toFixed(2)));
+      if (pb.due > 0) lines.push(line2Col('Due / Credit:', Number(pb.due).toFixed(2)));
+      if (printableReceipt.changeReturn && printableReceipt.changeReturn > 0) {
+        lines.push(line2Col('Change Return:', Number(printableReceipt.changeReturn).toFixed(2)));
+      }
+    }
+
+    lines.push('------------------------------------------');
+    if (printableReceipt.isSettled) {
+      lines.push(centerLine('*** PAID & SETTLED ***'));
+    }
+    lines.push(centerLine('Thank you for dining with us!'));
+    lines.push(centerLine('Please visit again'));
+    lines.push('------------------------------------------');
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Receipt_${printableReceipt.invoiceNo}</title>
+  <style>
+    @page {
+      size: 80mm auto;
+      margin: 0mm !important;
+    }
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 72mm !important;
+        max-width: 72mm !important;
+      }
+      .no-print { display: none !important; }
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      color: #000000 !important;
+    }
+    body {
+      margin: 0 auto;
+      padding: 2mm 1mm;
+      width: 72mm;
+      max-width: 72mm;
+      background: #ffffff;
+      color: #000000 !important;
+      font-family: 'Courier New', Courier, monospace !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    pre {
+      margin: 0;
+      padding: 0;
+      font-family: 'Courier New', Courier, monospace !important;
+      font-size: 12.5px !important;
+      line-height: 1.25 !important;
+      letter-spacing: 0px !important;
+      white-space: pre !important;
+      word-break: normal !important;
+      font-weight: 700 !important;
+      color: #000000 !important;
+    }
+  </style>
+</head>
+<body>
+  <pre>${lines.join('\n')}</pre>
+</body>
+</html>`;
   };
 
   const handleExportPdf = () => {
@@ -750,6 +825,18 @@ export const ThermalBillModal: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Real-time Hardware Thermal Print Feedback */}
+          {hardwarePrintStatus && (
+            <div className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-1 ${
+              hardwarePrintStatus.startsWith('✅') 
+                ? 'bg-emerald-600 text-white shadow-xs' 
+                : 'bg-amber-600 text-white shadow-xs'
+            }`}>
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{hardwarePrintStatus}</span>
+            </div>
+          )}
 
           {/* Quick Hardware Routing Toolbar (Collapsible or visible) */}
           {showConfigBar && (

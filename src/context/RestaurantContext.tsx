@@ -42,6 +42,7 @@ import {
   PrintableReceipt
 } from '../types';
 import { Language, Translations, translations } from '../utils/i18n';
+import { dispatchHardwarePrint } from '../utils/hardwarePrint';
 import confetti from 'canvas-confetti';
 
 export const formatRoleTitle = (role?: string): string => {
@@ -2960,23 +2961,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       slips: slipsToPrint
     };
 
-    // 1. Direct local bridge (0ms instant hardware print)
-    fetch('http://127.0.0.1:9123/api/hardware/print-kot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(kotHardwarePayload)
-    }).catch(() => {});
-
-    // 2. Cloud server endpoint (Queues for polling print bridge)
-    fetch('/api/hardware/print-kot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(kotHardwarePayload)
-    }).catch(err => console.warn('Direct KOT hardware print dispatch error:', err));
+    // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
+    dispatchHardwarePrint('/api/hardware/print-kot', kotHardwarePayload);
   };
 
   const directSubmitKotAndHold = async (tableId: string) => {
-    openPrintKot(tableId, true);
+    openPrintKot(tableId, false);
     setPosView('floor');
   };
 
@@ -3049,34 +3039,32 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
 
     // Direct hardware dispatch Cancel KOT without opening preview modal
-
     const printers = data?.printers || [];
     const getPrinterForDept = (dept: string) => {
       const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
       return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
     };
 
-    fetch('/api/hardware/print-kot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tableName: table.name,
-        tableZone: table.zone || 'Floor 1',
-        waiter: table.waiter || 'Staff',
-        customer: table.customer || 'Walk-in Customer',
-        invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
-        dateTime: new Date().toLocaleString('en-US'),
-        slips: [{
-          station: cancelledItemInfo.department || 'Main Kitchen',
-          targetPrinterName: getPrinterForDept(cancelledItemInfo.department || 'Main Kitchen')?.name,
-          items: [{
-            name: `*** CANCELLED *** ${cancelledItemInfo.name}`,
-            qty: cancelledItemInfo.qty,
-            notes: `REASON: ${cancelledItemInfo.reason} | AUTH: ${authorizedBy || 'Manager'}`
-          }]
+    const cancelKotPayload = {
+      tableName: table.name,
+      tableZone: table.zone || 'Floor 1',
+      waiter: table.waiter || 'Staff',
+      customer: table.customer || 'Walk-in Customer',
+      invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
+      dateTime: new Date().toLocaleString('en-US'),
+      slips: [{
+        station: cancelledItemInfo.department || 'Main Kitchen',
+        targetPrinterName: getPrinterForDept(cancelledItemInfo.department || 'Main Kitchen')?.name,
+        items: [{
+          name: `*** CANCELLED *** ${cancelledItemInfo.name}`,
+          qty: cancelledItemInfo.qty,
+          notes: `REASON: ${cancelledItemInfo.reason} | AUTH: ${authorizedBy || 'Manager'}`
         }]
-      })
-    }).catch(err => console.warn('Direct Cancel KOT hardware print dispatch error:', err));
+      }]
+    };
+
+    // Unified hardware print dispatch
+    dispatchHardwarePrint('/api/hardware/print-kot', cancelKotPayload);
   };
 
   const releaseTable = (tableId: string, reason?: string, authorizedBy?: string) => {
@@ -3095,34 +3083,32 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }));
 
       // Direct hardware dispatch Cancel KOT for released table without modal
-
       const printers = data?.printers || [];
       const getPrinterForDept = (dept: string) => {
         const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
         return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
       };
 
-      fetch('/api/hardware/print-kot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tableName: table.name,
-          tableZone: table.zone || 'Floor 1',
-          waiter: table.waiter || 'Staff',
-          customer: table.customer || 'Walk-in Customer',
-          invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
-          dateTime: new Date().toLocaleString('en-US'),
-          slips: [{
-            station: 'All Stations',
-            targetPrinterName: getPrinterForDept('Main Kitchen')?.name,
-            items: cancelledList.map(c => ({
-              name: `*** TABLE RELEASED / VOID *** ${c.name}`,
-              qty: c.qty,
-              notes: `REASON: ${c.reason} | AUTH: ${authorizedBy || 'Manager'}`
-            }))
-          }]
-        })
-      }).catch(err => console.warn('Direct Cancel KOT hardware print dispatch error:', err));
+      const releaseKotPayload = {
+        tableName: table.name,
+        tableZone: table.zone || 'Floor 1',
+        waiter: table.waiter || 'Staff',
+        customer: table.customer || 'Walk-in Customer',
+        invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
+        dateTime: new Date().toLocaleString('en-US'),
+        slips: [{
+          station: 'All Stations',
+          targetPrinterName: getPrinterForDept('Main Kitchen')?.name,
+          items: cancelledList.map(c => ({
+            name: `*** TABLE RELEASED / VOID *** ${c.name}`,
+            qty: c.qty,
+            notes: `REASON: ${c.reason} | AUTH: ${authorizedBy || 'Manager'}`
+          }))
+        }]
+      };
+
+      // Unified hardware print dispatch
+      dispatchHardwarePrint('/api/hardware/print-kot', releaseKotPayload);
     }
 
     // Reset table back to free status
@@ -3185,27 +3171,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
     };
 
-    fetch('/api/hardware/print-kot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tableName: table.name,
-        tableZone: table.zone || 'Floor 1',
-        waiter: table.waiter || 'Staff',
-        customer: table.customer || 'Walk-in Customer',
-        invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
-        dateTime: new Date().toLocaleString('en-US'),
-        slips: [{
-          station: cancelledItems[0]?.department || 'Main Kitchen',
-          targetPrinterName: getPrinterForDept(cancelledItems[0]?.department || 'Main Kitchen')?.name,
-          items: cancelledItems.map(c => ({
-            name: `*** CANCELLED *** ${c.name}`,
-            qty: c.qty,
-            notes: `REASON: ${c.reason || reason} | AUTH: ${authorizedBy || 'Manager'}`
-          }))
-        }]
-      })
-    }).catch(err => console.warn('Direct Cancel KOT hardware print dispatch error:', err));
+    const cancelKotPayload = {
+      tableName: table.name,
+      tableZone: table.zone || 'Floor 1',
+      waiter: table.waiter || 'Staff',
+      customer: table.customer || 'Walk-in Customer',
+      invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
+      dateTime: new Date().toLocaleString('en-US'),
+      slips: [{
+        station: cancelledItems[0]?.department || 'Main Kitchen',
+        targetPrinterName: getPrinterForDept(cancelledItems[0]?.department || 'Main Kitchen')?.name,
+        items: cancelledItems.map(c => ({
+          name: `*** CANCELLED *** ${c.name}`,
+          qty: c.qty,
+          notes: `REASON: ${c.reason || reason} | AUTH: ${authorizedBy || 'Manager'}`
+        }))
+      }]
+    };
+
+    // Unified hardware print dispatch
+    dispatchHardwarePrint('/api/hardware/print-kot', cancelKotPayload);
   };
 
   const openPrintBill = (tableId: string, showModal: boolean = false) => {
@@ -3291,19 +3276,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }))
     };
 
-    // 1. Direct local bridge (0ms instant hardware print)
-    fetch('http://127.0.0.1:9123/api/hardware/print-bill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(billHardwarePayload)
-    }).catch(() => {});
-
-    // 2. Cloud server endpoint (Queues for polling print bridge)
-    fetch('/api/hardware/print-bill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(billHardwarePayload)
-    }).catch(err => console.warn('Direct bill hardware print error:', err));
+    // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
+    dispatchHardwarePrint('/api/hardware/print-bill', billHardwarePayload);
   };
 
   const directPrintBill = async (tableId: string) => {
@@ -3483,19 +3457,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }))
     };
 
-    // 1. Direct local bridge (0ms instant hardware print)
-    fetch('http://127.0.0.1:9123/api/hardware/print-bill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(memoPayload)
-    }).catch(() => {});
-
-    // 2. Cloud server endpoint (Queues for polling print bridge)
-    fetch('/api/hardware/print-bill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(memoPayload)
-    }).catch(err => console.warn('Direct paid memo hardware print error:', err));
+    // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
+    dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
 
     setPrintableReceipt(memoReceipt);
     closeSettleModal();
@@ -3894,11 +3857,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       session: completedSession
     };
 
-    fetch('/api/hardware/print-zreport', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(zReportPayload)
-    }).catch(err => console.warn('Direct Z-Report print dispatch error:', err));
+    // Unified hardware print dispatch
+    dispatchHardwarePrint('/api/hardware/print-zreport', zReportPayload);
 
     if (startNextShiftImmediately) {
       if (handoverToCashier) {
@@ -3983,17 +3943,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       };
     });
 
-    try {
-      fetch('/api/hardware/print-dayend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
-          dayRecord,
-          daySessions
-        })
-      }).catch(() => {});
-    } catch {}
+    // Unified hardware print dispatch
+    dispatchHardwarePrint('/api/hardware/print-dayend', {
+      restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
+      dayRecord,
+      daySessions
+    });
 
     return dayRecord;
   };
@@ -4075,16 +4030,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     setIsChefShiftModalOpen(false);
 
-    // Direct hardware print for Kitchen Production Slip
-    fetch('/api/hardware/print-chef-slip', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
-        restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
-        shift: completedShift
-      })
-    }).catch(err => console.warn('Direct Chef Slip print dispatch error:', err));
+    // Unified hardware print dispatch
+    dispatchHardwarePrint('/api/hardware/print-chef-slip', {
+      restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
+      restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
+      shift: completedShift
+    });
 
     return completedShift;
   };

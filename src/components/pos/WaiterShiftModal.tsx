@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
+import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
 import { 
   X, 
   UserCheck, 
@@ -123,11 +124,7 @@ export const WaiterShiftModal: React.FC = () => {
     };
 
     try {
-      await fetch('/api/hardware/print-waiter-slip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(slipPayload)
-      });
+      await dispatchHardwarePrint('/api/hardware/print-waiter-slip', slipPayload);
     } catch {
       // ignore
     } finally {

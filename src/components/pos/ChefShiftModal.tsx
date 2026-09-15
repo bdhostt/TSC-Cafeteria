@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
+import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
 import { 
   X, 
   ChefHat, 
@@ -109,21 +110,17 @@ export const ChefShiftModal: React.FC = () => {
     if (!activeChefShift) return;
     setIsPrintingSlip(true);
     try {
-      await fetch('/api/hardware/print-chef-slip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
-          restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
-          shift: {
-            ...activeChefShift,
-            endTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-            kotsPreparedCount: liveShiftStats.totalKots,
-            dishesCookedCount: liveShiftStats.totalDishes,
-            notes: closingNotes || activeChefShift.notes || '',
-            handoverToChef: handoverTargetChef || ''
-          }
-        })
+      await dispatchHardwarePrint('/api/hardware/print-chef-slip', {
+        restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
+        restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
+        shift: {
+          ...activeChefShift,
+          endTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          kotsPreparedCount: liveShiftStats.totalKots,
+          dishesCookedCount: liveShiftStats.totalDishes,
+          notes: closingNotes || activeChefShift.notes || '',
+          handoverToChef: handoverTargetChef || ''
+        }
       });
     } catch {
       // ignore

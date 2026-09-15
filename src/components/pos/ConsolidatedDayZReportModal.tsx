@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useRestaurant, DEFAULT_USERS } from '../../context/RestaurantContext';
 import { Printer, X, Calendar, Clock, User, CheckCircle2, AlertTriangle, Wallet, Coins, Layers, ArrowRight, DollarSign, Trash2 } from 'lucide-react';
+import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
 
 export const ConsolidatedDayZReportModal: React.FC = () => {
   const { selectedDayEndPreview, setSelectedDayEndPreview, data, deleteDayEndRecord } = useRestaurant();
@@ -157,39 +158,35 @@ export const ConsolidatedDayZReportModal: React.FC = () => {
   const handlePrint = async () => {
     setIsPrinting(true);
     try {
-      fetch('/api/hardware/print-dayend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurantName,
-          restaurantAddress,
-          restaurantHotline,
-          restaurantBin,
-          dayRecord: day.dayRecord || {
-            id: `DAY-${day.date.replace(/-/g, '')}`,
-            date: day.date,
-            totalDaySales: day.totalSales,
-            totalDayOrders: totalOrdersCount,
-            shiftCount: day.shiftCount,
-            shiftIds: daySessions.map(s => s.id),
-            totalCash: day.totalCash,
-            totalCard: day.totalCard,
-            totalBkash: day.totalBkash,
-            totalNagad: day.totalNagad,
-            totalDue: day.totalDue,
-            totalExpenses: day.totalExpenses,
-            netCashToVault: day.netCashToVault,
-            openedBy,
-            openedAt,
-            openingCash,
-            closingCash,
-            closedBy,
-            closedAt: closedAt || new Date().toLocaleString(),
-            notes: 'Consolidated Master Day-End Z-Report'
-          },
-          daySessions
-        })
-      }).catch(e => console.warn('Hardware Day-End print failed:', e));
+      await dispatchHardwarePrint('/api/hardware/print-dayend', {
+        restaurantName,
+        restaurantAddress,
+        restaurantHotline,
+        restaurantBin,
+        dayRecord: day.dayRecord || {
+          id: `DAY-${day.date.replace(/-/g, '')}`,
+          date: day.date,
+          totalDaySales: day.totalSales,
+          totalDayOrders: totalOrdersCount,
+          shiftCount: day.shiftCount,
+          shiftIds: daySessions.map(s => s.id),
+          totalCash: day.totalCash,
+          totalCard: day.totalCard,
+          totalBkash: day.totalBkash,
+          totalNagad: day.totalNagad,
+          totalDue: day.totalDue,
+          totalExpenses: day.totalExpenses,
+          netCashToVault: day.netCashToVault,
+          openedBy,
+          openedAt,
+          openingCash,
+          closingCash,
+          closedBy,
+          closedAt: closedAt || new Date().toLocaleString(),
+          notes: 'Consolidated Master Day-End Z-Report'
+        },
+        daySessions
+      });
     } catch (e) {
       console.warn('Hardware Day-End print failed:', e);
     }

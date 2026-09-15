@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useRestaurant, DEFAULT_USERS } from '../../context/RestaurantContext';
 import { Printer, X, Lock } from 'lucide-react';
+import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
 
 export const ShiftZReportModal: React.FC = () => {
   const { selectedZReportSession, setSelectedZReportSession, data } = useRestaurant();
@@ -200,22 +201,18 @@ export const ShiftZReportModal: React.FC = () => {
   const handlePrint = async () => {
     setIsPrinting(true);
     try {
-      fetch('/api/hardware/print-zreport', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurantName,
-          restaurantAddress,
-          restaurantHotline,
-          restaurantBin,
-          session: {
-            ...session,
-            roleBreakdown,
-            cashierBreakdown,
-            waiterBreakdown
-          }
-        })
-      }).catch(e => console.warn('Hardware Z-report print failed:', e));
+      await dispatchHardwarePrint('/api/hardware/print-zreport', {
+        restaurantName,
+        restaurantAddress,
+        restaurantHotline,
+        restaurantBin,
+        session: {
+          ...session,
+          roleBreakdown,
+          cashierBreakdown,
+          waiterBreakdown
+        }
+      });
     } catch (e) {
       console.warn('Hardware Z-report print failed:', e);
     }

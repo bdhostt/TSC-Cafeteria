@@ -100,6 +100,28 @@ async function startServer() {
     });
   }
 
+  // Resolve active thermal printer: Prioritizes Kot Printer (USB001), strictly bypassing 80 Printer (192.168.1.87)
+  function resolveThermalPrinter(installedPrinters: string[], requestedName?: string): string {
+    const safePrinters = (installedPrinters || []).filter(p => 
+      !/^80\s*printer$/i.test(p.trim()) && 
+      !p.toLowerCase().includes('192.168')
+    );
+
+    const kot = safePrinters.find(p => /kot\s*printer/i.test(p)) || safePrinters.find(p => /kot/i.test(p));
+
+    if (requestedName && !/^80\s*printer$/i.test(requestedName.trim())) {
+      const exact = safePrinters.find(p => p.toLowerCase() === requestedName.toLowerCase().trim());
+      if (exact) return exact;
+    }
+
+    if (kot) return kot;
+
+    const thermal = safePrinters.find(p => /pos|receipt|thermal/i.test(p));
+    if (thermal) return thermal;
+
+    return safePrinters[0] || 'Kot Printer';
+  }
+
   // Build ESC/POS binary buffer for a compact single-page KOT slip
   function buildKotEscPosBuffer(
     req: { tableName: string; tableZone?: string; waiter?: string; customer?: string; invoiceNo: string; dateTime?: string },
@@ -114,26 +136,27 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Uniform Standard Font Size throughout (No stretched/unequal fonts)
-    pushBytes([0x1B, 0x21, 0x00]);
+    // 2. Hardware Thermal Darkening & Density Configuration
+    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
+    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
+    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
+    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
+    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform standard font A (42 columns)
 
     // 3. Center Align: Station & KOT number
     pushBytes([0x1B, 0x61, 0x01]); // Center
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(`STATION: ${slip.station.toUpperCase()}\n`);
-    pushStr(`KOT NO: ${req.invoiceNo}-${index}\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+    const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
+    pushStr(`STATION: ${cleanStation.toUpperCase()}\n`);
+    pushStr(`KOT NO: ${req.invoiceNo}${total > 1 ? `-${index}` : ''}\n`);
     if (slip.category) {
       pushStr(`Category: ${slip.category}\n`);
     }
     pushStr("------------------------------------------\n");
 
-    // 4. Left Align: Table, Time, Waiter Info
+    // 4. Left Align: Table, Time, Waiter Info (All Bold)
     pushBytes([0x1B, 0x61, 0x00]); // Left align
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`TABLE   : ${req.tableName}${req.tableZone ? ` (${req.tableZone})` : ""}\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     const timeStr = req.dateTime || new Date().toLocaleString("en-US");
     pushStr(`TIME    : ${timeStr}\n`);
@@ -144,12 +167,10 @@ async function startServer() {
     pushStr("------------------------------------------\n");
 
     // 5. Items Header
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr("ITEM NAME                              QTY\n");
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
-    // 6. Food Items (Uniform Font Size)
+    // 6. Food Items (Bold & Double-Strike Jet-Black)
     let totalQty = 0;
     for (const item of slip.items) {
       totalQty += item.qty;
@@ -157,10 +178,7 @@ async function startServer() {
       const nameCol = name.padEnd(34, ' ');
       const qtyCol = `${item.qty}x`.padStart(6, ' ');
 
-      // Item Name & Qty in Bold, standard font size
-      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
       pushStr(`${nameCol} ${qtyCol}\n`);
-      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
       if (item.variation) {
         pushStr(`   - Cut: ${item.variation}\n`);
@@ -228,15 +246,17 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Uniform Font (Standard ESC/POS 12x24 font, 42 columns)
-    pushBytes([0x1B, 0x21, 0x00]);
+    // 2. Hardware Thermal Darkening & Density Configuration
+    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
+    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
+    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
+    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
+    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
 
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`${bill.restaurantName || "BARCODE CAFE BANANI"}\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-    // Restaurant Address under name (neatly formatted without character-wrapping on 42-column thermal receipt)
+
     const rawAddress = bill.restaurantAddress || "House #42, Road #11, Block D, Banani, Dhaka-1213";
     if (rawAddress) {
       if (rawAddress.includes(",")) {
@@ -270,14 +290,12 @@ async function startServer() {
       pushStr(`BIN/VAT Reg: ${rawBin}\n`);
     }
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`${bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL"}\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
-    // 4. Left Align: Invoice metadata
+    // 4. Left Align: Invoice metadata (All Bold)
     pushBytes([0x1B, 0x61, 0x00]); // Left
-    pushStr(line2Col("Invoice No :", bill.invoiceNo));
+    pushStr(line2Col("Invoice No :", bill.invoiceNo || "INV-0000"));
     let dateStr = "";
     let timeStr = "";
     const rawDt = bill.dateTime || new Date().toLocaleString("en-US");
@@ -296,34 +314,33 @@ async function startServer() {
       }
     }
     pushStr(line2Col(`Date :  ${dateStr}`, `Time: ${timeStr}`));
-    pushStr(line2Col("Table & Z  :", `${bill.tableName}${bill.tableZone ? ` (${bill.tableZone})` : ""}`));
+    pushStr(line2Col("Table & Z  :", `${bill.tableName || "Takeaway"}${bill.tableZone ? ` (${bill.tableZone})` : ""}`));
     if (bill.channelOrAgent) {
       pushStr(line2Col("Channel    :", bill.channelOrAgent));
     }
     pushStr(line2Col("Waiter     :", bill.waiter || "Staff"));
     const orderTaker = bill.orderTakenBy || bill.orderCreatedBy || bill.waiter || "Staff";
-    pushStr(line2Col("Order Taken By :", orderTaker));
-    const settleRole = bill.isSettled 
-      ? (bill.settleBillRole || bill.cashierRole || "Cashier") 
-      : (bill.settleBillRole || "");
-    pushStr(line2Col("Bill Settled By :", settleRole));
+    if (orderTaker && orderTaker !== (bill.waiter || "Staff")) {
+      pushStr(line2Col("Order Taken By :", orderTaker));
+    }
+    if (bill.isSettled) {
+      const settleRole = bill.settleBillRole || bill.cashierRole || "Cashier";
+      pushStr(line2Col("Bill Settled By :", settleRole));
+    }
     if (bill.customer && bill.customer !== "Walk-in Customer") {
       pushStr(line2Col("Customer   :", bill.customer));
     }
     pushStr("------------------------------------------\n");
 
-    // 5. Items Header (Exact 42 character columns):
-    // ITEM: 19 chars | QTY: 3 chars | PRICE: 8 chars | TOTAL: 9 chars + 3 spaces = 42 chars!
+    // 5. Items Header (Exact 42 character columns)
     const colItemH = "ITEM".padEnd(19, ' ');
     const colQtyH = "QTY".padStart(3, ' ');
     const colPriceH = "PRICE".padStart(8, ' ');
     const colTotalH = "TOTAL".padStart(9, ' ');
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}\n`);
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
-    // 6. Food Items
+    // 6. Food Items (Bold & Double-Strike Jet-Black)
     for (const item of bill.items) {
       let firstLineName = item.name.trim();
       let remainder = "";
@@ -359,7 +376,7 @@ async function startServer() {
 
     pushStr("------------------------------------------\n");
 
-    // 7. Financial Summary (Dual Column: Left Label, Right Value, 42 chars)
+    // 7. Financial Summary (Bold & Double-Strike Jet-Black)
     pushBytes([0x1B, 0x61, 0x00]); // Left align
     pushStr(line2Col("Subtotal:", Number(bill.subtotal || 0).toFixed(2)));
     if (bill.discountDeduction && bill.discountDeduction > 0) {
@@ -369,9 +386,7 @@ async function startServer() {
       pushStr(line2Col(discLbl, `-${Number(bill.discountDeduction).toFixed(2)}`));
     }
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(line2Col("TOTAL PAYABLE:", Number(bill.netTotal || 0).toFixed(2)));
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     // Payment breakdown if settled
     const pb = (bill as any).paymentBreakdown;
@@ -391,9 +406,7 @@ async function startServer() {
     // 8. Center Align: Footer Note
     pushBytes([0x1B, 0x61, 0x01]); // Center
     if (bill.isSettled) {
-      pushBytes([0x1B, 0x45, 0x01]);
       pushStr("*** PAID & SETTLED ***\n");
-      pushBytes([0x1B, 0x45, 0x00]);
     }
     pushStr("Thank you for dining with us!\n");
     pushStr("Please visit again\n");
@@ -454,14 +467,16 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Uniform Font (Standard ESC/POS 12x24 font, 42 columns)
-    pushBytes([0x1B, 0x21, 0x00]);
+    // 2. Hardware Thermal Darkening & Density Configuration
+    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
+    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
+    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
+    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
+    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
 
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`${report.restaurantName || "BARCODE CAFE BANANI"}\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     // Restaurant Address
     const rawAddress = report.restaurantAddress || "House #42, Road #11, Block D, Banani, Dhaka-1213";
@@ -498,9 +513,7 @@ async function startServer() {
     }
 
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr("*** POS SHIFT Z-REPORT ***\n");
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
     // 4. Session Meta Information (Left Align)
@@ -520,9 +533,7 @@ async function startServer() {
     pushStr("------------------------------------------\n");
 
     // 5. Sales Payment Breakdown
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr("1. SALES PAYMENT BREAKDOWN\n");
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr(line2Col("Cash Sales       :", Number(s.cashSales || 0).toFixed(2)));
     pushStr(line2Col("Credit/Debit Card:", Number(s.cardSales || 0).toFixed(2)));
     pushStr(line2Col("bKash Payment    :", Number(s.bkashSales || 0).toFixed(2)));
@@ -531,16 +542,12 @@ async function startServer() {
       pushStr(line2Col("Customer Due     :", Number(s.dueSales).toFixed(2)));
     }
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(line2Col("GROSS SHIFT REVENUE:", Number(s.totalSales || 0).toFixed(2)));
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
     // 2. Cash Collection (Staff / Cashier Breakdown)
     const cashiers = (s as any).cashierBreakdown;
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`2. CASH COLLECTION (${(cashiers && Array.isArray(cashiers)) ? cashiers.length : 1} STAFF)\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     if (cashiers && Array.isArray(cashiers) && cashiers.length > 0) {
       for (const c of cashiers) {
@@ -560,23 +567,18 @@ async function startServer() {
 
     // 3. Role-Wise Sales Breakdown (Admin, Manager, Waiter, Cashier)
     const roles = (s as any).roleBreakdown;
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(`3. ROLE-WISE SALES (${(roles && Array.isArray(roles)) ? roles.length : 0} ROLES)\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-
     if (roles && Array.isArray(roles) && roles.length > 0) {
+      pushStr(`3. ROLE-WISE SALES (${roles.length} ROLES)\n`);
       for (const r of roles) {
         pushStr(line2Col(`* [${r.role}] (${r.orderCount} ord):`, `Tk ${Number(r.totalCollected || 0).toFixed(2)}`));
       }
+      pushStr("------------------------------------------\n");
     }
-    pushStr("------------------------------------------\n");
 
     // 4. Waiter-wise Sales Breakdown
     const waiters = (s as any).waiterBreakdown;
     if (waiters && Array.isArray(waiters) && waiters.length > 0) {
-      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
       pushStr(`4. WAITER-WISE SALES (${waiters.length} WAITERS)\n`);
-      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
       for (const w of waiters) {
         const pct = s.totalSales > 0 ? Math.round(((w.totalSales || 0) / s.totalSales) * 100) : 0;
         pushStr(line2Col(`* ${w.waiter} (${w.orderCount} ord - ${pct}%):`, `Tk ${Number(w.totalSales || 0).toFixed(2)}`));
@@ -585,9 +587,7 @@ async function startServer() {
     }
 
     // 5. Cash Drawer Reconciliation
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr("5. CASH DRAWER RECONCILIATION\n");
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr(line2Col("(+) Opening Float     :", Number(s.openingCash || 0).toFixed(2)));
     pushStr(line2Col("(+) Cash Sales Total  :", Number(s.cashSales || 0).toFixed(2)));
     pushStr(line2Col("(=) Expected in Drawer:", Number(s.expectedCash || 0).toFixed(2)));
@@ -601,9 +601,7 @@ async function startServer() {
       : diff < 0 
         ? `-${Math.abs(diff).toFixed(2)} (SHORT)` 
         : `+${diff.toFixed(2)} (OVER)`;
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(line2Col("DRAWER VARIANCE:", varTxt));
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
     // 5.1 Cash Handover & Settlement Allocation
@@ -668,18 +666,21 @@ async function startServer() {
       return safeL + ' '.repeat(spaces) + r + '\n';
     };
 
+    // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
-    pushBytes([0x1B, 0x21, 0x00]);
+
+    // 2. Hardware Thermal Darkening & Density Configuration
+    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
+    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
+    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
+    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
+    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr(`${data.restaurantName || "BARCODE CAFE BANANI"}\n`);
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr(`${data.restaurantAddress || "Banani, Dhaka"}\n`);
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr("*** WAITER SERVER SUMMARY SLIP ***\n");
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr("------------------------------------------\n");
 
     pushBytes([0x1B, 0x61, 0x00]);
@@ -689,24 +690,18 @@ async function startServer() {
     pushStr(line2Col("Orders Served :", `${data.totalOrders || 0} Orders`));
     pushStr("------------------------------------------\n");
 
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr(line2Col("TOTAL SALES GENERATED:", Number(data.totalSales || 0).toFixed(2)));
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr(line2Col("ESTIMATED TIPS (5%)  :", Number(data.estimatedTips || 0).toFixed(2)));
     pushStr("------------------------------------------\n");
 
     if (data.serverCashFloat && data.serverCashFloat > 0) {
-      pushBytes([0x1B, 0x45, 0x01]);
       pushStr(line2Col("SERVER CASH FLOAT (POCKET):", Number(data.serverCashFloat || 0).toFixed(2)));
-      pushBytes([0x1B, 0x45, 0x00]);
       pushStr(line2Col("FLOAT RETURN TO REGISTER  :", Number(data.serverCashFloat || 0).toFixed(2)));
       pushStr("------------------------------------------\n");
     }
 
     if (data.runningTables && data.runningTables.length > 0) {
-      pushBytes([0x1B, 0x45, 0x01]);
       pushStr("RUNNING TABLES HANDED OVER:\n");
-      pushBytes([0x1B, 0x45, 0x00]);
       for (const t of data.runningTables) {
         pushStr(line2Col(`* ${t.name} (${t.zone}):`, Number(t.total || 0).toFixed(2)));
       }
@@ -765,18 +760,21 @@ async function startServer() {
 
     const r = data.dayRecord;
 
+    // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
-    pushBytes([0x1B, 0x21, 0x00]);
+
+    // 2. Hardware Thermal Darkening & Density Configuration
+    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
+    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
+    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
+    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
+    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr(`${data.restaurantName || "BARCODE CAFE BANANI"}\n`);
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr("House #42, Road #11, Block D, Banani, Dhaka\n");
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr("*** DAILY MASTER DAY-END Z-REPORT ***\n");
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr("------------------------------------------\n");
 
     pushBytes([0x1B, 0x61, 0x00]);
@@ -802,9 +800,7 @@ async function startServer() {
 
     // Shift 1, Shift 2... Summary
     if (data.daySessions && Array.isArray(data.daySessions) && data.daySessions.length > 0) {
-      pushBytes([0x1B, 0x45, 0x01]);
       pushStr(">> SHIFT BREAKDOWN (SHIFT 1, 2...):\n");
-      pushBytes([0x1B, 0x45, 0x00]);
       data.daySessions.forEach((s: any, idx: number) => {
         const shName = s.shiftType || `Shift ${idx + 1}`;
         pushStr(line2Col(`* [${shName}] ${s.openedBy}:`, `Tk ${Number(s.totalSales || 0).toFixed(2)}`));
@@ -817,9 +813,7 @@ async function startServer() {
       pushStr("------------------------------------------\n");
     }
 
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr("1. CONSOLIDATED PAYMENT REVENUE\n");
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr(line2Col("Cash Sales (Total) :", Number(r.totalCash || 0).toFixed(2)));
     pushStr(line2Col("Card Sales (Total) :", Number(r.totalCard || 0).toFixed(2)));
     pushStr(line2Col("bKash Sales (Total):", Number(r.totalBkash || 0).toFixed(2)));
@@ -828,19 +822,13 @@ async function startServer() {
       pushStr(line2Col("Due / Credit Total :", Number(r.totalDue || 0).toFixed(2)));
     }
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr(line2Col("GROSS DAILY REVENUE:", Number(r.totalDaySales || 0).toFixed(2)));
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr("------------------------------------------\n");
 
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr("2. EXPENSES & VAULT DEPOSIT\n");
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr(line2Col("(-) Daily Petty Exp:", Number(r.totalExpenses || 0).toFixed(2)));
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr(line2Col("NET CASH TO VAULT  :", Number(r.netCashToVault || 0).toFixed(2)));
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr("------------------------------------------\n");
 
     pushStr("\n");
@@ -890,18 +878,21 @@ async function startServer() {
 
     const s = data.shift;
 
+    // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
-    pushBytes([0x1B, 0x21, 0x00]);
+
+    // 2. Hardware Thermal Darkening & Density Configuration
+    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
+    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
+    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
+    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
+    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr(`${data.restaurantName || "BARCODE CAFE BANANI"}\n`);
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr(`${data.restaurantAddress || "Banani, Dhaka"}\n`);
     pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr("*** KITCHEN PRODUCTION & HANDOVER SLIP ***\n");
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr("------------------------------------------\n");
 
     pushBytes([0x1B, 0x61, 0x00]);
@@ -913,17 +904,13 @@ async function startServer() {
     pushStr(line2Col("Duty Hours    :", `${s.startTime} - ${s.endTime || "In Progress"}`));
     pushStr("------------------------------------------\n");
 
-    pushBytes([0x1B, 0x45, 0x01]);
     pushStr("KITCHEN PRODUCTION STATS:\n");
-    pushBytes([0x1B, 0x45, 0x00]);
     pushStr(line2Col("KOTs Processed    :", `${s.kotsPreparedCount || 0} Tickets`));
     pushStr(line2Col("Total Dishes Cooked:", `${s.dishesCookedCount || 0} Portions`));
     pushStr("------------------------------------------\n");
 
     if (s.handoverToChef) {
-      pushBytes([0x1B, 0x45, 0x01]);
       pushStr(line2Col("HANDOVER TO CHEF  :", s.handoverToChef));
-      pushBytes([0x1B, 0x45, 0x00]);
       pushStr("------------------------------------------\n");
     }
 
@@ -1001,7 +988,9 @@ async function startServer() {
   app.get("/api/hardware/printers", async (req, res) => {
     try {
       const printers = await getWindowsPrinters();
-      res.json({ success: true, printers });
+      const safePrinters = printers.filter(p => !/^80\s*printer$/i.test(p.trim()));
+      const activePrinter = resolveThermalPrinter(printers);
+      res.json({ success: true, printers: safePrinters, activePrinter });
     } catch (err: any) {
       res.json({ success: false, printers: [], error: err?.message });
     }
@@ -1052,21 +1041,31 @@ async function startServer() {
       // Enqueue for cloud print agent
       enqueueCloudPrintJob('BILL', billData);
 
-      const installedPrinters = await getWindowsPrinters();
-      // Bill printer preference: "POS", "Receipt", "Thermal", "Kot" or first installed
-      const targetPrinter = installedPrinters.find(p => /pos|receipt|bill|cash/i.test(p))
-        || installedPrinters.find(p => /kot|thermal|80/i.test(p))
-        || installedPrinters[0]
-        || "Receipt Printer";
+      const isWindows = process.platform === 'win32';
+      const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
-      console.log(`🖨️ [Hardware Bill Print] Printing bill for ${billData.tableName} on "${targetPrinter}"`);
+      if (isWindows) {
+        const installedPrinters = await getWindowsPrinters();
+        const targetPrinter = resolveThermalPrinter(installedPrinters);
 
-      const rawBuffer = buildBillEscPosBuffer(billData);
-      const ok = await printSlipWindows(targetPrinter, rawBuffer);
+        console.log(`🖨️ [Hardware Bill Print] Printing bill for ${billData.tableName} on "${targetPrinter}" (Kot Printer USB001)`);
+        const rawBuffer = buildBillEscPosBuffer(billData);
+        const ok = await printSlipWindows(targetPrinter, rawBuffer);
+        return res.json({
+          success: ok,
+          printerUsed: targetPrinter,
+          isLocalServer: true
+        });
+      }
 
+      console.log(`☁️ [Cloud Bill Queue] Enqueued bill for ${billData.tableName}. Agent online: ${isAgentOnline}`);
       res.json({
-        success: ok,
-        printerUsed: targetPrinter
+        success: isAgentOnline,
+        queued: true,
+        isAgentOnline,
+        message: isAgentOnline
+          ? "Bill queued and dispatched to active local printer agent"
+          : "Bill queued in cloud. Run start-printer-agent.bat on cashier PC."
       });
     } catch (err: any) {
       console.error("Hardware bill print error:", err);
@@ -1082,20 +1081,29 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No session report data provided" });
       }
 
-      const installedPrinters = await getWindowsPrinters();
-      const targetPrinter = installedPrinters.find(p => /pos|receipt|bill|cash/i.test(p))
-        || installedPrinters.find(p => /kot|thermal|80/i.test(p))
-        || installedPrinters[0]
-        || "Receipt Printer";
+      enqueueCloudPrintJob('ZREPORT', reportData);
 
-      console.log(`🖨️ [Hardware Z-Report Print] Printing shift Z-Report for session ${reportData.session.id} on "${targetPrinter}"`);
+      const isWindows = process.platform === 'win32';
+      const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
-      const rawBuffer = buildZReportEscPosBuffer(reportData);
-      const ok = await printSlipWindows(targetPrinter, rawBuffer);
+      if (isWindows) {
+        const installedPrinters = await getWindowsPrinters();
+        const targetPrinter = resolveThermalPrinter(installedPrinters);
+
+        console.log(`🖨️ [Hardware Z-Report Print] Printing shift Z-Report for session ${reportData.session.id} on "${targetPrinter}" (Kot Printer USB001)`);
+        const rawBuffer = buildZReportEscPosBuffer(reportData);
+        const ok = await printSlipWindows(targetPrinter, rawBuffer);
+        return res.json({
+          success: ok,
+          printerUsed: targetPrinter,
+          isLocalServer: true
+        });
+      }
 
       res.json({
-        success: ok,
-        printerUsed: targetPrinter
+        success: isAgentOnline,
+        queued: true,
+        isAgentOnline
       });
     } catch (err: any) {
       console.error("Hardware Z-Report print error:", err);
@@ -1111,20 +1119,29 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No waiter slip data provided" });
       }
 
-      const installedPrinters = await getWindowsPrinters();
-      const targetPrinter = installedPrinters.find(p => /pos|receipt|bill|cash/i.test(p))
-        || installedPrinters.find(p => /kot|thermal|80/i.test(p))
-        || installedPrinters[0]
-        || "Receipt Printer";
+      enqueueCloudPrintJob('WAITER_SLIP', slipData);
 
-      console.log(`🖨️ [Hardware Waiter Slip Print] Printing slip for waiter ${slipData.waiterName} on "${targetPrinter}"`);
+      const isWindows = process.platform === 'win32';
+      const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
-      const rawBuffer = buildWaiterSlipEscPosBuffer(slipData);
-      const ok = await printSlipWindows(targetPrinter, rawBuffer);
+      if (isWindows) {
+        const installedPrinters = await getWindowsPrinters();
+        const targetPrinter = resolveThermalPrinter(installedPrinters);
+
+        console.log(`🖨️ [Hardware Waiter Slip Print] Printing slip for waiter ${slipData.waiterName} on "${targetPrinter}" (Kot Printer USB001)`);
+        const rawBuffer = buildWaiterSlipEscPosBuffer(slipData);
+        const ok = await printSlipWindows(targetPrinter, rawBuffer);
+        return res.json({
+          success: ok,
+          printerUsed: targetPrinter,
+          isLocalServer: true
+        });
+      }
 
       res.json({
-        success: ok,
-        printerUsed: targetPrinter
+        success: isAgentOnline,
+        queued: true,
+        isAgentOnline
       });
     } catch (err: any) {
       console.error("Hardware Waiter Slip print error:", err);
@@ -1140,20 +1157,29 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No day-end report data provided" });
       }
 
-      const installedPrinters = await getWindowsPrinters();
-      const targetPrinter = installedPrinters.find(p => /pos|receipt|bill|cash/i.test(p))
-        || installedPrinters.find(p => /kot|thermal|80/i.test(p))
-        || installedPrinters[0]
-        || "Receipt Printer";
+      enqueueCloudPrintJob('DAYEND', dayData);
 
-      console.log(`🖨️ [Hardware Day-End Print] Printing master day-end for date ${dayData.dayRecord.date} on "${targetPrinter}"`);
+      const isWindows = process.platform === 'win32';
+      const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
-      const rawBuffer = buildDayEndEscPosBuffer(dayData);
-      const ok = await printSlipWindows(targetPrinter, rawBuffer);
+      if (isWindows) {
+        const installedPrinters = await getWindowsPrinters();
+        const targetPrinter = resolveThermalPrinter(installedPrinters);
+
+        console.log(`🖨️ [Hardware Day-End Print] Printing master day-end for date ${dayData.dayRecord.date} on "${targetPrinter}" (Kot Printer USB001)`);
+        const rawBuffer = buildDayEndEscPosBuffer(dayData);
+        const ok = await printSlipWindows(targetPrinter, rawBuffer);
+        return res.json({
+          success: ok,
+          printerUsed: targetPrinter,
+          isLocalServer: true
+        });
+      }
 
       res.json({
-        success: ok,
-        printerUsed: targetPrinter
+        success: isAgentOnline,
+        queued: true,
+        isAgentOnline
       });
     } catch (err: any) {
       console.error("Hardware Day-End print error:", err);
@@ -1169,21 +1195,29 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "No chef shift data provided" });
       }
 
-      const installedPrinters = await getWindowsPrinters();
-      const targetPrinter = installedPrinters.find(p => /kot|kitchen|chef/i.test(p))
-        || installedPrinters.find(p => /pos|receipt|bill|cash/i.test(p))
-        || installedPrinters.find(p => /thermal|80/i.test(p))
-        || installedPrinters[0]
-        || "Kot Printer";
+      enqueueCloudPrintJob('CHEF_SLIP', shiftData);
 
-      console.log(`🖨️ [Hardware Chef Slip Print] Printing production slip for chef ${shiftData.shift.chefName} on "${targetPrinter}"`);
+      const isWindows = process.platform === 'win32';
+      const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
-      const rawBuffer = buildChefSlipEscPosBuffer(shiftData);
-      const ok = await printSlipWindows(targetPrinter, rawBuffer);
+      if (isWindows) {
+        const installedPrinters = await getWindowsPrinters();
+        const targetPrinter = resolveThermalPrinter(installedPrinters);
+
+        console.log(`🖨️ [Hardware Chef Slip Print] Printing production slip for chef ${shiftData.shift.chefName} on "${targetPrinter}" (Kot Printer USB001)`);
+        const rawBuffer = buildChefSlipEscPosBuffer(shiftData);
+        const ok = await printSlipWindows(targetPrinter, rawBuffer);
+        return res.json({
+          success: ok,
+          printerUsed: targetPrinter,
+          isLocalServer: true
+        });
+      }
 
       res.json({
-        success: ok,
-        printerUsed: targetPrinter
+        success: isAgentOnline,
+        queued: true,
+        isAgentOnline
       });
     } catch (err: any) {
       console.error("Hardware Chef Slip print error:", err);
@@ -1202,51 +1236,57 @@ async function startServer() {
       // Enqueue for cloud print agent
       enqueueCloudPrintJob('KOT', req.body);
 
-      const installedPrinters = await getWindowsPrinters();
-      // Master / default printer preference: "Kot Printer" -> POS / thermal -> first installed
-      const masterPrinter = installedPrinters.find(p => /kot/i.test(p))
-        || installedPrinters.find(p => /pos|receipt|thermal|80/i.test(p))
-        || installedPrinters[0]
-        || "Kot Printer";
+      const isWindows = process.platform === 'win32';
+      const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
 
-      console.log(`🖨️ [Hardware Print] Processing ${slips.length} KOT slips. Master fallback printer: "${masterPrinter}"`);
+      if (isWindows) {
+        const installedPrinters = await getWindowsPrinters();
+        const masterPrinter = resolveThermalPrinter(installedPrinters);
 
-      let printedCount = 0;
-      for (let i = 0; i < slips.length; i++) {
-        const slip = slips[i];
-        let targetPrinter = masterPrinter;
-        
-        // If slip target printer exists and is online in Windows, use it; otherwise fallback to master printer
-        if (slip.targetPrinterName && installedPrinters.includes(slip.targetPrinterName)) {
-          targetPrinter = slip.targetPrinterName;
-        } else {
-          console.log(`ℹ️ Station printer "${slip.targetPrinterName || slip.station}" offline/not found. Routed to master printer "${masterPrinter}".`);
+        console.log(`🖨️ [Hardware Print] Processing ${slips.length} KOT slips. Master fallback printer: "${masterPrinter}" (Kot Printer USB001)`);
+
+        let printedCount = 0;
+        for (let i = 0; i < slips.length; i++) {
+          const slip = slips[i];
+          const targetPrinter = resolveThermalPrinter(installedPrinters, slip.targetPrinterName);
+          console.log(` ➔ Printing KOT Slip ${i + 1}/${slips.length} on "${targetPrinter}" (Kot Printer USB001)...`);
+
+          const rawBuffer = buildKotEscPosBuffer(
+            { tableName, tableZone, waiter, customer, invoiceNo, dateTime },
+            slip,
+            i + 1,
+            slips.length
+          );
+
+          const ok = await printSlipWindows(targetPrinter, rawBuffer);
+          if (ok) {
+            printedCount++;
+            console.log(`✅ [Hardware Print] Slip ${i + 1}/${slips.length} printed & cut on "${targetPrinter}"`);
+          }
+
+          if (i < slips.length - 1) {
+            await new Promise(r => setTimeout(r, 800));
+          }
         }
 
-        const rawBuffer = buildKotEscPosBuffer(
-          { tableName, tableZone, waiter, customer, invoiceNo, dateTime },
-          slip,
-          i + 1,
-          slips.length
-        );
-
-        const ok = await printSlipWindows(targetPrinter, rawBuffer);
-        if (ok) {
-          printedCount++;
-          console.log(`✅ [Hardware Print] Slip ${i + 1}/${slips.length} printed & cut on "${targetPrinter}"`);
-        }
-
-        // Wait 800ms between slips to allow physical cutter to complete
-        if (i < slips.length - 1) {
-          await new Promise(r => setTimeout(r, 800));
-        }
+        return res.json({
+          success: printedCount > 0,
+          printedCount,
+          totalSlips: slips.length,
+          printerUsed: masterPrinter,
+          isLocalServer: true
+        });
       }
 
+      console.log(`☁️ [Cloud KOT Queue] Enqueued ${slips.length} KOT slips for table ${tableName}. Agent online: ${isAgentOnline}`);
       res.json({
-        success: printedCount > 0,
-        printedCount,
+        success: isAgentOnline,
+        queued: true,
+        isAgentOnline,
         totalSlips: slips.length,
-        printerUsed: masterPrinter
+        message: isAgentOnline
+          ? "KOT slips queued and dispatched to active local printer agent"
+          : "KOT slips queued in cloud. Run start-printer-agent.bat on cashier PC."
       });
     } catch (err: any) {
       console.error("Hardware KOT print error:", err);
