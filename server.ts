@@ -100,26 +100,40 @@ async function startServer() {
     });
   }
 
-  // Resolve active thermal printer: Prioritizes Kot Printer (USB001), strictly bypassing 80 Printer (192.168.1.87)
+  // Resolve active thermal printer: Prioritizes 80 Printer (LAN 192.168.1.87) or Kot Printer (USB001)
   function resolveThermalPrinter(installedPrinters: string[], requestedName?: string): string {
-    const safePrinters = (installedPrinters || []).filter(p => 
-      !/^80\s*printer$/i.test(p.trim()) && 
-      !p.toLowerCase().includes('192.168')
-    );
+    const printers = installedPrinters || [];
 
-    const kot = safePrinters.find(p => /kot\s*printer/i.test(p)) || safePrinters.find(p => /kot/i.test(p));
-
-    if (requestedName && !/^80\s*printer$/i.test(requestedName.trim())) {
-      const exact = safePrinters.find(p => p.toLowerCase() === requestedName.toLowerCase().trim());
+    // 1. If a specific printer name was requested:
+    if (requestedName) {
+      const trimmedReq = requestedName.trim();
+      const exact = printers.find(p => p.toLowerCase() === trimmedReq.toLowerCase());
       if (exact) return exact;
+
+      if (/80\s*printer/i.test(trimmedReq) || trimmedReq.includes('80')) {
+        const match80 = printers.find(p => /80\s*printer/i.test(p));
+        if (match80) return match80;
+      }
+
+      if (/kot/i.test(trimmedReq)) {
+        const matchKot = printers.find(p => /kot/i.test(p));
+        if (matchKot) return matchKot;
+      }
     }
 
+    // 2. Prioritize active 80 Printer (LAN 192.168.1.87)
+    const lanPrinter = printers.find(p => /80\s*printer/i.test(p));
+    if (lanPrinter) return lanPrinter;
+
+    // 3. Fallback to Kot Printer (USB001)
+    const kot = printers.find(p => /kot\s*printer/i.test(p)) || printers.find(p => /kot/i.test(p));
     if (kot) return kot;
 
-    const thermal = safePrinters.find(p => /pos|receipt|thermal/i.test(p));
+    // 4. Fallback to any other thermal/receipt printer
+    const thermal = printers.find(p => /pos|receipt|thermal/i.test(p));
     if (thermal) return thermal;
 
-    return safePrinters[0] || 'Kot Printer';
+    return printers[0] || '80 Printer';
   }
 
   // Build ESC/POS binary buffer for a compact single-page KOT slip

@@ -1,13 +1,13 @@
 @echo off
-title Cafe Banani - Local Thermal Printer Bridge Agent (Kot Printer USB001)
+title Cafe Banani - Local Thermal Printer Bridge Agent (80 Printer LAN 192.168.1.87)
 color 0A
 cls
 echo ================================================================
 echo    CAFE BANANI - LOCAL THERMAL PRINTER BRIDGE AGENT
 echo ================================================================
 echo.
-echo  Primary Printer : Kot Printer (USB001 - Direct Hardware)
-echo  Offline Bypass  : 80 Printer (192.168.1.87) [Blocked]
+echo  Primary Printer : 80 Printer (192.168.1.87 - LAN)
+echo  Secondary Fallback: Kot Printer (USB001 - Direct Hardware)
 echo.
 set CLOUD_URL=https://erp-pos-sdv3.onrender.com
 if not "%~1"=="" set CLOUD_URL=%~1

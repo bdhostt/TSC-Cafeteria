@@ -19,29 +19,35 @@ async function getWindowsPrinters() {
 }
 
 function resolveThermalPrinter(installedPrinters, requestedName) {
-  // 1. Strict blacklist: Never use the offline network printer "80 Printer" (192.168.1.87)
-  const safePrinters = (installedPrinters || []).filter(p => 
-    !/^80\s*printer$/i.test(p.trim()) && 
-    !p.toLowerCase().includes('192.168')
-  );
+  const printers = installedPrinters || [];
+  const lanPrinter = printers.find(p => /80\s*printer/i.test(p));
 
-  // 2. Kot Printer on USB001 is the absolute primary hardware printer
-  const kot = safePrinters.find(p => /kot\s*printer/i.test(p)) || safePrinters.find(p => /kot/i.test(p));
-
-  // 3. If a specific printer was requested, ensure it's not the blacklisted "80 Printer"
-  if (requestedName && !/^80\s*printer$/i.test(requestedName.trim())) {
-    const exact = safePrinters.find(p => p.toLowerCase() === requestedName.toLowerCase().trim());
-    if (exact) return exact;
+  // If 80 Printer (LAN 192.168.1.87) is installed, route ALL POS orders, KOTs, and bills to it
+  if (lanPrinter) {
+    return lanPrinter;
   }
 
-  // 4. Default to Kot Printer if available
+  // 1. If a specific printer name was requested:
+  if (requestedName) {
+    const trimmedReq = requestedName.trim();
+    const exact = printers.find(p => p.toLowerCase() === trimmedReq.toLowerCase());
+    if (exact) return exact;
+
+    if (/kot/i.test(trimmedReq)) {
+      const matchKot = printers.find(p => /kot/i.test(p));
+      if (matchKot) return matchKot;
+    }
+  }
+
+  // 2. Fallback to Kot Printer (USB001)
+  const kot = printers.find(p => /kot\s*printer/i.test(p)) || printers.find(p => /kot/i.test(p));
   if (kot) return kot;
 
-  // 5. Fallback to any other thermal/receipt printer (excluding 80 Printer)
-  const thermal = safePrinters.find(p => /pos|receipt|thermal/i.test(p));
+  // 3. Fallback to any other thermal/receipt printer
+  const thermal = printers.find(p => /pos|receipt|thermal/i.test(p));
   if (thermal) return thermal;
 
-  return safePrinters[0] || 'Kot Printer';
+  return printers[0] || '80 Printer';
 }
 
 async function printSlipWindows(printerName, rawBuffer) {
@@ -690,7 +696,7 @@ async function processPrintJob(job) {
     for (let i = 0; i < slips.length; i++) {
       const slip = slips[i];
       const targetPrinter = resolveThermalPrinter(installedPrinters, slip.targetPrinterName);
-      console.log(' ➔ Printing KOT Slip ' + (i + 1) + '/' + slips.length + ' on "' + targetPrinter + '" (Kot Printer USB001)...');
+      console.log(' ➔ Printing KOT Slip ' + (i + 1) + '/' + slips.length + ' on "' + targetPrinter + '"...');
       const buffer = buildKotEscPosBuffer(payload, slip, i + 1, slips.length);
       await printSlipWindows(targetPrinter, buffer);
       if (i < slips.length - 1) await new Promise(r => setTimeout(r, 800));
@@ -701,7 +707,7 @@ async function processPrintJob(job) {
 
   if (job.type === 'BILL') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
-    console.log(' ➔ Printing Bill for Table ' + (job.payload.tableName || 'N/A') + ' on "' + targetPrinter + '" (Kot Printer USB001)...');
+    console.log(' ➔ Printing Bill for Table ' + (job.payload.tableName || 'N/A') + ' on "' + targetPrinter + '"...');
     const buffer = buildBillEscPosBuffer(job.payload);
     await printSlipWindows(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Bill printed successfully on ' + targetPrinter + '!');
@@ -710,7 +716,7 @@ async function processPrintJob(job) {
 
   if (job.type === 'ZREPORT') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
-    console.log(' ➔ Printing Shift Z-Report on "' + targetPrinter + '" (Kot Printer USB001)...');
+    console.log(' ➔ Printing Shift Z-Report on "' + targetPrinter + '"...');
     const buffer = buildZReportEscPosBuffer(job.payload);
     await printSlipWindows(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Shift Z-Report printed successfully on ' + targetPrinter + '!');
@@ -719,7 +725,7 @@ async function processPrintJob(job) {
 
   if (job.type === 'WAITER_SLIP') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
-    console.log(' ➔ Printing Waiter Slip for ' + (job.payload.waiterName || 'Staff') + ' on "' + targetPrinter + '" (Kot Printer USB001)...');
+    console.log(' ➔ Printing Waiter Slip for ' + (job.payload.waiterName || 'Staff') + ' on "' + targetPrinter + '"...');
     const buffer = buildWaiterSlipEscPosBuffer(job.payload);
     await printSlipWindows(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Waiter slip printed successfully on ' + targetPrinter + '!');
@@ -728,7 +734,7 @@ async function processPrintJob(job) {
 
   if (job.type === 'CHEF_SLIP') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
-    console.log(' ➔ Printing Kitchen Chef Slip on "' + targetPrinter + '" (Kot Printer USB001)...');
+    console.log(' ➔ Printing Kitchen Chef Slip on "' + targetPrinter + '"...');
     const buffer = buildChefSlipEscPosBuffer(job.payload);
     await printSlipWindows(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Chef slip printed successfully on ' + targetPrinter + '!');
@@ -737,7 +743,7 @@ async function processPrintJob(job) {
 
   if (job.type === 'DAYEND') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
-    console.log(' ➔ Printing Daily Master Day-End Z-Report on "' + targetPrinter + '" (Kot Printer USB001)...');
+    console.log(' ➔ Printing Daily Master Day-End Z-Report on "' + targetPrinter + '"...');
     const buffer = buildDayEndEscPosBuffer(job.payload);
     await printSlipWindows(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Day-End Master Z-Report printed successfully on ' + targetPrinter + '!');
@@ -762,14 +768,12 @@ function startLocalHttpServer() {
 
     if (req.url === '/health' && req.method === 'GET') {
       const printers = await getWindowsPrinters();
-      const safePrinters = printers.filter(p => !/^80\s*printer$/i.test(p.trim()));
       const activePrinter = resolveThermalPrinter(printers);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         status: 'ok', 
         activePrinter,
-        printers: safePrinters, 
-        bypassedPrinters: ['80 Printer (192.168.1.87)'],
+        printers: printers, 
         timestamp: Date.now() 
       }));
       return;
@@ -866,17 +870,14 @@ async function init() {
 
   console.log('📋 Detected Installed Windows Printers:');
   printers.forEach(p => {
-    if (/^80\s*printer$/i.test(p.trim())) {
-      console.log('   ⛔ ' + p + ' (192.168.1.87) [PERMANENTLY BYPASSED - OFFLINE]');
-    } else if (p === primaryThermal) {
-      console.log('   🎯 ' + p + ' (USB001) [PRIMARY ACTIVE HARDWARE PRINTER]');
+    if (p === primaryThermal) {
+      console.log('   🎯 ' + p + ' [PRIMARY ACTIVE HARDWARE PRINTER]');
     } else {
       console.log('   • ' + p);
     }
   });
 
-  console.log('\n🖨️ Active Output Device : "' + primaryThermal + '" on USB001');
-  console.log('🛡️ Security Protection : 80 Printer (192.168.1.87) is completely blocked.');
+  console.log('\n🖨️ Active Output Device : "' + primaryThermal + '"');
   console.log('🟢 Status: Listening for print orders from ' + CLOUD_SERVER_URL + '...\n');
 
   startLocalHttpServer();
