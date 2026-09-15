@@ -136,27 +136,29 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Hardware Thermal Darkening & Density Configuration
-    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
-    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
-    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
-    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
-    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform standard font A (42 columns)
+    // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
+    pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF (prevents muddy/bleeding characters)
+    pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
+    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform standard font A (12x24, 42 columns)
 
     // 3. Center Align: Station & KOT number
     pushBytes([0x1B, 0x61, 0x01]); // Center
     pushStr("------------------------------------------\n");
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
     pushStr(`STATION: ${cleanStation.toUpperCase()}\n`);
     pushStr(`KOT NO: ${req.invoiceNo}${total > 1 ? `-${index}` : ''}\n`);
     if (slip.category) {
       pushStr(`Category: ${slip.category}\n`);
     }
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
-    // 4. Left Align: Table, Time, Waiter Info (All Bold)
+    // 4. Left Align: Table, Time, Waiter Info
     pushBytes([0x1B, 0x61, 0x00]); // Left align
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Table
     pushStr(`TABLE   : ${req.tableName}${req.tableZone ? ` (${req.tableZone})` : ""}\n`);
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     const timeStr = req.dateTime || new Date().toLocaleString("en-US");
     pushStr(`TIME    : ${timeStr}\n`);
@@ -167,10 +169,12 @@ async function startServer() {
     pushStr("------------------------------------------\n");
 
     // 5. Items Header
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr("ITEM NAME                              QTY\n");
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
-    // 6. Food Items (Bold & Double-Strike Jet-Black)
+    // 6. Food Items (Crisp, High Legibility)
     let totalQty = 0;
     for (const item of slip.items) {
       totalQty += item.qty;
@@ -178,7 +182,9 @@ async function startServer() {
       const nameCol = name.padEnd(34, ' ');
       const qtyCol = `${item.qty}x`.padStart(6, ' ');
 
+      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
       pushStr(`${nameCol} ${qtyCol}\n`);
+      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
       if (item.variation) {
         pushStr(`   - Cut: ${item.variation}\n`);
@@ -246,16 +252,16 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Hardware Thermal Darkening & Density Configuration
-    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
-    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
-    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
-    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
-    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
+    // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
+    pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF (prevents muddy/bleeding characters)
+    pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
+    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (12x24, 42 columns)
 
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`${bill.restaurantName || "BARCODE CAFE BANANI"}\n`);
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     const rawAddress = bill.restaurantAddress || "House #42, Road #11, Block D, Banani, Dhaka-1213";
     if (rawAddress) {
@@ -290,10 +296,12 @@ async function startServer() {
       pushStr(`BIN/VAT Reg: ${rawBin}\n`);
     }
     pushStr("------------------------------------------\n");
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(`${bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL"}\n`);
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
-    // 4. Left Align: Invoice metadata (All Bold)
+    // 4. Left Align: Invoice metadata
     pushBytes([0x1B, 0x61, 0x00]); // Left
     pushStr(line2Col("Invoice No :", bill.invoiceNo || "INV-0000"));
     let dateStr = "";
@@ -333,14 +341,16 @@ async function startServer() {
     pushStr("------------------------------------------\n");
 
     // 5. Items Header (Exact 42 character columns)
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     const colItemH = "ITEM".padEnd(19, ' ');
     const colQtyH = "QTY".padStart(3, ' ');
     const colPriceH = "PRICE".padStart(8, ' ');
     const colTotalH = "TOTAL".padStart(9, ' ');
     pushStr(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}\n`);
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
-    // 6. Food Items (Bold & Double-Strike Jet-Black)
+    // 6. Food Items (Crisp & High Legibility)
     for (const item of bill.items) {
       let firstLineName = item.name.trim();
       let remainder = "";
@@ -376,7 +386,7 @@ async function startServer() {
 
     pushStr("------------------------------------------\n");
 
-    // 7. Financial Summary (Bold & Double-Strike Jet-Black)
+    // 7. Financial Summary
     pushBytes([0x1B, 0x61, 0x00]); // Left align
     pushStr(line2Col("Subtotal:", Number(bill.subtotal || 0).toFixed(2)));
     if (bill.discountDeduction && bill.discountDeduction > 0) {
@@ -386,7 +396,9 @@ async function startServer() {
       pushStr(line2Col(discLbl, `-${Number(bill.discountDeduction).toFixed(2)}`));
     }
     pushStr("------------------------------------------\n");
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     pushStr(line2Col("TOTAL PAYABLE:", Number(bill.netTotal || 0).toFixed(2)));
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     // Payment breakdown if settled
     const pb = (bill as any).paymentBreakdown;
@@ -406,7 +418,9 @@ async function startServer() {
     // 8. Center Align: Footer Note
     pushBytes([0x1B, 0x61, 0x01]); // Center
     if (bill.isSettled) {
+      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
       pushStr("*** PAID & SETTLED ***\n");
+      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     }
     pushStr("Thank you for dining with us!\n");
     pushStr("Please visit again\n");
@@ -467,12 +481,10 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Hardware Thermal Darkening & Density Configuration
-    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
-    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
-    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
-    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
-    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
+    // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
+    pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF
+    pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
+    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
@@ -669,12 +681,10 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Hardware Thermal Darkening & Density Configuration
-    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
-    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
-    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
-    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
-    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
+    // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
+    pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF
+    pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
+    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
     pushStr(`${data.restaurantName || "BARCODE CAFE BANANI"}\n`);
@@ -763,12 +773,10 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Hardware Thermal Darkening & Density Configuration
-    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
-    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
-    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
-    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
-    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
+    // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
+    pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF
+    pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
+    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
     pushStr(`${data.restaurantName || "BARCODE CAFE BANANI"}\n`);
@@ -881,12 +889,10 @@ async function startServer() {
     // 1. ESC @ : Initialize printer
     pushBytes([0x1B, 0x40]);
 
-    // 2. Hardware Thermal Darkening & Density Configuration
-    pushBytes([0x1B, 0x37, 0x08, 0xFF, 0x02]); // ESC 7: Max heat
-    pushBytes([0x12, 0x23, 0x3F]);             // DC2 #: Max density
-    pushBytes([0x1B, 0x47, 0x01]);             // ESC G 1: Double-strike ON
-    pushBytes([0x1B, 0x45, 0x01]);             // ESC E 1: Bold ON throughout (matches font-weight: 700)
-    pushBytes([0x1B, 0x21, 0x00]);             // ESC ! 0: Uniform font A (42 columns)
+    // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
+    pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF
+    pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
+    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
     pushStr(`${data.restaurantName || "BARCODE CAFE BANANI"}\n`);
