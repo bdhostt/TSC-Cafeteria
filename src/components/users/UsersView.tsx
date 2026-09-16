@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant, DEFAULT_ROLE_PERMISSIONS, DEFAULT_USERS } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_ROLE_PERMISSIONS, DEFAULT_USERS, DEFAULT_ORDER_EDIT_PERMISSIONS } from '../../context/RestaurantContext';
 import { AppUser, UserRole, ActiveTab } from '../../types';
 import { 
   Users, 
@@ -49,7 +49,8 @@ export const UsersView: React.FC = () => {
     addUser, 
     editUser, 
     deleteUser, 
-    updateRolePermissions
+    updateRolePermissions,
+    updateOrderEditPermission
   } = useRestaurant();
 
   const usersList: AppUser[] = data.users && data.users.length > 0 ? data.users : DEFAULT_USERS;
@@ -220,25 +221,29 @@ export const UsersView: React.FC = () => {
       </div>
 
       {/* Sub Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-2">
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/80 w-fit">
         <button
+          id="tab-btn-users-directory"
+          type="button"
           onClick={() => setActiveSubTab('users')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition cursor-pointer shadow-2xs ${
             activeSubTab === 'users'
-              ? 'border-purple-600 text-purple-700'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Users Directory ({usersList.length})</span>
+          <span>Users & Staff Directory ({usersList.length})</span>
         </button>
 
         <button
+          id="tab-btn-role-matrix"
+          type="button"
           onClick={() => setActiveSubTab('roles')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition cursor-pointer shadow-2xs ${
             activeSubTab === 'roles'
-              ? 'border-purple-600 text-purple-700'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
           }`}
         >
           <Shield className="w-4 h-4" />
@@ -473,6 +478,112 @@ export const UsersView: React.FC = () => {
                     </tr>
                   );
                 })}
+
+                {/* SPECIAL SECTION: POS OPERATIONAL & ACTION PERMISSIONS */}
+                <tr className="bg-amber-100/70 border-t-2 border-b-2 border-amber-300">
+                  <td colSpan={7} className="p-2.5 px-3 font-black text-amber-950 text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-amber-800" />
+                      <span>POS Operational & Action Permissions (অর্ডার কন্ট্রোল পারমিশন)</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded border border-amber-300">
+                      Action Security Control
+                    </span>
+                  </td>
+                </tr>
+
+                <tr className="bg-amber-50/50 hover:bg-amber-100/50 transition border-b border-slate-200">
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-amber-600 shrink-0" />
+                      <div>
+                        <div className="font-extrabold text-slate-900 text-xs">
+                          Cancel or Edit Submitted Orders
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          KOT সাবমিট বা বিল প্রিন্ট হওয়ার পর আইটেম এডিট, মাইনাস, ডিলিট বা পুরো অর্ডার বাতিল (Void) করার অনুমতি
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <span className="text-[10px] font-black uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
+                      POS ACTION
+                    </span>
+                  </td>
+
+                  {/* ADMIN */}
+                  <td className="p-3 text-center bg-purple-50/30">
+                    <div className="flex items-center justify-center" title="Admin always has full unrestricted access">
+                      <CheckCircle2 className="w-5 h-5 text-purple-600" />
+                    </div>
+                  </td>
+
+                  {/* MANAGER */}
+                  <td className="p-3 text-center bg-blue-50/30">
+                    <button
+                      type="button"
+                      onClick={() => updateOrderEditPermission('MANAGER', !(data.orderEditPermissions?.MANAGER ?? true))}
+                      className="p-1 rounded hover:bg-blue-100 transition inline-flex items-center justify-center cursor-pointer"
+                      title="Toggle Manager permission"
+                    >
+                      {(data.orderEditPermissions?.MANAGER ?? true) ? (
+                        <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-slate-300" />
+                      )}
+                    </button>
+                  </td>
+
+                  {/* CASHIER */}
+                  <td className="p-3 text-center bg-emerald-50/30">
+                    <button
+                      type="button"
+                      onClick={() => updateOrderEditPermission('CASHIER', !(data.orderEditPermissions?.CASHIER ?? true))}
+                      className="p-1 rounded hover:bg-emerald-100 transition inline-flex items-center justify-center cursor-pointer"
+                      title="Toggle Cashier permission"
+                    >
+                      {(data.orderEditPermissions?.CASHIER ?? true) ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-slate-300" />
+                      )}
+                    </button>
+                  </td>
+
+                  {/* WAITER */}
+                  <td className="p-3 text-center bg-amber-100/40">
+                    <button
+                      type="button"
+                      id="toggle-waiter-order-edit-matrix"
+                      onClick={() => updateOrderEditPermission('WAITER', !(data.orderEditPermissions?.WAITER ?? false))}
+                      className="p-1 rounded hover:bg-amber-200/70 transition inline-flex items-center justify-center cursor-pointer"
+                      title="Click to toggle Waiter permission to cancel or edit submitted orders"
+                    >
+                      {(data.orderEditPermissions?.WAITER ?? false) ? (
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600 font-bold" />
+                      ) : (
+                        <XCircle className="w-6 h-6 text-rose-500 hover:text-rose-700" />
+                      )}
+                    </button>
+                  </td>
+
+                  {/* CHEF */}
+                  <td className="p-3 text-center bg-orange-50/30">
+                    <button
+                      type="button"
+                      onClick={() => updateOrderEditPermission('CHEF', !(data.orderEditPermissions?.CHEF ?? false))}
+                      className="p-1 rounded hover:bg-orange-100 transition inline-flex items-center justify-center cursor-pointer"
+                      title="Toggle Chef permission"
+                    >
+                      {(data.orderEditPermissions?.CHEF ?? false) ? (
+                        <CheckCircle2 className="w-5 h-5 text-orange-600" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-slate-300" />
+                      )}
+                    </button>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>

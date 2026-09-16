@@ -649,6 +649,7 @@ export interface AppData {
   customerAdvances?: CustomerAdvance[];
   users?: AppUser[];
   rolePermissions?: Record<UserRole, ActiveTab[]>;
+  orderEditPermissions?: Record<UserRole, boolean>;
   employees?: Employee[];
   attendanceRecords?: AttendanceRecord[];
   leaveApplications?: LeaveApplication[];

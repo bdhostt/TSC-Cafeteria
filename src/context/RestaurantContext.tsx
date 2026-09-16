@@ -143,6 +143,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ActiveTab[]> = {
   ]
 };
 
+export const DEFAULT_ORDER_EDIT_PERMISSIONS: Record<UserRole, boolean> = {
+  ADMIN: true,
+  MANAGER: true,
+  CASHIER: true,
+  WAITER: false,
+  CHEF: false
+};
+
 export const DEFAULT_USERS: AppUser[] = [
   {
     id: 'USR-01',
@@ -1069,6 +1077,7 @@ interface RestaurantContextType {
   editUser: (id: string, updates: Partial<AppUser>) => void;
   deleteUser: (id: string) => void;
   updateRolePermissions: (role: UserRole, permissions: ActiveTab[]) => void;
+  updateOrderEditPermission: (role: UserRole, allowed: boolean) => void;
   canAccessTab: (tab: ActiveTab, ignoreShift?: boolean) => boolean;
 
   // Language & i18n
@@ -2000,6 +2009,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (currentUser?.role === role) {
       setCurrentUser(prev => prev ? { ...prev, permissions } : null);
     }
+  };
+
+  const updateOrderEditPermission = (role: UserRole, allowed: boolean) => {
+    setData(prev => {
+      const current = prev.orderEditPermissions || DEFAULT_ORDER_EDIT_PERMISSIONS;
+      const updated = { ...current, [role]: allowed };
+      saveData({ ...prev, orderEditPermissions: updated });
+      return { ...prev, orderEditPermissions: updated };
+    });
   };
 
   const canAccessTab = (tab: ActiveTab, ignoreShift: boolean = false): boolean => {
@@ -5101,6 +5119,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       editUser,
       deleteUser,
       updateRolePermissions,
+      updateOrderEditPermission,
       canAccessTab,
       language,
       setLanguage,

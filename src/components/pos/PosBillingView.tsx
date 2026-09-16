@@ -111,10 +111,12 @@ export const PosBillingView: React.FC = () => {
   } = useRestaurant();
 
   const isWaiter = currentUser?.role === 'WAITER';
+  const isRoleAllowed = Boolean(currentUser?.role && (data.orderEditPermissions?.[currentUser.role] ?? (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'CASHIER')));
   const canCancelOrEditOrder = 
     currentUser?.role === 'ADMIN' || 
     currentUser?.role === 'MANAGER' || 
-    Boolean(currentUser?.canEditSubmittedOrders);
+    Boolean(currentUser?.canEditSubmittedOrders) ||
+    isRoleAllowed;
 
   // Void and Release Modals state
   const [voidingItem, setVoidingItem] = useState<{ item: TableCartItem; index: number } | null>(null);
