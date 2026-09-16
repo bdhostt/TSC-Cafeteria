@@ -595,6 +595,7 @@ export interface AppUser {
   permissions?: ActiveTab[];
   isActive: boolean;
   phone?: string;
+  canEditSubmittedOrders?: boolean;
 }
 
 export interface RestaurantProfile {

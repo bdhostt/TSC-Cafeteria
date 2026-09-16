@@ -48,7 +48,7 @@ export const ReleaseTableModal: React.FC<ReleaseTableModalProps> = ({
   const adminUsers = usersList.filter(u => u.role === 'ADMIN' || u.role === 'MANAGER' || u.role === 'CASHIER');
   const defaultAuthorizer = adminUsers.find(u => u.id === currentUser?.id) || adminUsers[0] || usersList[0];
 
-  const isCurrentAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER';
+  const isCurrentAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' || Boolean(currentUser?.canEditSubmittedOrders);
   const [authorizedUserId, setAuthorizedUserId] = useState<string>(defaultAuthorizer?.id || '');
   const [supervisorPin, setSupervisorPin] = useState<string>('');
   const [pinError, setPinError] = useState<string>('');

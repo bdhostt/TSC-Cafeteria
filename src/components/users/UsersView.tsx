@@ -68,6 +68,7 @@ export const UsersView: React.FC = () => {
     role: UserRole;
     phone: string;
     isActive: boolean;
+    canEditSubmittedOrders: boolean;
   }>({
     name: '',
     username: '',
@@ -75,7 +76,8 @@ export const UsersView: React.FC = () => {
     pinOrPassword: '',
     role: 'CASHIER',
     phone: '',
-    isActive: true
+    isActive: true,
+    canEditSubmittedOrders: true
   });
 
   const handleOpenAdd = () => {
@@ -86,7 +88,8 @@ export const UsersView: React.FC = () => {
       pinOrPassword: '123',
       role: 'CASHIER',
       phone: '',
-      isActive: true
+      isActive: true,
+      canEditSubmittedOrders: false
     });
     setEditingUserId(null);
     setIsAddUserModalOpen(true);
@@ -100,7 +103,8 @@ export const UsersView: React.FC = () => {
       pinOrPassword: user.pinOrPassword || '',
       role: user.role,
       phone: user.phone || '',
-      isActive: user.isActive !== false
+      isActive: user.isActive !== false,
+      canEditSubmittedOrders: user.canEditSubmittedOrders ?? (user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'CASHIER')
     });
     setEditingUserId(user.id);
     setIsAddUserModalOpen(true);
@@ -138,7 +142,8 @@ export const UsersView: React.FC = () => {
         pinOrPassword: cleanPin,
         role: formData.role,
         phone: formData.phone.trim(),
-        isActive: formData.isActive
+        isActive: formData.isActive,
+        canEditSubmittedOrders: formData.canEditSubmittedOrders
       });
     } else {
       addUser({
@@ -148,7 +153,8 @@ export const UsersView: React.FC = () => {
         pinOrPassword: cleanPin,
         role: formData.role,
         phone: formData.phone.trim(),
-        isActive: formData.isActive
+        isActive: formData.isActive,
+        canEditSubmittedOrders: formData.canEditSubmittedOrders
       });
     }
     setIsAddUserModalOpen(false);
@@ -317,6 +323,19 @@ export const UsersView: React.FC = () => {
                         </span>
                         <span className="font-bold text-slate-800">
                           {user.role === 'ADMIN' ? 'All (Unrestricted)' : `${(user.permissions || []).length} modules`}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+                          <Shield className="w-3.5 h-3.5" /> Cancel/Edit Order:
+                        </span>
+                        <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
+                          (user.role === 'ADMIN' || user.role === 'MANAGER' || user.canEditSubmittedOrders)
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {(user.role === 'ADMIN' || user.role === 'MANAGER' || user.canEditSubmittedOrders) ? 'Allowed' : 'Locked (Read-Only)'}
                         </span>
                       </div>
                     </div>
@@ -551,9 +570,27 @@ export const UsersView: React.FC = () => {
                   onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
                   className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                 />
-                <label htmlFor="isActiveUser" className="text-xs font-bold text-slate-700">
+                <label htmlFor="isActiveUser" className="text-xs font-bold text-slate-700 cursor-pointer">
                   Account Active & Enabled for Sign In
                 </label>
+              </div>
+
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1 mt-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="canEditSubmittedOrders"
+                    checked={formData.canEditSubmittedOrders}
+                    onChange={e => setFormData({ ...formData, canEditSubmittedOrders: e.target.checked })}
+                    className="w-4 h-4 rounded border-amber-400 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                  />
+                  <label htmlFor="canEditSubmittedOrders" className="text-xs font-bold text-slate-800 cursor-pointer">
+                    🛡️ Permission: Can Cancel or Edit Submitted Orders
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-500 pl-6">
+                  Admin যাকে অনুমতি দিবে, সে KOT সাবমিট বা বিল প্রিন্ট হওয়ার পরেও আইটেম এডিট/ভয়েড বা অর্ডার বাতিল করতে পারবে। (Default: Waiter-দের জন্য বন্ধ)
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">

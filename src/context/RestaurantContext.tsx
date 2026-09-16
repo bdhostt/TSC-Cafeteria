@@ -153,7 +153,8 @@ export const DEFAULT_USERS: AppUser[] = [
     role: 'ADMIN',
     permissions: DEFAULT_ROLE_PERMISSIONS.ADMIN,
     isActive: true,
-    phone: '+880 1711-000001'
+    phone: '+880 1711-000001',
+    canEditSubmittedOrders: true
   },
   {
     id: 'USR-02',
@@ -164,7 +165,8 @@ export const DEFAULT_USERS: AppUser[] = [
     role: 'MANAGER',
     permissions: DEFAULT_ROLE_PERMISSIONS.MANAGER,
     isActive: true,
-    phone: '+880 1811-000002'
+    phone: '+880 1811-000002',
+    canEditSubmittedOrders: true
   },
   {
     id: 'USR-03',
@@ -175,7 +177,8 @@ export const DEFAULT_USERS: AppUser[] = [
     role: 'CASHIER',
     permissions: DEFAULT_ROLE_PERMISSIONS.CASHIER,
     isActive: true,
-    phone: '+880 1911-000003'
+    phone: '+880 1911-000003',
+    canEditSubmittedOrders: true
   },
   {
     id: 'USR-03B',
@@ -186,7 +189,8 @@ export const DEFAULT_USERS: AppUser[] = [
     role: 'CASHIER',
     permissions: DEFAULT_ROLE_PERMISSIONS.CASHIER,
     isActive: true,
-    phone: '+880 1911-000004'
+    phone: '+880 1911-000004',
+    canEditSubmittedOrders: true
   },
   {
     id: 'USR-04',
@@ -197,7 +201,8 @@ export const DEFAULT_USERS: AppUser[] = [
     role: 'WAITER',
     permissions: DEFAULT_ROLE_PERMISSIONS.WAITER,
     isActive: true,
-    phone: '+880 1611-000004'
+    phone: '+880 1611-000004',
+    canEditSubmittedOrders: false
   },
   {
     id: 'USR-05',
@@ -208,7 +213,8 @@ export const DEFAULT_USERS: AppUser[] = [
     role: 'CHEF',
     permissions: DEFAULT_ROLE_PERMISSIONS.CHEF,
     isActive: true,
-    phone: '+880 1511-000005'
+    phone: '+880 1511-000005',
+    canEditSubmittedOrders: false
   }
 ];
 

@@ -43,6 +43,7 @@ import {
   UserCheck,
   BookOpen,
   ArrowRightLeft,
+  Lock,
   Sun,
   Moon,
   LogOut,
@@ -110,6 +111,10 @@ export const PosBillingView: React.FC = () => {
   } = useRestaurant();
 
   const isWaiter = currentUser?.role === 'WAITER';
+  const canCancelOrEditOrder = 
+    currentUser?.role === 'ADMIN' || 
+    currentUser?.role === 'MANAGER' || 
+    Boolean(currentUser?.canEditSubmittedOrders);
 
   // Void and Release Modals state
   const [voidingItem, setVoidingItem] = useState<{ item: TableCartItem; index: number } | null>(null);
@@ -941,6 +946,10 @@ export const PosBillingView: React.FC = () => {
                   key={dish.id}
                   id={`menu-item-btn-${dish.id}`}
                   onClick={() => {
+                    if (activeTable?.status === 'billed' && !canCancelOrEditOrder) {
+                      alert('This order is already billed. Only Admin or authorized staff can edit it.');
+                      return;
+                    }
                     if (hasOptions) {
                       setSelectedDishForCustomization(dish);
                     } else {
@@ -1052,6 +1061,20 @@ export const PosBillingView: React.FC = () => {
                 <UserCheck className="w-3 h-3 text-[#004b9b]" />
                 <span className="truncate max-w-[110px]">{activeTable.waiter || 'Staff'}</span>
               </button>
+
+              {/* Void / Cancel Order Button - Only for Admin / Authorized users */}
+              {canCancelOrEditOrder && activeTable.cart.length > 0 && (
+                <button
+                  type="button"
+                  id="btn-void-table-order"
+                  onClick={() => setReleasingTable(activeTable)}
+                  className="px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] flex items-center gap-1 border border-rose-200 cursor-pointer transition shadow-2xs"
+                  title="Cancel/Void entire order and release table (Admin/Authorized)"
+                >
+                  <Ban className="w-3 h-3 text-rose-600" />
+                  <span>Void Order</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1160,6 +1183,9 @@ export const PosBillingView: React.FC = () => {
                 const kotTimestamp = item.kotPrintedTimestamp || item.addedAt || activeTable.orderCreatedAt || null;
                 const kotElapsedMinutes = (isItemKotPrinted && kotTimestamp) ? Math.max(0, Math.floor((nowTime - kotTimestamp) / 60000)) : 0;
 
+                const isTableBilled = activeTable.status === 'billed';
+                const isItemLocked = (isItemKotPrinted || isTableBilled) && !canCancelOrEditOrder;
+
                 return (
                   <div key={item.cartItemId || `${item.id}-${idx}`} className="py-2.5 flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -1181,7 +1207,7 @@ export const PosBillingView: React.FC = () => {
                             className="text-[8.5px] text-slate-400 font-medium inline-flex items-center gap-1 tracking-tight select-none ml-0.5"
                             title={`KOT sent to kitchen at ${item.kotPrintedAt} (${kotElapsedMinutes} minutes elapsed)`}
                           >
-                            <Clock className="w-2 h-2 text-[#004b9b] shrink-0" />
+                            <Clock className="w-2 h-2 text-[#004b9b]" />
                             <span>{item.kotPrintedAt}</span>
                             <span>({kotElapsedMinutes}m)</span>
                           </span>
@@ -1191,101 +1217,125 @@ export const PosBillingView: React.FC = () => {
                       {/* Special Instruction / Item Note */}
                       <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                         {item.notes ? (
-                          <div 
-                            onClick={() => {
-                              setEditingNoteItem({ item, index: idx });
-                              setItemNoteInput(item.notes || '');
-                            }}
-                            className="group flex items-center gap-1 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5 cursor-pointer transition"
-                            title="Click to edit special instruction"
-                          >
-                            <FileText className="w-2.5 h-2.5 text-blue-700" />
-                            <span className="font-semibold italic truncate max-w-[140px]">{item.notes}</span>
-                            <Edit2 className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 text-blue-700 ml-0.5" />
-                          </div>
+                          isItemLocked ? (
+                            <div 
+                              className="flex items-center gap-1 text-[10px] bg-slate-100 text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 select-none"
+                              title="Special instruction (Read-only)"
+                            >
+                              <FileText className="w-2.5 h-2.5 text-slate-400" />
+                              <span className="font-medium italic truncate max-w-[140px]">{item.notes}</span>
+                            </div>
+                          ) : (
+                            <div 
+                              onClick={() => {
+                                setEditingNoteItem({ item, index: idx });
+                                setItemNoteInput(item.notes || '');
+                              }}
+                              className="group flex items-center gap-1 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5 cursor-pointer transition"
+                              title="Click to edit special instruction"
+                            >
+                              <FileText className="w-2.5 h-2.5 text-blue-700" />
+                              <span className="font-semibold italic truncate max-w-[140px]">{item.notes}</span>
+                              <Edit2 className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100 text-blue-700 ml-0.5" />
+                            </div>
+                          )
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingNoteItem({ item, index: idx });
-                              setItemNoteInput('');
-                            }}
-                            className="inline-flex items-center gap-1 text-[10px] text-slate-400 hover:text-[#004b9b] hover:bg-blue-50 px-1.5 py-0.5 rounded transition cursor-pointer border border-dashed border-slate-200 hover:border-blue-300"
-                            title="Add special cooking note / instruction (prints on KOT)"
-                          >
-                            <FileText className="w-2.5 h-2.5" />
-                            <span>+ Note</span>
-                          </button>
+                          !isItemLocked && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingNoteItem({ item, index: idx });
+                                itemNoteInput('');
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] text-slate-400 hover:text-[#004b9b] hover:bg-blue-50 px-1.5 py-0.5 rounded transition cursor-pointer border border-dashed border-slate-200 hover:border-blue-300"
+                              title="Add special cooking note / instruction (prints on KOT)"
+                            >
+                              <FileText className="w-2.5 h-2.5" />
+                              <span>+ Note</span>
+                            </button>
+                          )
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* Decrement or Void */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)) {
-                            // Cannot decrement below printed KOT qty without void authorization
-                            setVoidingItem({ item, index: idx });
-                          } else {
-                            updateCartItemQty(activeTable.id, item.cartItemId || idx, -1);
+                    {isItemLocked ? (
+                      <div className="flex items-center gap-1.5 shrink-0 select-none">
+                        <span 
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-xs flex items-center gap-1.5 shadow-2xs"
+                          title="This item was submitted and is read-only. Contact Admin or Supervisor to modify."
+                        >
+                          <Lock className="w-3 h-3 text-slate-400" />
+                          <span>Qty: {item.qty}</span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* Decrement or Void */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)) {
+                              // Cannot decrement below printed KOT qty without void authorization
+                              setVoidingItem({ item, index: idx });
+                            } else {
+                              updateCartItemQty(activeTable.id, item.cartItemId || idx, -1);
+                            }
+                          }}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ${
+                            isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
+                              ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }`}
+                          title={
+                            isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
+                              ? 'Void Item (KOT already sent to kitchen - authorization required)'
+                              : 'Decrease quantity'
                           }
-                        }}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ${
-                          isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
-                            ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        }`}
-                        title={
-                          isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
-                            ? 'Void Item (KOT already sent to kitchen - authorization required)'
-                            : 'Decrease quantity'
-                        }
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
 
-                      <span className="w-7 text-center font-extrabold text-xs text-slate-900">{item.qty}</span>
+                        <span className="w-7 text-center font-extrabold text-xs text-slate-900">{item.qty}</span>
 
-                      {/* Increment */}
-                      <button
-                        type="button"
-                        onClick={() => updateCartItemQty(activeTable.id, item.cartItemId || idx, 1)}
-                        className="w-6 h-6 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 flex items-center justify-center font-bold transition cursor-pointer"
-                        title="Increase quantity"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
+                        {/* Increment */}
+                        <button
+                          type="button"
+                          onClick={() => updateCartItemQty(activeTable.id, item.cartItemId || idx, 1)}
+                          className="w-6 h-6 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 flex items-center justify-center font-bold transition cursor-pointer"
+                          title="Increase quantity"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
 
-                      {/* Void / Delete Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isItemKotPrinted) {
-                            setVoidingItem({ item, index: idx });
-                          } else {
-                            removeCartItem(activeTable.id, item.cartItemId || idx);
+                        {/* Void / Delete Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isItemKotPrinted) {
+                              setVoidingItem({ item, index: idx });
+                            } else {
+                              removeCartItem(activeTable.id, item.cartItemId || idx);
+                            }
+                          }}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ml-0.5 ${
+                            isItemKotPrinted
+                              ? 'bg-rose-100 hover:bg-rose-200 text-rose-700'
+                              : 'hover:bg-slate-100 text-slate-400 hover:text-rose-600'
+                          }`}
+                          title={
+                            isItemKotPrinted
+                              ? 'Void KOT Item (Admin/Manager Permission Required)'
+                              : 'Remove from cart'
                           }
-                        }}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ml-0.5 ${
-                          isItemKotPrinted
-                            ? 'bg-rose-100 hover:bg-rose-200 text-rose-700'
-                            : 'hover:bg-slate-100 text-slate-400 hover:text-rose-600'
-                        }`}
-                        title={
-                          isItemKotPrinted
-                            ? 'Void KOT Item (Admin/Manager Permission Required)'
-                            : 'Remove from cart'
-                        }
-                      >
-                        {isItemKotPrinted ? (
-                          <Ban className="w-3 h-3 text-rose-700" />
-                        ) : (
-                          <Trash2 className="w-3 h-3" />
-                        )}
-                      </button>
-                    </div>
+                        >
+                          {isItemKotPrinted ? (
+                            <Ban className="w-3 h-3 text-rose-700" />
+                          ) : (
+                            <Trash2 className="w-3 h-3" />
+                          )}
+                        </button>
+                      </div>
+                    )}
 
                     <div className="w-14 text-right font-extrabold text-xs text-slate-900 shrink-0">
                       ৳{item.price * item.qty}
@@ -1297,62 +1347,89 @@ export const PosBillingView: React.FC = () => {
           </div>
 
           {/* Discount and Summary calculation */}
-          <div className="pt-2 border-t border-slate-200 space-y-1.5 text-xs shrink-0">
-            {/* Discount Form Row */}
-            <div className="flex items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-              <span className="font-bold text-slate-700 text-[11px] shrink-0">Discount:</span>
-              
-              <div className="flex items-center gap-1.5 flex-1 justify-end">
-                <div className="flex rounded-lg overflow-hidden border border-slate-300">
-                  <button
-                    type="button"
-                    onClick={() => setTableDiscount(activeTable.id, 'taka', activeTable.discountVal)}
-                    className={`px-2 py-0.5 text-[10px] font-bold cursor-pointer transition ${
-                      activeTable.discountType === 'taka' ? 'bg-black text-blue-300' : 'bg-white text-slate-600'
-                    }`}
-                  >
-                    ৳ BDT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTableDiscount(activeTable.id, 'percent', activeTable.discountVal)}
-                    className={`px-2 py-0.5 text-[10px] font-bold cursor-pointer transition ${
-                      activeTable.discountType === 'percent' ? 'bg-black text-blue-300' : 'bg-white text-slate-600'
-                    }`}
-                  >
-                    % Percent
-                  </button>
+          {(() => {
+            const hasSubmittedKotItems = Boolean(activeTable?.cart?.some(item => item.kotPrinted && (item.kotPrintedQty || 0) > 0));
+            const isTableBilled = activeTable.status === 'billed';
+            const isDiscountLocked = !canCancelOrEditOrder && (hasSubmittedKotItems || isTableBilled);
+
+            return (
+              <div className="pt-2 border-t border-slate-200 space-y-1.5 text-xs shrink-0">
+                {/* Discount Form Row */}
+                <div className="flex items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-slate-700 text-[11px] shrink-0">Discount:</span>
+                    {isDiscountLocked && (
+                      <span title="Discount locked after KOT / Bill submission">
+                        <Lock className="w-3 h-3 text-slate-400" />
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5 flex-1 justify-end">
+                    <div className="flex rounded-lg overflow-hidden border border-slate-300">
+                      <button
+                        type="button"
+                        disabled={isDiscountLocked}
+                        onClick={() => setTableDiscount(activeTable.id, 'taka', activeTable.discountVal)}
+                        className={`px-2 py-0.5 text-[10px] font-bold transition ${
+                          isDiscountLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                        } ${
+                          activeTable.discountType === 'taka' ? 'bg-black text-blue-300' : 'bg-white text-slate-600'
+                        }`}
+                      >
+                        ৳ BDT
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isDiscountLocked}
+                        onClick={() => setTableDiscount(activeTable.id, 'percent', activeTable.discountVal)}
+                        className={`px-2 py-0.5 text-[10px] font-bold transition ${
+                          isDiscountLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                        } ${
+                          activeTable.discountType === 'percent' ? 'bg-black text-blue-300' : 'bg-white text-slate-600'
+                        }`}
+                      >
+                        % Percent
+                      </button>
+                    </div>
+
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={isDiscountLocked}
+                      readOnly={isDiscountLocked}
+                      value={activeTable.discountVal === 0 ? '' : activeTable.discountVal}
+                      onChange={e => setTableDiscount(activeTable.id, activeTable.discountType, parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className={`w-16 px-2 py-0.5 border border-slate-300 rounded-lg text-xs font-bold text-right focus:outline-none ${
+                        isDiscountLocked
+                          ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                          : 'bg-white text-slate-900 focus:ring-1 focus:ring-[#004b9b]'
+                      }`}
+                    />
+                  </div>
                 </div>
 
-                <input
-                  type="number"
-                  min="0"
-                  value={activeTable.discountVal === 0 ? '' : activeTable.discountVal}
-                  onChange={e => setTableDiscount(activeTable.id, activeTable.discountType, parseFloat(e.target.value) || 0)}
-                  placeholder="0"
-                  className="w-16 px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#004b9b]"
-                />
+                {/* Subtotal & Net Total */}
+                <div className="flex justify-between text-slate-600 font-medium text-[11px]">
+                  <span>Subtotal:</span>
+                  <span className="font-bold text-slate-900 font-mono">৳{subtotal.toLocaleString()}</span>
+                </div>
+
+                {discountDeduction > 0 && (
+                  <div className="flex justify-between text-emerald-700 font-medium text-[11px]">
+                    <span>Discount:</span>
+                    <span>- ৳{discountDeduction.toLocaleString()}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-200">
+                  <span>Total Payable:</span>
+                  <span className="text-[#004b9b] text-base font-black font-mono">৳{netTotal.toLocaleString()}</span>
+                </div>
               </div>
-            </div>
-
-            {/* Subtotal & Net Total */}
-            <div className="flex justify-between text-slate-600 font-medium text-[11px]">
-              <span>Subtotal:</span>
-              <span className="font-bold text-slate-900 font-mono">৳{subtotal.toLocaleString()}</span>
-            </div>
-
-            {discountDeduction > 0 && (
-              <div className="flex justify-between text-emerald-700 font-medium text-[11px]">
-                <span>Discount:</span>
-                <span>- ৳{discountDeduction.toLocaleString()}</span>
-              </div>
-            )}
-
-            <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-200">
-              <span>Total Payable:</span>
-              <span className="text-[#004b9b] text-base font-black font-mono">৳{netTotal.toLocaleString()}</span>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Action Buttons: Dynamically adapts to POS order lifecycle */}
           {(() => {
