@@ -479,43 +479,21 @@ export const UsersView: React.FC = () => {
                   );
                 })}
 
-                {/* SPECIAL SECTION: POS OPERATIONAL & ACTION PERMISSIONS */}
-                <tr className="bg-amber-100/70 border-t-2 border-b-2 border-amber-300">
-                  <td colSpan={7} className="p-2.5 px-3 font-black text-amber-950 text-xs flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-amber-800" />
-                      <span>POS Operational & Action Permissions (অর্ডার কন্ট্রোল পারমিশন)</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded border border-amber-300">
-                      Action Security Control
-                    </span>
-                  </td>
-                </tr>
-
-                <tr className="bg-amber-50/50 hover:bg-amber-100/50 transition border-b border-slate-200">
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-amber-600 shrink-0" />
-                      <div>
-                        <div className="font-extrabold text-slate-900 text-xs">
-                          Cancel or Edit Submitted Orders
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                          KOT সাবমিট বা বিল প্রিন্ট হওয়ার পর আইটেম এডিট, মাইনাস, ডিলিট বা পুরো অর্ডার বাতিল (Void) করার অনুমতি
-                        </div>
-                      </div>
-                    </div>
+                {/* CANCEL OR EDIT SUBMITTED ORDERS ROW */}
+                <tr className="hover:bg-slate-50 transition border-b border-slate-100">
+                  <td className="p-3 font-bold text-slate-900">
+                    Cancel or Edit Submitted Orders
                   </td>
                   <td className="p-3">
-                    <span className="text-[10px] font-black uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
-                      POS ACTION
+                    <span className="text-[10px] font-semibold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                      Operations
                     </span>
                   </td>
 
                   {/* ADMIN */}
                   <td className="p-3 text-center bg-purple-50/30">
                     <div className="flex items-center justify-center" title="Admin always has full unrestricted access">
-                      <CheckCircle2 className="w-5 h-5 text-purple-600" />
+                      <CheckCircle2 className="w-4 h-4 text-purple-600" />
                     </div>
                   </td>
 
@@ -528,9 +506,9 @@ export const UsersView: React.FC = () => {
                       title="Toggle Manager permission"
                     >
                       {(data.orderEditPermissions?.MANAGER ?? true) ? (
-                        <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                        <CheckCircle2 className="w-4 h-4 text-blue-600" />
                       ) : (
-                        <XCircle className="w-5 h-5 text-slate-300" />
+                        <XCircle className="w-4 h-4 text-slate-300" />
                       )}
                     </button>
                   </td>
@@ -544,26 +522,26 @@ export const UsersView: React.FC = () => {
                       title="Toggle Cashier permission"
                     >
                       {(data.orderEditPermissions?.CASHIER ?? true) ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                       ) : (
-                        <XCircle className="w-5 h-5 text-slate-300" />
+                        <XCircle className="w-4 h-4 text-slate-300" />
                       )}
                     </button>
                   </td>
 
                   {/* WAITER */}
-                  <td className="p-3 text-center bg-amber-100/40">
+                  <td className="p-3 text-center bg-amber-50/30">
                     <button
                       type="button"
                       id="toggle-waiter-order-edit-matrix"
                       onClick={() => updateOrderEditPermission('WAITER', !(data.orderEditPermissions?.WAITER ?? false))}
-                      className="p-1 rounded hover:bg-amber-200/70 transition inline-flex items-center justify-center cursor-pointer"
+                      className="p-1 rounded hover:bg-amber-100 transition inline-flex items-center justify-center cursor-pointer"
                       title="Click to toggle Waiter permission to cancel or edit submitted orders"
                     >
                       {(data.orderEditPermissions?.WAITER ?? false) ? (
-                        <CheckCircle2 className="w-6 h-6 text-emerald-600 font-bold" />
+                        <CheckCircle2 className="w-4 h-4 text-amber-600 font-bold" />
                       ) : (
-                        <XCircle className="w-6 h-6 text-rose-500 hover:text-rose-700" />
+                        <XCircle className="w-4 h-4 text-slate-300 hover:text-rose-600" />
                       )}
                     </button>
                   </td>
@@ -577,9 +555,9 @@ export const UsersView: React.FC = () => {
                       title="Toggle Chef permission"
                     >
                       {(data.orderEditPermissions?.CHEF ?? false) ? (
-                        <CheckCircle2 className="w-5 h-5 text-orange-600" />
+                        <CheckCircle2 className="w-4 h-4 text-orange-600" />
                       ) : (
-                        <XCircle className="w-5 h-5 text-slate-300" />
+                        <XCircle className="w-4 h-4 text-slate-300" />
                       )}
                     </button>
                   </td>
@@ -700,7 +678,7 @@ export const UsersView: React.FC = () => {
                   </label>
                 </div>
                 <p className="text-[11px] text-slate-500 pl-6">
-                  Admin যাকে অনুমতি দিবে, সে KOT সাবমিট বা বিল প্রিন্ট হওয়ার পরেও আইটেম এডিট/ভয়েড বা অর্ডার বাতিল করতে পারবে। (Default: Waiter-দের জন্য বন্ধ)
+                  Allow this staff member to edit, modify quantities, void items, or cancel table orders after KOT is sent or bill is printed.
                 </p>
               </div>
 
