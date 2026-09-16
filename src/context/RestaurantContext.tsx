@@ -3340,6 +3340,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const openSettleModal = (tableId: string) => {
+    if (currentUser?.role === 'WAITER') {
+      return;
+    }
     if (!data.session || !data.session.isActive) {
       setIsStartSessionModalOpen(true);
       return;

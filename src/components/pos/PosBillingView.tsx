@@ -109,6 +109,8 @@ export const PosBillingView: React.FC = () => {
     t
   } = useRestaurant();
 
+  const isWaiter = currentUser?.role === 'WAITER';
+
   // Void and Release Modals state
   const [voidingItem, setVoidingItem] = useState<{ item: TableCartItem; index: number } | null>(null);
   const [releasingTable, setReleasingTable] = useState<Table | null>(null);
@@ -755,18 +757,20 @@ export const PosBillingView: React.FC = () => {
                             </button>
                           )}
 
-                          {/* Settle / Pay Button (Visible for all roles on active tables) */}
-                          <button
-                            type="button"
-                            title="Settle Payment & Pay"
-                            onClick={(e) => { e.stopPropagation(); openSettleModal(table.id); }}
-                            className={`flex-1 bg-black hover:bg-slate-900 text-blue-300 font-black flex items-center justify-center gap-0.5 transition cursor-pointer shadow-xs active:scale-95 ${
-                              isUltraCompact ? 'py-0.5 px-0.5 rounded text-[8px]' : isCompact ? 'py-1 px-1 rounded-md text-[10px]' : isLarge ? 'py-2 px-2 rounded-xl text-xs' : 'py-1.5 px-1.5 rounded-lg text-[11px]'
-                            }`}
-                          >
-                            <CreditCard className={isUltraCompact ? 'w-2 h-2' : isCompact ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
-                            <span className={isUltraCompact ? 'hidden' : ''}>Pay</span>
-                          </button>
+                          {/* Settle / Pay Button (Hidden for WAITER role) */}
+                          {!isWaiter && (
+                            <button
+                              type="button"
+                              title="Settle Payment & Pay"
+                              onClick={(e) => { e.stopPropagation(); openSettleModal(table.id); }}
+                              className={`flex-1 bg-black hover:bg-slate-900 text-blue-300 font-black flex items-center justify-center gap-0.5 transition cursor-pointer shadow-xs active:scale-95 ${
+                                isUltraCompact ? 'py-0.5 px-0.5 rounded text-[8px]' : isCompact ? 'py-1 px-1 rounded-md text-[10px]' : isLarge ? 'py-2 px-2 rounded-xl text-xs' : 'py-1.5 px-1.5 rounded-lg text-[11px]'
+                              }`}
+                            >
+                              <CreditCard className={isUltraCompact ? 'w-2 h-2' : isCompact ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
+                              <span className={isUltraCompact ? 'hidden' : ''}>Pay</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1453,10 +1457,10 @@ export const PosBillingView: React.FC = () => {
             if (hasUnprintedKotItems) {
               return (
                 <div className="pt-1.5 sm:pt-2 shrink-0">
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className={`grid ${isWaiter ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2`}>
                     {cancelBtn(false)}
                     {submitKotBtn}
-                    {settlePayBtn(false)}
+                    {!isWaiter && settlePayBtn(false)}
                   </div>
                 </div>
               );
@@ -1466,9 +1470,9 @@ export const PosBillingView: React.FC = () => {
             if (isBillAlreadyPrinted) {
               return (
                 <div className="pt-1.5 sm:pt-2 shrink-0">
-                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                    {cancelBtn(false)}
-                    {settlePayBtn(false)}
+                  <div className={`grid ${isWaiter ? 'grid-cols-1' : 'grid-cols-2'} gap-1.5 sm:gap-2`}>
+                    {cancelBtn(isWaiter)}
+                    {!isWaiter && settlePayBtn(false)}
                   </div>
                 </div>
               );
@@ -1477,10 +1481,10 @@ export const PosBillingView: React.FC = () => {
             // State 4 (When bill NOT yet printed): Show Cancel, Print Bill, Settle & Pay
             return (
               <div className="pt-1.5 sm:pt-2 shrink-0">
-                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                <div className={`grid ${isWaiter ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2`}>
                   {cancelBtn(false)}
                   {printBillBtn(false)}
-                  {settlePayBtn(false)}
+                  {!isWaiter && settlePayBtn(false)}
                 </div>
               </div>
             );
