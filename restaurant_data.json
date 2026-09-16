@@ -977,7 +977,7 @@
         "name": "Table 02",
         "zone": "Floor 1",
         "status": "free",
-        "waiter": "Sajjad",
+        "waiter": "",
         "customer": "Walk-in Customer",
         "channelOrAgentId": "dine_in",
         "discountType": "taka",

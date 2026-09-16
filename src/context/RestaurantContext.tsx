@@ -1380,7 +1380,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const parsed = JSON.parse(saved);
         const mergedTables = (parsed.tables || DEFAULT_DATA.tables).map((t: Table, idx: number) => ({
           ...t,
-          zone: t.zone || (t.id.startsWith('VIP') ? 'VIP Lounge' : t.id.startsWith('RT') ? 'Rooftop Garden' : idx >= 3 ? 'Floor 2' : 'Floor 1')
+          zone: t.zone || (t.id.startsWith('VIP') ? 'VIP Lounge' : t.id.startsWith('RT') ? 'Rooftop Garden' : idx >= 3 ? 'Floor 2' : 'Floor 1'),
+          waiter: (t.status === 'free' && (!t.cart || t.cart.length === 0)) ? '' : (t.waiter || '')
         }));
         const mergedZones = (parsed.tableZones && parsed.tableZones.length > 0)
           ? parsed.tableZones
@@ -1526,6 +1527,24 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const setPosView = (v: 'floor' | 'order') => {
+    if (v === 'floor') {
+      setData(prev => {
+        let hasChanges = false;
+        const updatedTables = prev.tables.map(t => {
+          if (t.status === 'free' && (!t.cart || t.cart.length === 0) && (t.waiter || t.customer !== 'Walk-in Customer')) {
+            hasChanges = true;
+            return {
+              ...t,
+              waiter: '',
+              customer: 'Walk-in Customer',
+              channelOrAgentId: 'dine_in'
+            };
+          }
+          return t;
+        });
+        return hasChanges ? { ...prev, tables: updatedTables } : prev;
+      });
+    }
     setPosViewState(v);
     try {
       localStorage.setItem(POS_VIEW_KEY, v);
@@ -1671,6 +1690,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
         if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
           result.data.tableDimensions = { width: 147, height: 98 };
+        }
+        if (result.data.tables) {
+          result.data.tables = result.data.tables.map((t: Table) => {
+            if (t.status === 'free' && (!t.cart || t.cart.length === 0) && t.waiter) {
+              return { ...t, waiter: '', customer: 'Walk-in Customer' };
+            }
+            return t;
+          });
         }
         const serverStateStr = JSON.stringify(result.data);
         const currentLocalStr = JSON.stringify(dataRef.current);
@@ -2550,7 +2577,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ...t,
           status: t.status === 'billed' ? 'hold' : t.status,
           cart: existingCart,
-          waiter: t.waiter || prev.waiters[0] || '',
+          waiter: t.waiter || (currentUser?.role === 'WAITER' ? currentUser.name : '') || '',
           orderCreatedBy: t.orderCreatedBy || currentUser?.name || 'Cashier',
           orderCreatedRole: t.orderCreatedRole || currentUser?.role || 'CASHIER',
           orderCreatedId: t.orderCreatedId || currentUser?.id,
@@ -2620,9 +2647,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             };
           }
         }
+        const isNowEmpty = existingCart.length === 0;
         return {
           ...table,
-          status: table.status === 'billed' ? 'hold' : table.status,
+          status: isNowEmpty ? 'free' : (table.status === 'billed' ? 'hold' : table.status),
+          waiter: isNowEmpty ? '' : table.waiter,
+          customer: isNowEmpty ? 'Walk-in Customer' : table.customer,
           cart: existingCart
         };
       });
@@ -3028,9 +3058,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           };
         }
 
+        const isNowEmpty = newCart.length === 0;
         return {
           ...t,
-          status: newCart.length === 0 ? 'free' : t.status,
+          status: isNowEmpty ? 'free' : t.status,
+          waiter: isNowEmpty ? '' : t.waiter,
+          customer: isNowEmpty ? 'Walk-in Customer' : t.customer,
           cart: newCart
         };
       });
