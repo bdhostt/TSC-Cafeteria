@@ -1,6 +1,7 @@
 @echo off
 title Cafe Banani - Local Thermal Printer Bridge Agent (80 Printer LAN 192.168.1.87)
 color 0A
+cd /d "%~dp0"
 cls
 echo ================================================================
 echo    CAFE BANANI - LOCAL THERMAL PRINTER BRIDGE AGENT

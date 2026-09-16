@@ -2,18 +2,53 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const net = require('net');
 const { exec } = require('child_process');
 
 const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://erp-pos-sdv3.onrender.com').replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
-const POLL_INTERVAL_MS = 1200;
+const POLL_INTERVAL_MS = 800;
 
-async function getWindowsPrinters() {
+let cachedPrinters = [];
+let lastPrinterScan = 0;
+
+async function getWindowsPrinters(force = false) {
+  const now = Date.now();
+  if (!force && cachedPrinters.length > 0 && (now - lastPrinterScan < 60000)) {
+    return cachedPrinters;
+  }
   return new Promise((resolve) => {
     exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', (err, stdout) => {
-      if (err || !stdout) return resolve([]);
+      if (err || !stdout) return resolve(cachedPrinters.length > 0 ? cachedPrinters : []);
       const list = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      resolve(list);
+      if (list.length > 0) {
+        cachedPrinters = list;
+        lastPrinterScan = Date.now();
+      }
+      resolve(cachedPrinters);
+    });
+  });
+}
+
+function printTcpRaw(host, port, rawBuffer, timeoutMs = 1000) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const socket = new net.Socket();
+    const finish = (ok) => {
+      if (!resolved) {
+        resolved = true;
+        try { socket.destroy(); } catch (e) {}
+        resolve(ok);
+      }
+    };
+    socket.setTimeout(timeoutMs);
+    socket.on('timeout', () => finish(false));
+    socket.on('error', () => finish(false));
+    socket.connect(port, host, () => {
+      socket.write(rawBuffer, () => {
+        socket.end();
+        finish(true);
+      });
     });
   });
 }
@@ -68,6 +103,18 @@ async function printSlipWindows(printerName, rawBuffer) {
       }
     });
   });
+}
+
+async function printSlipFast(printerName, rawBuffer) {
+  // If printing to LAN 80 Printer, try direct high-speed TCP socket first (10ms instant print)
+  if (/80\s*printer/i.test(printerName)) {
+    const tcpOk = await printTcpRaw('192.168.1.87', 9100, rawBuffer, 1000);
+    if (tcpOk) {
+      console.log('⚡ [Ultra-Fast TCP Print] Sent directly to 192.168.1.87:9100');
+      return true;
+    }
+  }
+  return await printSlipWindows(printerName, rawBuffer);
 }
 
 function line2Col(left, right, width) {
@@ -698,8 +745,8 @@ async function processPrintJob(job) {
       const targetPrinter = resolveThermalPrinter(installedPrinters, slip.targetPrinterName);
       console.log(' ➔ Printing KOT Slip ' + (i + 1) + '/' + slips.length + ' on "' + targetPrinter + '"...');
       const buffer = buildKotEscPosBuffer(payload, slip, i + 1, slips.length);
-      await printSlipWindows(targetPrinter, buffer);
-      if (i < slips.length - 1) await new Promise(r => setTimeout(r, 800));
+      await printSlipFast(targetPrinter, buffer);
+      if (i < slips.length - 1) await new Promise(r => setTimeout(r, 200));
     }
     console.log('✅ [Job ' + job.id + '] All KOT slips printed successfully on ' + defaultKotPrinter + '!');
     return true;
@@ -709,7 +756,7 @@ async function processPrintJob(job) {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Bill for Table ' + (job.payload.tableName || 'N/A') + ' on "' + targetPrinter + '"...');
     const buffer = buildBillEscPosBuffer(job.payload);
-    await printSlipWindows(targetPrinter, buffer);
+    await printSlipFast(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Bill printed successfully on ' + targetPrinter + '!');
     return true;
   }
@@ -718,7 +765,7 @@ async function processPrintJob(job) {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Shift Z-Report on "' + targetPrinter + '"...');
     const buffer = buildZReportEscPosBuffer(job.payload);
-    await printSlipWindows(targetPrinter, buffer);
+    await printSlipFast(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Shift Z-Report printed successfully on ' + targetPrinter + '!');
     return true;
   }
@@ -727,7 +774,7 @@ async function processPrintJob(job) {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Waiter Slip for ' + (job.payload.waiterName || 'Staff') + ' on "' + targetPrinter + '"...');
     const buffer = buildWaiterSlipEscPosBuffer(job.payload);
-    await printSlipWindows(targetPrinter, buffer);
+    await printSlipFast(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Waiter slip printed successfully on ' + targetPrinter + '!');
     return true;
   }
@@ -736,7 +783,7 @@ async function processPrintJob(job) {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Kitchen Chef Slip on "' + targetPrinter + '"...');
     const buffer = buildChefSlipEscPosBuffer(job.payload);
-    await printSlipWindows(targetPrinter, buffer);
+    await printSlipFast(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Chef slip printed successfully on ' + targetPrinter + '!');
     return true;
   }
@@ -745,7 +792,7 @@ async function processPrintJob(job) {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Daily Master Day-End Z-Report on "' + targetPrinter + '"...');
     const buffer = buildDayEndEscPosBuffer(job.payload);
-    await printSlipWindows(targetPrinter, buffer);
+    await printSlipFast(targetPrinter, buffer);
     console.log('✅ [Job ' + job.id + '] Day-End Master Z-Report printed successfully on ' + targetPrinter + '!');
     return true;
   }
