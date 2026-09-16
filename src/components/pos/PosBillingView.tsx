@@ -1049,37 +1049,6 @@ export const PosBillingView: React.FC = () => {
                 <span className="truncate max-w-[110px]">{activeTable.waiter || 'Staff'}</span>
               </button>
             </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                id="btn-release-table-pos"
-                onClick={() => setReleasingTable(activeTable)}
-                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 px-2 py-1 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
-                title="Release table back to free"
-              >
-                <RotateCcw className="w-3 h-3 text-blue-700" />
-                <span>Release</span>
-              </button>
-
-              {activeTable?.cart?.length > 0 && (
-                <button
-                  id="btn-clear-cart"
-                  onClick={() => {
-                    const hasKot = activeTable.cart.some(i => i.kotPrinted && (i.kotPrintedQty || 0) > 0);
-                    if (hasKot) {
-                      setReleasingTable(activeTable);
-                    } else {
-                      clearCart(activeTable.id);
-                    }
-                  }}
-                  className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Clear</span>
-                </button>
-              )}
-            </div>
           </div>
 
           {/* Order Timing Row: Start Time • End Time • Total Duration (Matching mark 1 text size and style) */}
