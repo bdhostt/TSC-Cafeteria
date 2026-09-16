@@ -1698,6 +1698,25 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             }
             return t;
           });
+
+          // Protect active local table's cart from being wiped by background server poll
+          if (activeTableId && !isInitial) {
+            const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
+            if (localActive && localActive.cart && localActive.cart.length > 0) {
+              result.data.tables = result.data.tables.map((st: Table) => {
+                if (st.id === activeTableId) {
+                  return {
+                    ...st,
+                    cart: localActive.cart,
+                    status: localActive.status,
+                    waiter: localActive.waiter || st.waiter,
+                    customer: localActive.customer || st.customer
+                  };
+                }
+                return st;
+              });
+            }
+          }
         }
         const serverStateStr = JSON.stringify(result.data);
         const currentLocalStr = JSON.stringify(dataRef.current);

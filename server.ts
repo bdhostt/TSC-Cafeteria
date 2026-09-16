@@ -1319,7 +1319,7 @@ async function startServer() {
     try {
       if (isDbConnected()) {
         const doc = await RestaurantStateModel.findOne({ stateKey: STATE_KEY }).lean() as any;
-        if (doc && doc.data) {
+        if (doc && doc.data && (!cachedState || !lastServerUpdate || (doc.timestamp && doc.timestamp > lastServerUpdate))) {
           cachedState = doc.data;
           lastServerUpdate = doc.timestamp || lastServerUpdate;
         }
@@ -1353,11 +1353,15 @@ async function startServer() {
         
         // Save to MongoDB if connected
         if (isDbConnected()) {
-          RestaurantStateModel.findOneAndUpdate(
-            { stateKey: STATE_KEY },
-            { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
-            { upsert: true, new: true }
-          ).catch((err: any) => console.error("MongoDB async update error:", err));
+          try {
+            await RestaurantStateModel.findOneAndUpdate(
+              { stateKey: STATE_KEY },
+              { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
+              { upsert: true, new: true }
+            );
+          } catch (err: any) {
+            console.error("MongoDB async update error:", err);
+          }
         }
 
         // Always write file backup to disk
