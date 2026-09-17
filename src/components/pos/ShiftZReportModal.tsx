@@ -188,7 +188,12 @@ export const ShiftZReportModal: React.FC = () => {
 
     const map: Record<string, { waiter: string; orderCount: number; totalSales: number }> = {};
     sessionSales.forEach(s => {
-      const w = s.waiterName || (s.details?.match(/W:\s*([^,\]\)]+)/i)?.[1]?.trim()) || 'Staff';
+      let w = (s.waiterName && s.waiterName !== 'Staff' && s.waiterName !== 'N/A')
+        ? s.waiterName
+        : (s.details?.match(/W:\s*([^,\]\)]+)/i)?.[1]?.trim());
+      if (!w || w === 'N/A') {
+        w = 'Staff';
+      }
       if (!map[w]) map[w] = { waiter: w, orderCount: 0, totalSales: 0 };
       map[w].orderCount += 1;
       map[w].totalSales += (s.total || 0);

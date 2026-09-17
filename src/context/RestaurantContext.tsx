@@ -1216,7 +1216,8 @@ interface RestaurantContextType {
   closeSettleModal: () => void;
   settlePayment: (
     tableId: string, 
-    payments: { cash: number; card: number; bkash: number; nagad: number; due: number }
+    payments: { cash: number; card: number; bkash: number; nagad: number; due: number },
+    waiterOverride?: string
   ) => void;
   
   printableReceipt: PrintableReceipt | null;
@@ -1708,24 +1709,33 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
         if (result.data.tables) {
           result.data.tables = result.data.tables.map((t: Table) => {
+            // Never wipe waiter/customer if this is the active table currently in order view!
+            if (activeTableId && t.id === activeTableId && posView === 'order') {
+              return t;
+            }
             if (t.status === 'free' && (!t.cart || t.cart.length === 0) && t.waiter) {
               return { ...t, waiter: '', customer: 'Walk-in Customer' };
             }
             return t;
           });
 
-          // Protect active local table's cart from being wiped by background server poll
+          // Protect active local table's cart and metadata from being wiped by background server poll
           if (activeTableId && !isInitial) {
             const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
-            if (localActive && localActive.cart && localActive.cart.length > 0) {
+            if (localActive) {
               result.data.tables = result.data.tables.map((st: Table) => {
                 if (st.id === activeTableId) {
                   return {
                     ...st,
-                    cart: localActive.cart,
-                    status: localActive.status,
+                    cart: (localActive.cart && localActive.cart.length > 0) ? localActive.cart : st.cart,
+                    status: (localActive.cart && localActive.cart.length > 0) ? localActive.status : st.status,
                     waiter: localActive.waiter || st.waiter,
-                    customer: localActive.customer || st.customer
+                    customer: (localActive.customer && localActive.customer !== 'Walk-in Customer') ? localActive.customer : (st.customer || localActive.customer),
+                    channelOrAgentId: localActive.channelOrAgentId || st.channelOrAgentId,
+                    discountVal: localActive.discountVal ?? st.discountVal,
+                    discountType: localActive.discountType ?? st.discountType,
+                    orderCreatedBy: localActive.orderCreatedBy || st.orderCreatedBy,
+                    orderCreatedRole: localActive.orderCreatedRole || st.orderCreatedRole
                   };
                 }
                 return st;
@@ -2615,11 +2625,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       const updatedTables = prev.tables.map(t => {
         if (t.id !== tableId) return t;
+        const assignedWaiter = t.waiter || (currentUser?.role === 'WAITER' ? currentUser.name : '');
         return {
           ...t,
-          status: t.status === 'billed' ? 'hold' : t.status,
+          status: (t.status === 'billed' || t.status === 'free') ? 'hold' : t.status,
           cart: existingCart,
-          waiter: t.waiter || (currentUser?.role === 'WAITER' ? currentUser.name : '') || '',
+          waiter: assignedWaiter,
           orderCreatedBy: t.orderCreatedBy || currentUser?.name || 'Cashier',
           orderCreatedRole: t.orderCreatedRole || currentUser?.role || 'CASHIER',
           orderCreatedId: t.orderCreatedId || currentUser?.id,
@@ -2777,6 +2788,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const setTableWaiter = (tableId: string, waiter: string) => {
+    lastLocalCartEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       tables: prev.tables.map(t => t.id === tableId ? { 
@@ -2791,6 +2803,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const setTableCustomer = (tableId: string, customer: string) => {
+    lastLocalCartEditTimeRef.current = Date.now();
     const trimmed = (customer || '').trim();
     setData(prev => {
       const agents = prev.commissionAgents || DEFAULT_COMMISSION_AGENTS;
@@ -3384,7 +3397,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const settlePayment = (
     tableId: string, 
-    payments: { cash: number; card: number; bkash: number; nagad: number; due: number }
+    payments: { cash: number; card: number; bkash: number; nagad: number; due: number },
+    waiterOverride?: string
   ) => {
     if (!data.session || !data.session.isActive) {
       setIsStartSessionModalOpen(true);
@@ -3392,6 +3406,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     const table = data.tables.find(t => t.id === tableId);
     if (!table || table.cart.length === 0) return;
+
+    const assignedWaiter = (waiterOverride || table.waiter || '').trim();
 
     const agents = data.commissionAgents || DEFAULT_COMMISSION_AGENTS;
     const agent = agents.find(a => a.id === table.channelOrAgentId);
@@ -3432,7 +3448,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       id: Date.now(),
       date: today,
       invoiceNo,
-      details: `${table.name} [Zone: ${table.zone || 'Floor 1'}] (W: ${table.waiter || 'N/A'}${agent ? `, Ch: ${agent.name}` : ''}): ${itemSummary}`,
+      details: `${table.name} [Zone: ${table.zone || 'Floor 1'}] (W: ${assignedWaiter || 'N/A'}${agent ? `, Ch: ${agent.name}` : ''}): ${itemSummary}`,
       items: JSON.parse(JSON.stringify(table.cart)),
       cash: cashRetained,
       card: payments.card,
@@ -3448,7 +3464,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       channelCommissionAmount: commissionAmount,
       netRestaurantRevenue,
       sessionId: data.session?.id || 'SES-DEFAULT',
-      waiterName: table.waiter || 'Staff',
+      waiterName: assignedWaiter || 'Staff',
       cashierName: currentUser?.name || data.session?.openedBy || 'Cashier',
       cashierRole: currentUser?.role || 'CASHIER',
       cashierId: currentUser?.id,
@@ -3499,7 +3515,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       tableName: table.name,
       tableZone: table.zone || 'Floor 1',
       channelOrAgent: agent ? `${agent.name} (${agent.commissionPercent}%)` : undefined,
-      waiter: table.waiter || 'N/A',
+      waiter: assignedWaiter || 'N/A',
       orderTakenBy: getOrderTakerDisplay(sellerName, sellerRole),
       settleBillRole: formatRoleTitle(currentUser?.role || 'CASHIER'),
       customer: table.customer || 'Walk-in Customer',
@@ -3770,7 +3786,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Compute Waiter-wise Sales Breakdown
     const waiterMap: Record<string, { waiter: string; orderCount: number; totalSales: number }> = {};
     sessionSales.forEach(s => {
-      const w = s.waiterName || (s.details?.match(/W:\s*([^,\]\)]+)/i)?.[1]?.trim()) || 'Staff';
+      let w = (s.waiterName && s.waiterName !== 'Staff' && s.waiterName !== 'N/A')
+        ? s.waiterName
+        : (s.details?.match(/W:\s*([^,\]\)]+)/i)?.[1]?.trim());
+      if (!w || w === 'N/A') {
+        w = 'Staff';
+      }
       if (!waiterMap[w]) waiterMap[w] = { waiter: w, orderCount: 0, totalSales: 0 };
       waiterMap[w].orderCount += 1;
       waiterMap[w].totalSales += (s.total || 0);

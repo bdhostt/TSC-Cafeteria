@@ -489,7 +489,10 @@ export const ThermalBillModal: React.FC = () => {
     if (printableReceipt.channelOrAgent) {
       lines.push(line2Col('Channel    :', printableReceipt.channelOrAgent));
     }
-    lines.push(line2Col('Waiter     :', printableReceipt.waiter || 'Staff'));
+    const waiterText = (printableReceipt.waiter && printableReceipt.waiter !== 'N/A' && printableReceipt.waiter !== 'Staff')
+      ? printableReceipt.waiter
+      : (printableReceipt.waiter || 'Staff');
+    lines.push(line2Col('Waiter     :', waiterText));
     if (printableReceipt.orderTakenBy && printableReceipt.orderTakenBy !== printableReceipt.waiter) {
       lines.push(line2Col('Order Taken By :', printableReceipt.orderTakenBy));
     }
@@ -672,7 +675,9 @@ export const ThermalBillModal: React.FC = () => {
           {activeTemplate?.showWaiter !== false && (
             <div className="flex justify-between">
               <span className="text-slate-500">Server / Waiter:</span>
-              <span className="font-semibold text-slate-800">{printableReceipt.waiter || 'Staff'}</span>
+              <span className="font-semibold text-slate-800">
+                {printableReceipt.waiter && printableReceipt.waiter !== 'N/A' && printableReceipt.waiter !== 'Staff' ? printableReceipt.waiter : (printableReceipt.waiter || 'Not Assigned')}
+              </span>
             </div>
           )}
           {activeTemplate?.showCustomer !== false && printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer' && (
@@ -1080,12 +1085,14 @@ export const ThermalBillModal: React.FC = () => {
                 {activeTemplate?.showWaiter !== false && (
                   <div className="flex justify-between">
                     <span className="text-slate-500">Waiter:</span>
-                    <span>{printableReceipt.waiter}</span>
+                    <span className="font-bold text-slate-800">
+                      {printableReceipt.waiter && printableReceipt.waiter !== 'N/A' && printableReceipt.waiter !== 'Staff' ? printableReceipt.waiter : (printableReceipt.waiter || 'Not Assigned')}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-slate-500">Order Taken By:</span>
-                  <span className="font-semibold">{printableReceipt.orderTakenBy || printableReceipt.waiter || 'Staff'}</span>
+                  <span className="font-semibold">{printableReceipt.orderTakenBy || 'Cashier'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Bill Settled By:</span>

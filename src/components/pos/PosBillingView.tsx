@@ -721,7 +721,7 @@ export const PosBillingView: React.FC = () => {
                           ৳ {tableSubtotal.toLocaleString()}
                         </div>
                         <div className={`${isUltraCompact ? 'text-[8px]' : 'text-[10px]'} text-blue-100 font-semibold truncate`}>
-                          {table.cart.length} items • <span>{table.waiter || 'Staff'}</span>
+                          {table.cart.length} items • <span>{table.waiter ? `Waiter: ${table.waiter}` : 'No Waiter'}</span>
                         </div>
                       </div>
 
@@ -1053,15 +1053,21 @@ export const PosBillingView: React.FC = () => {
                   <span>Billed</span>
                 </span>
               )}
-              {/* Clickable Staff / Customer badge to change waiter or customer if needed */}
+              {/* Clickable Waiter / Customer badge to change waiter or customer if needed */}
               <button
                 type="button"
                 onClick={() => setAssigningTable(activeTable)}
-                className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-[10px] flex items-center gap-1 border border-blue-200 cursor-pointer transition"
+                className={`px-2 py-0.5 rounded-md font-bold text-[10px] flex items-center gap-1 border cursor-pointer transition ${
+                  activeTable.waiter && activeTable.waiter !== 'Staff' && activeTable.waiter !== 'N/A'
+                    ? 'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                }`}
                 title="Click to edit Waiter or Customer"
               >
                 <UserCheck className="w-3 h-3 text-[#004b9b]" />
-                <span className="truncate max-w-[110px]">{activeTable.waiter || 'Staff'}</span>
+                <span className="truncate max-w-[120px]">
+                  {activeTable.waiter && activeTable.waiter !== 'Staff' && activeTable.waiter !== 'N/A' ? `Waiter: ${activeTable.waiter}` : 'Assign Waiter'}
+                </span>
               </button>
 
               {/* Void / Cancel Order Button - Only for Admin / Authorized users */}

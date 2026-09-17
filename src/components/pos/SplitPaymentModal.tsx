@@ -7,18 +7,24 @@ import {
   Banknote, 
   Smartphone, 
   UserX, 
+  UserCheck,
   Coins, 
   Zap 
 } from 'lucide-react';
 
 export const SplitPaymentModal: React.FC = () => {
-  const { activeSettlingTable, closeSettleModal, settlePayment, data, setTableCustomer } = useRestaurant();
+  const { activeSettlingTable, closeSettleModal, settlePayment, data, setTableCustomer, setTableWaiter } = useRestaurant();
 
   const [cash, setCash] = useState<number>(0);
   const [card, setCard] = useState<number>(0);
   const [bkash, setBkash] = useState<number>(0);
   const [nagad, setNagad] = useState<number>(0);
   const [due, setDue] = useState<number>(0);
+  const [selectedWaiter, setSelectedWaiter] = useState<string>(
+    activeSettlingTable?.waiter && activeSettlingTable.waiter !== 'Staff' && activeSettlingTable.waiter !== 'N/A'
+      ? activeSettlingTable.waiter
+      : ''
+  );
   const [selectedCustomer, setSelectedCustomer] = useState<string>(
     activeSettlingTable?.customer && activeSettlingTable.customer !== 'Walk-in Customer'
       ? activeSettlingTable.customer
@@ -84,6 +90,11 @@ export const SplitPaymentModal: React.FC = () => {
       return;
     }
 
+    const finalWaiter = selectedWaiter.trim() || activeSettlingTable.waiter || '';
+    if (finalWaiter && finalWaiter !== activeSettlingTable.waiter) {
+      setTableWaiter(activeSettlingTable.id, finalWaiter);
+    }
+
     if (due > 0) {
       const finalCustomer = selectedCustomer.trim() || activeSettlingTable.customer;
       if (!finalCustomer || finalCustomer.toLowerCase().includes('walk-in')) {
@@ -99,8 +110,10 @@ export const SplitPaymentModal: React.FC = () => {
       bkash: Number(bkash || 0),
       nagad: Number(nagad || 0),
       due: Number(due || 0)
-    });
+    }, finalWaiter);
   };
+
+  const currentWaiterDisplay = selectedWaiter || activeSettlingTable.waiter;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
@@ -116,17 +129,49 @@ export const SplitPaymentModal: React.FC = () => {
             </div>
             <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
               <span>Order Taker: <strong className="text-slate-800 font-bold">{activeSettlingTable.orderCreatedBy || 'Staff'} {activeSettlingTable.orderCreatedRole ? `(${activeSettlingTable.orderCreatedRole})` : ''}</strong></span>
-              <span>• Waiter: <strong className="text-slate-800 font-semibold">{activeSettlingTable.waiter || 'N/A'}</strong></span>
-              <span>• Customer: <strong className="text-slate-800 font-semibold">{activeSettlingTable.customer || 'Walk-in Customer'}</strong></span>
+              <span>• Waiter: <strong className="text-[#004b9b] font-bold">{currentWaiterDisplay && currentWaiterDisplay !== 'Staff' && currentWaiterDisplay !== 'N/A' ? currentWaiterDisplay : 'Not Assigned'}</strong></span>
+              <span>• Customer: <strong className="text-slate-800 font-semibold">{selectedCustomer || activeSettlingTable.customer || 'Walk-in Customer'}</strong></span>
             </p>
           </div>
           <button
             id="close-split-payment-modal"
             onClick={closeSettleModal}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Assigned Waiter Selection Bar */}
+        <div className="mt-3 p-2 px-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+            <UserCheck className="w-4 h-4 text-[#004b9b]" />
+            <span>Assigned Waiter:</span>
+            {currentWaiterDisplay && currentWaiterDisplay !== 'Staff' && currentWaiterDisplay !== 'N/A' ? (
+              <span className="text-xs font-extrabold text-[#004b9b] bg-blue-100 px-2 py-0.5 rounded-md">
+                {currentWaiterDisplay}
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                Not Assigned
+              </span>
+            )}
+          </div>
+          <select
+            id="settle-select-waiter"
+            value={selectedWaiter}
+            onChange={e => {
+              const w = e.target.value;
+              setSelectedWaiter(w);
+              if (w) setTableWaiter(activeSettlingTable.id, w);
+            }}
+            className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#004b9b] cursor-pointer"
+          >
+            <option value="">-- Choose Waiter --</option>
+            {(data.waiters || []).map(w => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+          </select>
         </div>
 
         {/* Bill Summary Banner */}
