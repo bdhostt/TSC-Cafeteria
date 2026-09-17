@@ -221,7 +221,7 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
             <div className="flex items-center gap-2">
               <Download className="w-5 h-5 text-[#004b9b]" />
               <h4 className="font-extrabold text-sm text-slate-900">
-                1-Click Device Setup (ইনস্টলার ডাউনলোড)
+                1-Click Device Setup (Download Installer)
               </h4>
             </div>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
@@ -230,7 +230,7 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
           </div>
 
           <p className="text-xs text-slate-600">
-            যেকোনো কম্পিউটার বা ক্যাশ কাউন্টারে এই সফটওয়্যারটি এক ক্লিকে ইনস্টল করে নিতে নিচের বাটনে ক্লিক করুন:
+            Click the button below to install this software with one click on any computer or cash counter:
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
@@ -259,31 +259,31 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
         <div className="mt-5 space-y-2.5">
           <h5 className="font-bold text-xs text-slate-700 flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>ইনস্টল করার সহজ ৩টি ধাপ (Easy 3-Step Setup):</span>
+            <span>Easy 3-Step Setup:</span>
           </h5>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left">
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <div className="w-5 h-5 rounded-full bg-[#004b9b] text-white font-bold text-[10px] flex items-center justify-center mb-1.5">1</div>
-              <div className="font-bold text-xs text-slate-800">ডাউনলোড ও আনজিপ</div>
+              <div className="font-bold text-xs text-slate-800">Download & Unzip</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                জিপ ফাইলটি ডাউনলোড করে যেকোনো ফোল্ডারে Extract (Unzip) করুন।
+                Download the ZIP file and extract (unzip) it to any folder.
               </div>
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <div className="w-5 h-5 rounded-full bg-[#004b9b] text-white font-bold text-[10px] flex items-center justify-center mb-1.5">2</div>
-              <div className="font-bold text-xs text-slate-800">ইনস্টল ফাইলে ক্লিক</div>
+              <div className="font-bold text-xs text-slate-800">Run Installer</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                <strong>INSTALL-CAFE-BANANI-PRINTER.bat</strong> ফাইলটিতে ডাবল ক্লিক করুন।
+                Double-click the <strong>INSTALL-CAFE-BANANI-PRINTER.bat</strong> file.
               </div>
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold text-[10px] flex items-center justify-center mb-1.5">3</div>
-              <div className="font-bold text-xs text-slate-800">অটো রেডি & সাইলেন্ট</div>
+              <div className="font-bold text-xs text-slate-800">Auto Ready & Silent</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                ডেস্কটপে শর্টকাট আসবে এবং উইন্ডোজ অন করলেই অটো-স্টার্ট হয়ে যাবে!
+                A shortcut will appear on the desktop and it will automatically start with Windows!
               </div>
             </div>
           </div>
