@@ -98,15 +98,10 @@ export const ConsolidatedDayZReportModal: React.FC = () => {
 
   const totalOrdersCount = consolidatedSales.orders;
 
-  // Role-wise collection breakdown for the entire day (Always includes Admin, Manager, Cashier)
+  // Role-wise collection breakdown for the entire day (Only roles that made sales)
   const roleBreakdown = useMemo(() => {
     const allKnownUsers = [...(data.users || []), ...DEFAULT_USERS];
-    const baseRoles = ['ADMIN', 'MANAGER', 'CASHIER'];
     const map: Record<string, { role: string; orderCount: number; cashCollected: number; digitalCollected: number; dueAmount: number; totalCollected: number }> = {};
-    
-    baseRoles.forEach(r => {
-      map[r] = { role: r, orderCount: 0, cashCollected: 0, digitalCollected: 0, dueAmount: 0, totalCollected: 0 };
-    });
 
     if (daySalesList.length > 0) {
       daySalesList.forEach(s => {
@@ -143,14 +138,16 @@ export const ConsolidatedDayZReportModal: React.FC = () => {
       });
     }
 
-    return Object.values(map).sort((a, b) => {
-      if (b.totalCollected !== a.totalCollected) return b.totalCollected - a.totalCollected;
-      if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
-      const orderPref = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'];
-      const idxA = orderPref.indexOf(a.role);
-      const idxB = orderPref.indexOf(b.role);
-      return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
-    });
+    return Object.values(map)
+      .filter(r => (r.orderCount || 0) > 0 || (r.totalCollected || 0) > 0)
+      .sort((a, b) => {
+        if (b.totalCollected !== a.totalCollected) return b.totalCollected - a.totalCollected;
+        if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
+        const orderPref = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'];
+        const idxA = orderPref.indexOf(a.role);
+        const idxB = orderPref.indexOf(b.role);
+        return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
+      });
   }, [daySalesList, totalOrdersCount, data.users]);
 
   const [isPrinting, setIsPrinting] = React.useState(false);

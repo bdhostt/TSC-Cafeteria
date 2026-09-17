@@ -434,8 +434,9 @@ function buildZReportEscPosBuffer(report) {
   }
   pushStr('------------------------------------------\n');
 
-  const roles = s.roleBreakdown;
-  if (roles && Array.isArray(roles) && roles.length > 0) {
+  const rawRoles = s.roleBreakdown;
+  const roles = Array.isArray(rawRoles) ? rawRoles.filter(r => (Number(r.orderCount) || 0) > 0 || (Number(r.totalCollected) || 0) > 0) : [];
+  if (roles && roles.length > 0) {
     pushStr('3. ROLE-WISE SALES (' + roles.length + ' ROLES)\n');
     for (const r of roles) {
       pushStr(line2Col('* [' + r.role + '] (' + r.orderCount + ' ord):', 'Tk ' + Number(r.totalCollected || 0).toFixed(2)));

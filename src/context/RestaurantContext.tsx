@@ -3778,12 +3778,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
     const waiterBreakdown = Object.values(waiterMap).sort((a, b) => b.totalSales - a.totalSales);
 
-    // Compute Role-wise Cash, Digital & Due Collection Breakdown (Always includes Admin, Manager, Cashier)
+    // Compute Role-wise Cash, Digital & Due Collection Breakdown (Only roles that made sales in this shift)
     const allKnownUsers = [...(data.users || []), ...DEFAULT_USERS];
     const roleMap: Record<string, { role: string; orderCount: number; cashCollected: number; digitalCollected: number; dueAmount: number; totalCollected: number }> = {};
-    ['ADMIN', 'MANAGER', 'CASHIER'].forEach(r => {
-      roleMap[r] = { role: r, orderCount: 0, cashCollected: 0, digitalCollected: 0, dueAmount: 0, totalCollected: 0 };
-    });
 
     sessionSales.forEach(s => {
       let r = s.sellerRole || s.orderCreatedRole || s.cashierRole;
@@ -3819,14 +3816,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       roleMap[r].dueAmount += (s.dueGiven || 0);
       roleMap[r].totalCollected += (s.total || 0);
     });
-    const roleBreakdown = Object.values(roleMap).sort((a, b) => {
-      if (b.totalCollected !== a.totalCollected) return b.totalCollected - a.totalCollected;
-      if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
-      const orderPref = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'];
-      const idxA = orderPref.indexOf(a.role);
-      const idxB = orderPref.indexOf(b.role);
-      return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
-    });
+    const roleBreakdown = Object.values(roleMap)
+      .filter(r => (r.orderCount || 0) > 0 || (r.totalCollected || 0) > 0)
+      .sort((a, b) => {
+        if (b.totalCollected !== a.totalCollected) return b.totalCollected - a.totalCollected;
+        if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
+        const orderPref = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'];
+        const idxA = orderPref.indexOf(a.role);
+        const idxB = orderPref.indexOf(b.role);
+        return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
+      });
 
     // Compute Cashier & Shift-wise Collection Breakdown
     const cashierMap: Record<string, { cashier: string; role?: string; shift?: string; orderCount: number; cashCollected: number; digitalCollected: number; dueAmount: number; totalCollected: number }> = {};

@@ -591,9 +591,10 @@ async function startServer() {
     }
     pushStr("------------------------------------------\n");
 
-    // 3. Role-Wise Sales Breakdown (Admin, Manager, Waiter, Cashier)
-    const roles = (s as any).roleBreakdown;
-    if (roles && Array.isArray(roles) && roles.length > 0) {
+    // 3. Role-Wise Sales Breakdown (Only active roles that sold)
+    const rawRoles = (s as any).roleBreakdown;
+    const roles = Array.isArray(rawRoles) ? rawRoles.filter((r: any) => (Number(r.orderCount) || 0) > 0 || (Number(r.totalCollected) || 0) > 0) : [];
+    if (roles && roles.length > 0) {
       pushStr(`3. ROLE-WISE SALES (${roles.length} ROLES)\n`);
       for (const r of roles) {
         pushStr(line2Col(`* [${r.role}] (${r.orderCount} ord):`, `Tk ${Number(r.totalCollected || 0).toFixed(2)}`));

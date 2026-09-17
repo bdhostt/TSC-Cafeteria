@@ -43,31 +43,26 @@ export const ShiftZReportModal: React.FC = () => {
     });
   }, [session, data.sales]);
 
-  // Role-wise Sales Breakdown (Always displays Admin, Manager, Cashier + any active sales role)
+  // Role-wise Sales Breakdown (Only displays roles that actually sold in this shift)
   const roleBreakdown = useMemo(() => {
     const allKnownUsers = [...(data.users || []), ...DEFAULT_USERS];
     
-    // Core roles that always appear
-    const baseRoles = ['ADMIN', 'MANAGER', 'CASHIER'];
     const map: Record<string, { role: string; orderCount: number; cashCollected: number; digitalCollected: number; dueAmount: number; totalCollected: number }> = {};
-    
-    // Initialize base roles
-    baseRoles.forEach(r => {
-      map[r] = { role: r, orderCount: 0, cashCollected: 0, digitalCollected: 0, dueAmount: 0, totalCollected: 0 };
-    });
 
-    // If session already has saved roleBreakdown, merge it
+    // If session already has saved roleBreakdown, merge it (only active roles)
     if (session.roleBreakdown && session.roleBreakdown.length > 0) {
       session.roleBreakdown.forEach(rb => {
-        const r = (rb.role || 'CASHIER').toUpperCase();
-        if (!map[r]) {
-          map[r] = { role: r, orderCount: 0, cashCollected: 0, digitalCollected: 0, dueAmount: 0, totalCollected: 0 };
+        if ((rb.orderCount || 0) > 0 || (rb.totalCollected || 0) > 0) {
+          const r = (rb.role || 'CASHIER').toUpperCase();
+          if (!map[r]) {
+            map[r] = { role: r, orderCount: 0, cashCollected: 0, digitalCollected: 0, dueAmount: 0, totalCollected: 0 };
+          }
+          map[r].orderCount = Math.max(map[r].orderCount, rb.orderCount || 0);
+          map[r].cashCollected = Math.max(map[r].cashCollected, rb.cashCollected || 0);
+          map[r].digitalCollected = Math.max(map[r].digitalCollected, rb.digitalCollected || 0);
+          map[r].dueAmount = Math.max(map[r].dueAmount, rb.dueAmount || 0);
+          map[r].totalCollected = Math.max(map[r].totalCollected, rb.totalCollected || 0);
         }
-        map[r].orderCount = Math.max(map[r].orderCount, rb.orderCount || 0);
-        map[r].cashCollected = Math.max(map[r].cashCollected, rb.cashCollected || 0);
-        map[r].digitalCollected = Math.max(map[r].digitalCollected, rb.digitalCollected || 0);
-        map[r].dueAmount = Math.max(map[r].dueAmount, rb.dueAmount || 0);
-        map[r].totalCollected = Math.max(map[r].totalCollected, rb.totalCollected || 0);
       });
     }
 
@@ -75,7 +70,7 @@ export const ShiftZReportModal: React.FC = () => {
     if (sessionSales.length > 0) {
       // Reset before recalculating from live sales
       Object.keys(map).forEach(k => {
-        map[k] = { role: k, orderCount: 0, cashCollected: 0, digitalCollected: 0, dueAmount: 0, totalCollected: 0 };
+        delete map[k];
       });
 
       sessionSales.forEach(s => {
@@ -113,26 +108,31 @@ export const ShiftZReportModal: React.FC = () => {
         map[r].totalCollected += (s.total || 0);
       });
     } else if (!session.roleBreakdown || session.roleBreakdown.length === 0) {
-      // If no individual sales found and no roleBreakdown saved, attribute legacy total to primary session role
-      const mainRole = (session.role || 'CASHIER').toUpperCase();
-      if (map[mainRole]) {
-        map[mainRole].orderCount = session.orderCount || 0;
-        map[mainRole].cashCollected = session.cashSales || 0;
-        map[mainRole].digitalCollected = (session.cardSales || 0) + (session.bkashSales || 0) + (session.nagadSales || 0);
-        map[mainRole].dueAmount = session.dueSales || 0;
-        map[mainRole].totalCollected = session.totalSales || 0;
+      // If no individual sales found and no roleBreakdown saved, attribute legacy total to primary session role if sold
+      if ((session.totalSales || 0) > 0 || (session.orderCount || 0) > 0) {
+        const mainRole = (session.role || 'CASHIER').toUpperCase();
+        map[mainRole] = {
+          role: mainRole,
+          orderCount: session.orderCount || 0,
+          cashCollected: session.cashSales || 0,
+          digitalCollected: (session.cardSales || 0) + (session.bkashSales || 0) + (session.nagadSales || 0),
+          dueAmount: session.dueSales || 0,
+          totalCollected: session.totalSales || 0,
+        };
       }
     }
 
-    // Sort: roles with highest collections first, then base roles
-    return Object.values(map).sort((a, b) => {
-      if (b.totalCollected !== a.totalCollected) return b.totalCollected - a.totalCollected;
-      if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
-      const orderPref = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'];
-      const idxA = orderPref.indexOf(a.role);
-      const idxB = orderPref.indexOf(b.role);
-      return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
-    });
+    // Filter to ONLY roles that actually sold (orderCount > 0 or totalCollected > 0), then sort
+    return Object.values(map)
+      .filter(r => (r.orderCount || 0) > 0 || (r.totalCollected || 0) > 0)
+      .sort((a, b) => {
+        if (b.totalCollected !== a.totalCollected) return b.totalCollected - a.totalCollected;
+        if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
+        const orderPref = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'];
+        const idxA = orderPref.indexOf(a.role);
+        const idxB = orderPref.indexOf(b.role);
+        return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
+      });
   }, [session, sessionSales, data.users]);
 
   // Cashier & Shift Breakdown (Exactly as before)
