@@ -91,6 +91,12 @@ export const SplitPaymentModal: React.FC = () => {
     }
 
     const finalWaiter = selectedWaiter.trim() || activeSettlingTable.waiter || '';
+    if (!finalWaiter && (data.waiters || []).length > 0) {
+      const confirmProceed = window.confirm('No waiter is assigned to this order. Do you want to proceed as unassigned (Staff)?');
+      if (!confirmProceed) {
+        return;
+      }
+    }
     if (finalWaiter && finalWaiter !== activeSettlingTable.waiter) {
       setTableWaiter(activeSettlingTable.id, finalWaiter);
     }

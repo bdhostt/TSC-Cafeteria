@@ -173,12 +173,12 @@ export const ShiftZReportModal: React.FC = () => {
     return Object.values(map).sort((a, b) => b.totalCollected - a.totalCollected);
   }, [session, sessionSales, data.users]);
 
-  // Waiter-wise Breakdown (Exactly as before)
+  // Waiter-wise Breakdown (Dynamically synced with actual sales)
   const waiterBreakdown = useMemo(() => {
-    if (session.waiterBreakdown && session.waiterBreakdown.length > 0) {
-      return session.waiterBreakdown;
-    }
     if (sessionSales.length === 0) {
+      if (session.waiterBreakdown && session.waiterBreakdown.length > 0) {
+        return session.waiterBreakdown;
+      }
       return [{
         waiter: 'Floor Service Team',
         orderCount: session.orderCount || 0,

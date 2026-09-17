@@ -1231,6 +1231,7 @@ interface RestaurantContextType {
   // Sales & Due
   saveDirectDueCollection: (date: string, customer: string, amount: number, method: string) => void;
   deleteSale: (id: number) => void;
+  updateSaleWaiter: (id: number, waiterName: string) => void;
   
   // Menu & Recipe
   saveMenuItem: (item: Partial<MenuItem> & { id?: number }) => void;
@@ -1543,24 +1544,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const setPosView = (v: 'floor' | 'order') => {
-    if (v === 'floor') {
-      setData(prev => {
-        let hasChanges = false;
-        const updatedTables = prev.tables.map(t => {
-          if (t.status === 'free' && (!t.cart || t.cart.length === 0) && (t.waiter || t.customer !== 'Walk-in Customer')) {
-            hasChanges = true;
-            return {
-              ...t,
-              waiter: '',
-              customer: 'Walk-in Customer',
-              channelOrAgentId: 'dine_in'
-            };
-          }
-          return t;
-        });
-        return hasChanges ? { ...prev, tables: updatedTables } : prev;
-      });
-    }
     setPosViewState(v);
     try {
       localStorage.setItem(POS_VIEW_KEY, v);
@@ -1708,17 +1691,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           result.data.tableDimensions = { width: 147, height: 98 };
         }
         if (result.data.tables) {
-          result.data.tables = result.data.tables.map((t: Table) => {
-            // Never wipe waiter/customer if this is the active table currently in order view!
-            if (activeTableId && t.id === activeTableId && posView === 'order') {
-              return t;
-            }
-            if (t.status === 'free' && (!t.cart || t.cart.length === 0) && t.waiter) {
-              return { ...t, waiter: '', customer: 'Walk-in Customer' };
-            }
-            return t;
-          });
-
           // Protect active local table's cart and metadata from being wiped by background server poll
           if (activeTableId && !isInitial) {
             const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
@@ -2926,12 +2898,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return;
     }
 
-    if (table.status === 'free') {
-      setData(prev => ({
-        ...prev,
-        tables: prev.tables.map(t => t.id === tableId ? { ...t, status: 'hold' } : t)
-      }));
-    }
 
     // Mark all current items in cart as KOT printed
     setData(prev => ({
@@ -4276,6 +4242,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setData(prev => ({ ...prev, sales: prev.sales.filter(s => s.id !== id) }));
   };
 
+  const updateSaleWaiter = (id: number, waiterName: string) => {
+    setData(prev => ({
+      ...prev,
+      sales: prev.sales.map(s => {
+        if (s.id !== id) return s;
+        let details = s.details || '';
+        if (/W:\s*[^,\]\)]+/i.test(details)) {
+          details = details.replace(/W:\s*[^,\]\)]+/i, `W: ${waiterName}`);
+        } else {
+          details = details ? `(W: ${waiterName}) ${details}` : `(W: ${waiterName})`;
+        }
+        return {
+          ...s,
+          waiterName,
+          details
+        };
+      })
+    }));
+  };
+
   const saveMenuItem = (item: Partial<MenuItem> & { id?: number }) => {
     setData(prev => {
       const exists = prev.menuItems.some(i => i.id === item.id);
@@ -5229,6 +5215,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       closePrintReceipt,
       saveDirectDueCollection,
       deleteSale,
+      updateSaleWaiter,
       saveMenuItem,
       deleteMenuItem,
       saveMasterItem,

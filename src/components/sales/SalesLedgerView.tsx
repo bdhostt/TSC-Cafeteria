@@ -14,16 +14,19 @@ import {
   X,
   Eye,
   FileSpreadsheet,
-  ReceiptText
+  ReceiptText,
+  UserCheck
 } from 'lucide-react';
 
 export const SalesLedgerView: React.FC = () => {
-  const { data, metrics, deleteSale, saveDirectDueCollection, openPrintBill, setPrintableReceipt, currentUser } = useRestaurant();
+  const { data, metrics, deleteSale, updateSaleWaiter, saveDirectDueCollection, openPrintBill, setPrintableReceipt, currentUser } = useRestaurant();
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isDueModalOpen, setIsDueModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reassignSale, setReassignSale] = useState<{ id: number; invoiceNo: string; waiterName: string } | null>(null);
+  const [newWaiterChoice, setNewWaiterChoice] = useState<string>('');
 
   // Due collection modal state
   const [dueCust, setDueCust] = useState(data.customers[0] || 'Walk-in Customer');
@@ -90,7 +93,7 @@ export const SalesLedgerView: React.FC = () => {
     if (currentUser?.role === 'WAITER') return;
     let tableName = sale.table || 'Table';
     let tableZone = 'Floor 1';
-    let waiter = 'Staff';
+    let waiter = (sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A') ? sale.waiterName : 'Staff';
     let customer = sale.dueCustomer || sale.dueCollectedFrom || 'Walk-in Customer';
 
     const detailsStr = sale.details || '';
@@ -108,7 +111,7 @@ export const SalesLedgerView: React.FC = () => {
         tableZone = zoneMatch[1].trim();
       }
       const waiterMatch = detailsStr.match(/W:\s*([^):,]+)/i);
-      if (waiterMatch) {
+      if (waiterMatch && waiterMatch[1].trim() !== 'N/A' && waiterMatch[1].trim() !== 'Staff') {
         waiter = waiterMatch[1].trim();
       }
       if (!sale.dueCustomer && detailsStr.includes('•')) {
@@ -503,16 +506,47 @@ export const SalesLedgerView: React.FC = () => {
                       </td>
                       <td className="py-2.5 px-3 max-w-xs">
                         <div className="text-slate-800 font-medium line-clamp-1 group-hover:text-slate-900">{sale.details}</div>
-                        {sale.dueCustomer && (
-                          <div className="text-[10px] text-amber-700 font-bold">
-                            Due Customer: {sale.dueCustomer}
-                          </div>
-                        )}
-                        {sale.dueCollectedFrom && (
-                          <div className="text-[10px] text-emerald-700 font-bold">
-                            Collected From: {sale.dueCollectedFrom}
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          {currentUser?.role !== 'WAITER' ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const currentW = (sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A') ? sale.waiterName : 'Staff';
+                                setReassignSale({
+                                  id: sale.id,
+                                  invoiceNo: sale.invoiceNo,
+                                  waiterName: currentW
+                                });
+                                setNewWaiterChoice(currentW !== 'Staff' ? currentW : '');
+                              }}
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                                sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A'
+                                  ? 'bg-blue-50 hover:bg-blue-100 text-[#004b9b] border-blue-200'
+                                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                              }`}
+                              title="Click to reassign/change waiter"
+                            >
+                              <UserCheck className="w-2.5 h-2.5" />
+                              <span>Waiter: {(sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A') ? sale.waiterName : 'Staff'}</span>
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              <UserCheck className="w-2.5 h-2.5" />
+                              <span>Waiter: {(sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A') ? sale.waiterName : 'Staff'}</span>
+                            </span>
+                          )}
+                          {sale.dueCustomer && (
+                            <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
+                              Due: {sale.dueCustomer}
+                            </span>
+                          )}
+                          {sale.dueCollectedFrom && (
+                            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">
+                              From: {sale.dueCollectedFrom}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono font-semibold">
@@ -544,14 +578,32 @@ export const SalesLedgerView: React.FC = () => {
                       <td className="py-2.5 px-2 text-center" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
                           {currentUser?.role !== 'WAITER' && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenReceipt(sale, 'PAID_MEMO')}
-                              className="p-1.5 text-blue-600 hover:text-blue-800 rounded-lg hover:bg-blue-100/70 transition cursor-pointer"
-                              title="View & Print Bill / Cash Memo Receipt"
-                            >
-                              <ReceiptText className="w-3.5 h-3.5" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentW = (sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A') ? sale.waiterName : 'Staff';
+                                  setReassignSale({
+                                    id: sale.id,
+                                    invoiceNo: sale.invoiceNo,
+                                    waiterName: currentW
+                                  });
+                                  setNewWaiterChoice(currentW !== 'Staff' ? currentW : '');
+                                }}
+                                className="p-1.5 text-slate-500 hover:text-[#004b9b] rounded-lg hover:bg-blue-50 transition cursor-pointer"
+                                title="Reassign / Change Waiter"
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReceipt(sale, 'PAID_MEMO')}
+                                className="p-1.5 text-blue-600 hover:text-blue-800 rounded-lg hover:bg-blue-100/70 transition cursor-pointer"
+                                title="View & Print Bill / Cash Memo Receipt"
+                              >
+                                <ReceiptText className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
                           <button
                             type="button"
@@ -648,6 +700,75 @@ export const SalesLedgerView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reassign Waiter Modal */}
+      {reassignSale && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#004b9b] flex items-center justify-center">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm">Reassign Order Waiter</h3>
+                  <div className="text-[11px] text-slate-500 font-mono font-bold">
+                    Invoice: {reassignSale.invoiceNo}
+                  </div>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setReassignSale(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="my-4 space-y-3">
+              <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                Current Assigned: <strong className="text-slate-900 font-bold">{reassignSale.waiterName || 'Staff'}</strong>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Select New Waiter</label>
+                <select
+                  value={newWaiterChoice}
+                  onChange={e => setNewWaiterChoice(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#004b9b] cursor-pointer"
+                >
+                  <option value="">-- Choose Waiter --</option>
+                  {(data.waiters || []).map(w => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                  <option value="Staff">Staff (Unassigned)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setReassignSale(null)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const targetWaiter = newWaiterChoice.trim() || 'Staff';
+                  updateSaleWaiter(reassignSale.id, targetWaiter);
+                  setReassignSale(null);
+                }}
+                className="px-4 py-2 text-xs font-extrabold text-white bg-[#004b9b] hover:bg-blue-800 rounded-xl shadow-xs cursor-pointer transition"
+              >
+                Save Waiter
+              </button>
+            </div>
           </div>
         </div>
       )}

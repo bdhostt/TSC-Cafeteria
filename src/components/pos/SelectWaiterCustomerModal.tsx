@@ -24,11 +24,10 @@ export const SelectWaiterCustomerModal: React.FC<SelectWaiterCustomerModalProps>
 }) => {
   const { data } = useRestaurant();
 
-  // Only pre-fill waiter/customer if this is an already active table being re-edited
-  const isTableActive = table.status !== 'free' && !!(table.cart && table.cart.length > 0);
-  const [selectedWaiter, setSelectedWaiter] = useState<string>(isTableActive ? (table.waiter || '') : '');
+  // Pre-fill waiter and customer from table if already selected
+  const [selectedWaiter, setSelectedWaiter] = useState<string>(table.waiter || '');
   const [selectedCustomer, setSelectedCustomer] = useState<string>(
-    isTableActive ? (table.customer || '') : ''
+    table.customer && table.customer !== 'Walk-in Customer' ? table.customer : ''
   );
   const [error, setError] = useState<string>('');
 
