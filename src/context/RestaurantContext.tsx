@@ -1395,11 +1395,24 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const mergedTables = (parsed.tables || DEFAULT_DATA.tables).map((t: Table, idx: number) => ({
-          ...t,
-          zone: t.zone || (t.id.startsWith('VIP') ? 'VIP Lounge' : t.id.startsWith('RT') ? 'Rooftop Garden' : idx >= 3 ? 'Floor 2' : 'Floor 1'),
-          waiter: (t.status === 'free' && (!t.cart || t.cart.length === 0)) ? '' : (t.waiter || '')
-        }));
+        const mergedTables = (parsed.tables || DEFAULT_DATA.tables).map((t: Table, idx: number) => {
+          const isCleanFree = t.status === 'free' && (!t.cart || t.cart.length === 0);
+          return {
+            ...t,
+            zone: t.zone || (t.id.startsWith('VIP') ? 'VIP Lounge' : t.id.startsWith('RT') ? 'Rooftop Garden' : idx >= 3 ? 'Floor 2' : 'Floor 1'),
+            waiter: isCleanFree ? '' : (t.waiter || ''),
+            cart: isCleanFree ? [] : (t.cart || []),
+            discountVal: isCleanFree ? 0 : (t.discountVal || 0),
+            channelOrAgentId: isCleanFree ? 'dine_in' : (t.channelOrAgentId || 'dine_in'),
+            customer: isCleanFree ? 'Walk-in Customer' : (t.customer || 'Walk-in Customer'),
+            orderCreatedAt: isCleanFree ? undefined : t.orderCreatedAt,
+            orderCreatedBy: isCleanFree ? undefined : t.orderCreatedBy,
+            orderCreatedRole: isCleanFree ? undefined : t.orderCreatedRole,
+            orderCreatedId: isCleanFree ? undefined : t.orderCreatedId,
+            billedAt: isCleanFree ? undefined : t.billedAt,
+            billedAtTime: isCleanFree ? undefined : t.billedAtTime
+          };
+        });
         const mergedZones = (parsed.tableZones && parsed.tableZones.length > 0)
           ? parsed.tableZones
           : DEFAULT_TABLE_ZONES;
@@ -1691,6 +1704,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           result.data.tableDimensions = { width: 147, height: 98 };
         }
         if (result.data.tables) {
+          result.data.tables = result.data.tables.map((t: Table) => {
+            if (t.status === 'free' && (!t.cart || t.cart.length === 0) && t.id !== activeTableId) {
+              return {
+                ...t,
+                waiter: '',
+                customer: 'Walk-in Customer',
+                cart: [],
+                discountVal: 0,
+                channelOrAgentId: 'dine_in',
+                orderCreatedBy: undefined,
+                orderCreatedRole: undefined,
+                orderCreatedId: undefined,
+                orderCreatedAt: undefined,
+                billedAt: undefined,
+                billedAtTime: undefined
+              };
+            }
+            return t;
+          });
+
           // Protect active local table's cart and metadata from being wiped by background server poll
           if (activeTableId && !isInitial) {
             const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
@@ -2678,6 +2711,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           status: isNowEmpty ? 'free' : (table.status === 'billed' ? 'hold' : table.status),
           waiter: isNowEmpty ? '' : table.waiter,
           customer: isNowEmpty ? 'Walk-in Customer' : table.customer,
+          discountVal: isNowEmpty ? 0 : table.discountVal,
+          channelOrAgentId: isNowEmpty ? 'dine_in' : table.channelOrAgentId,
+          orderCreatedAt: isNowEmpty ? undefined : table.orderCreatedAt,
+          orderCreatedBy: isNowEmpty ? undefined : table.orderCreatedBy,
+          orderCreatedRole: isNowEmpty ? undefined : table.orderCreatedRole,
+          orderCreatedId: isNowEmpty ? undefined : table.orderCreatedId,
+          billedAt: isNowEmpty ? undefined : table.billedAt,
+          billedAtTime: isNowEmpty ? undefined : table.billedAtTime,
           cart: existingCart
         };
       });
@@ -2720,9 +2761,20 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (typeof cartItemIdOrIdx === 'number') return idx !== cartItemIdOrIdx;
           return (c.cartItemId || `${c.id}`) !== cartItemIdOrIdx && c.id !== Number(cartItemIdOrIdx);
         });
+        const isNowEmpty = existingCart.length === 0;
         return {
           ...table,
-          status: table.status === 'billed' ? 'hold' : table.status,
+          status: isNowEmpty ? 'free' : (table.status === 'billed' ? 'hold' : table.status),
+          waiter: isNowEmpty ? '' : table.waiter,
+          customer: isNowEmpty ? 'Walk-in Customer' : table.customer,
+          discountVal: isNowEmpty ? 0 : table.discountVal,
+          channelOrAgentId: isNowEmpty ? 'dine_in' : table.channelOrAgentId,
+          orderCreatedAt: isNowEmpty ? undefined : table.orderCreatedAt,
+          orderCreatedBy: isNowEmpty ? undefined : table.orderCreatedBy,
+          orderCreatedRole: isNowEmpty ? undefined : table.orderCreatedRole,
+          orderCreatedId: isNowEmpty ? undefined : table.orderCreatedId,
+          billedAt: isNowEmpty ? undefined : table.billedAt,
+          billedAtTime: isNowEmpty ? undefined : table.billedAtTime,
           cart: existingCart
         };
       });
@@ -3085,6 +3137,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           status: isNowEmpty ? 'free' : t.status,
           waiter: isNowEmpty ? '' : t.waiter,
           customer: isNowEmpty ? 'Walk-in Customer' : t.customer,
+          discountVal: isNowEmpty ? 0 : t.discountVal,
+          channelOrAgentId: isNowEmpty ? 'dine_in' : t.channelOrAgentId,
+          orderCreatedAt: isNowEmpty ? undefined : t.orderCreatedAt,
+          orderCreatedBy: isNowEmpty ? undefined : t.orderCreatedBy,
+          orderCreatedRole: isNowEmpty ? undefined : t.orderCreatedRole,
+          orderCreatedId: isNowEmpty ? undefined : t.orderCreatedId,
+          billedAt: isNowEmpty ? undefined : t.billedAt,
+          billedAtTime: isNowEmpty ? undefined : t.billedAtTime,
           cart: newCart
         };
       });

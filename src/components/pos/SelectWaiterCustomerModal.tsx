@@ -24,10 +24,11 @@ export const SelectWaiterCustomerModal: React.FC<SelectWaiterCustomerModalProps>
 }) => {
   const { data } = useRestaurant();
 
-  // Pre-fill waiter and customer from table if already selected
-  const [selectedWaiter, setSelectedWaiter] = useState<string>(table.waiter || '');
+  // Pre-fill waiter and customer only if table is already active/occupied
+  const isTableOccupied = table.status !== 'free' || (table.cart && table.cart.length > 0);
+  const [selectedWaiter, setSelectedWaiter] = useState<string>(isTableOccupied ? (table.waiter || '') : '');
   const [selectedCustomer, setSelectedCustomer] = useState<string>(
-    table.customer && table.customer !== 'Walk-in Customer' ? table.customer : ''
+    isTableOccupied && table.customer && table.customer !== 'Walk-in Customer' ? table.customer : ''
   );
   const [error, setError] = useState<string>('');
 
