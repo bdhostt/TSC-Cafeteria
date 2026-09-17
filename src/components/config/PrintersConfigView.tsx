@@ -21,8 +21,11 @@ import {
   ArrowRight,
   RefreshCw,
   Search,
-  Sparkles
+  Sparkles,
+  Download,
+  Cpu
 } from 'lucide-react';
+import { PrinterBridgeModal } from '../common/PrinterBridgeModal';
 
 export const PrintersConfigView: React.FC = () => {
   const { 
@@ -62,6 +65,31 @@ export const PrintersConfigView: React.FC = () => {
   // Test Print Simulation State
   const [testingPrinterId, setTestingPrinterId] = useState<string | null>(null);
   const [testPrintOutput, setTestPrintOutput] = useState<{ printer: PrinterConfig; timestamp: string } | null>(null);
+
+  // Desktop Print Bridge State
+  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
+  const [isLocalBridgeOnline, setIsLocalBridgeOnline] = useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const checkBridge = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:9123/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(1500)
+        });
+        if (isMounted) setIsLocalBridgeOnline(res.ok);
+      } catch {
+        if (isMounted) setIsLocalBridgeOnline(false);
+      }
+    };
+    checkBridge();
+    const interval = setInterval(checkBridge, 12000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Open Modal for Add
   const handleOpenAdd = () => {
@@ -211,6 +239,56 @@ export const PrintersConfigView: React.FC = () => {
           <Plus className="w-4 h-4" />
           <span>'+ Add New Printer'</span>
         </button>
+      </div>
+
+      {/* Desktop Print Bridge Agent & Installer Card */}
+      <div className="p-4 bg-linear-to-r from-blue-50/80 via-indigo-50/50 to-white border border-blue-200/80 rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-xs">
+            <Cpu className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-extrabold text-sm text-slate-900">
+                Cafe Banani Printer Agent (Floor Bridge)
+              </h4>
+              {isLocalBridgeOnline ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Online on this Device
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                  Not Running on this PC
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Connects this device to 80 Printer (192.168.1.87) & Kot Printer (USB001) for instant, silent printing.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href="/api/download/printer-agent-zip"
+            download="CafeBananiPrinter-Setup.zip"
+            className="px-3.5 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download 1-Click Installer</span>
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setIsBridgeModalOpen(true)}
+            className="px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5 text-slate-600" />
+            <span>Setup & Status</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter & Search Bar */}
@@ -830,6 +908,12 @@ export const PrintersConfigView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Desktop Printer Bridge Setup & Diagnostics Modal */}
+      <PrinterBridgeModal
+        isOpen={isBridgeModalOpen}
+        onClose={() => setIsBridgeModalOpen(false)}
+      />
     </div>
   );
 };

@@ -2015,7 +2015,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setData(prev => {
       const current = prev.orderEditPermissions || DEFAULT_ORDER_EDIT_PERMISSIONS;
       const updated = { ...current, [role]: allowed };
-      saveData({ ...prev, orderEditPermissions: updated });
       return { ...prev, orderEditPermissions: updated };
     });
   };

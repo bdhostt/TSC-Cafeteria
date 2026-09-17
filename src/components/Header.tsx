@@ -5,9 +5,11 @@ import {
   LogOut, 
   ChevronDown, 
   LayoutGrid,
-  Home
+  Home,
+  Printer
 } from 'lucide-react';
 import logo4 from '../image/logo4.png';
+import { PrinterBridgeModal } from './common/PrinterBridgeModal';
 
 export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({ 
   onOpenMobileSidebar = () => {} 
@@ -25,6 +27,34 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
 
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const userDropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
+  const [isPrinterOnline, setIsPrinterOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkPrinterHealth = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:9123/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(1500)
+        });
+        if (isMounted) {
+          setIsPrinterOnline(res.ok);
+        }
+      } catch {
+        if (isMounted) {
+          setIsPrinterOnline(false);
+        }
+      }
+    };
+    checkPrinterHealth();
+    const interval = setInterval(checkPrinterHealth, 12000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleMouseEnterUser = () => {
     if (userDropdownTimeoutRef.current) {
@@ -110,6 +140,28 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
 
       {/* Right: Actions & Session */}
       <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Printer Bridge Live Status & Quick Action Button */}
+        <button
+          type="button"
+          id="btn-printer-bridge-status"
+          onClick={() => setIsPrinterModalOpen(true)}
+          className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg border text-xs font-bold shadow-2xs transition cursor-pointer ${
+            isPrinterOnline
+              ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+              : 'border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800'
+          }`}
+          title={isPrinterOnline ? 'Printer Bridge Active (Click to inspect or test)' : 'Printer Agent Offline (Click to install / download)'}
+        >
+          <span className="relative flex h-2 w-2">
+            {isPrinterOnline && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            )}
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${isPrinterOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+          </span>
+          <Printer className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden sm:inline">{isPrinterOnline ? 'Printer OK' : 'Printer Offline'}</span>
+        </button>
+
         {/* Return to Main Launchpad Home Button */}
         <button
           type="button"
@@ -198,6 +250,12 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
         </div>
       </div>
       </div>
+
+      {/* Printer Bridge Live Inspection & Download Modal */}
+      <PrinterBridgeModal
+        isOpen={isPrinterModalOpen}
+        onClose={() => setIsPrinterModalOpen(false)}
+      />
     </header>
   );
 };

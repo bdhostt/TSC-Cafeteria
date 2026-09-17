@@ -1051,6 +1051,33 @@ async function startServer() {
     });
   });
 
+  // Download 1-Click Printer Agent Setup ZIP
+  app.get("/api/download/printer-agent-zip", (req, res) => {
+    const candidates = [
+      path.join(process.cwd(), "public", "downloads", "CafeBananiPrinter-Setup.zip"),
+      path.join(process.cwd(), "dist", "downloads", "CafeBananiPrinter-Setup.zip")
+    ];
+    for (const zipPath of candidates) {
+      if (fs.existsSync(zipPath)) {
+        res.setHeader('Content-Disposition', 'attachment; filename="CafeBananiPrinter-Setup.zip"');
+        res.setHeader('Content-Type', 'application/zip');
+        return res.sendFile(zipPath);
+      }
+    }
+    return res.status(404).json({ success: false, error: "Setup package not found" });
+  });
+
+  // Download 1-Click Installer BAT directly
+  app.get("/api/download/printer-installer-bat", (req, res) => {
+    const batPath = path.join(process.cwd(), "scripts", "INSTALL-CAFE-BANANI-PRINTER.bat");
+    if (fs.existsSync(batPath)) {
+      res.setHeader('Content-Disposition', 'attachment; filename="INSTALL-CAFE-BANANI-PRINTER.bat"');
+      res.setHeader('Content-Type', 'application/x-bat');
+      return res.sendFile(batPath);
+    }
+    return res.status(404).json({ success: false, error: "Installer script not found" });
+  });
+
   // REST endpoint: Direct hardware Bill / Cash Memo print with auto-cut
   app.post("/api/hardware/print-bill", async (req, res) => {
     try {

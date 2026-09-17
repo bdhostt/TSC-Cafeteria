@@ -1247,7 +1247,7 @@ export const PosBillingView: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 setEditingNoteItem({ item, index: idx });
-                                itemNoteInput('');
+                                setItemNoteInput('');
                               }}
                               className="inline-flex items-center gap-1 text-[10px] text-slate-400 hover:text-[#004b9b] hover:bg-blue-50 px-1.5 py-0.5 rounded transition cursor-pointer border border-dashed border-slate-200 hover:border-blue-300"
                               title="Add special cooking note / instruction (prints on KOT)"
