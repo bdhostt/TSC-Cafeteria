@@ -122,18 +122,18 @@ export const SplitPaymentModal: React.FC = () => {
   const currentWaiterDisplay = selectedWaiter || activeSettlingTable.waiter;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overflow-hidden">
+      <div className="bg-white rounded-2xl max-w-xl w-full max-h-[95dvh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden my-auto">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="flex items-center justify-between p-3.5 sm:p-5 pb-3 border-b border-slate-100 shrink-0">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-md bg-[#004b9b] text-white font-extrabold text-sm">
+              <span className="px-2.5 py-0.5 rounded-md bg-[#004b9b] text-white font-extrabold text-xs sm:text-sm">
                 {activeSettlingTable.name}
               </span>
-              <h3 className="font-extrabold text-slate-900 text-lg">Bill Settlement & Split Payment</h3>
+              <h3 className="font-extrabold text-slate-900 text-base sm:text-lg">Bill Settlement & Split Payment</h3>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span>Order Taker: <strong className="text-slate-800 font-bold">{activeSettlingTable.orderCreatedBy || 'Staff'} {activeSettlingTable.orderCreatedRole ? `(${activeSettlingTable.orderCreatedRole})` : ''}</strong></span>
               <span>• Waiter: <strong className="text-[#004b9b] font-bold">{currentWaiterDisplay && currentWaiterDisplay !== 'Staff' && currentWaiterDisplay !== 'N/A' ? currentWaiterDisplay : 'Not Assigned'}</strong></span>
               <span>• Customer: <strong className="text-slate-800 font-semibold">{selectedCustomer || activeSettlingTable.customer || 'Walk-in Customer'}</strong></span>
@@ -142,131 +142,132 @@ export const SplitPaymentModal: React.FC = () => {
           <button
             id="close-split-payment-modal"
             onClick={closeSettleModal}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Assigned Waiter Selection Bar */}
-        <div className="mt-3 p-2 px-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-            <UserCheck className="w-4 h-4 text-[#004b9b]" />
-            <span>Assigned Waiter:</span>
-            {currentWaiterDisplay && currentWaiterDisplay !== 'Staff' && currentWaiterDisplay !== 'N/A' ? (
-              <span className="text-xs font-extrabold text-[#004b9b] bg-blue-100 px-2 py-0.5 rounded-md">
-                {currentWaiterDisplay}
-              </span>
-            ) : (
-              <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                Not Assigned
-              </span>
-            )}
-          </div>
-          <select
-            id="settle-select-waiter"
-            value={selectedWaiter}
-            onChange={e => {
-              const w = e.target.value;
-              setSelectedWaiter(w);
-              if (w) setTableWaiter(activeSettlingTable.id, w);
-            }}
-            className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#004b9b] cursor-pointer"
-          >
-            <option value="">-- Choose Waiter --</option>
-            {(data.waiters || []).map(w => (
-              <option key={w} value={w}>{w}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Bill Summary Banner */}
-        <div className="my-4 p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-inner">
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Net Payable Bill</div>
-            <div className="text-2xl font-extrabold text-blue-400 tracking-tight">
-              ৳ {netTotal.toLocaleString()}
+        {/* Scrollable Form Body */}
+        <form id="settle-split-form" onSubmit={handleSettle} className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5 custom-scrollbar min-h-0">
+          {/* Assigned Waiter Selection Bar */}
+          <div className="p-2 px-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <UserCheck className="w-4 h-4 text-[#004b9b]" />
+              <span>Assigned Waiter:</span>
+              {currentWaiterDisplay && currentWaiterDisplay !== 'Staff' && currentWaiterDisplay !== 'N/A' ? (
+                <span className="text-xs font-extrabold text-[#004b9b] bg-blue-100 px-2 py-0.5 rounded-md">
+                  {currentWaiterDisplay}
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                  Not Assigned
+                </span>
+              )}
             </div>
-            {discDeduction > 0 && (
-              <div className="text-[11px] text-emerald-400">
-                Discount: ৳{discDeduction.toLocaleString()} (Subtotal: ৳{subtotal.toLocaleString()})
-              </div>
-            )}
+            <select
+              id="settle-select-waiter"
+              value={selectedWaiter}
+              onChange={e => {
+                const w = e.target.value;
+                setSelectedWaiter(w);
+                if (w) setTableWaiter(activeSettlingTable.id, w);
+              }}
+              className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#004b9b] cursor-pointer"
+            >
+              <option value="">-- Choose Waiter --</option>
+              {(data.waiters || []).map(w => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
           </div>
 
-          <div className="text-right">
-            {remaining > 0 ? (
-              <div>
-                <div className="text-xs text-rose-300 font-bold">Remaining Due</div>
-                <div className="text-xl font-extrabold text-rose-400">৳ {remaining.toLocaleString()}</div>
+          {/* Bill Summary Banner */}
+          <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-inner">
+            <div>
+              <div className="text-xs text-slate-400 font-medium">Net Payable Bill</div>
+              <div className="text-xl sm:text-2xl font-extrabold text-blue-400 tracking-tight">
+                ৳ {netTotal.toLocaleString()}
               </div>
-            ) : (
-              <div>
-                <div className="text-xs text-emerald-300 font-bold">Change Return</div>
-                <div className="text-xl font-extrabold text-emerald-400">৳ {changeReturn.toLocaleString()}</div>
-              </div>
-            )}
-          </div>
-        </div>
+              {discDeduction > 0 && (
+                <div className="text-[11px] text-emerald-400">
+                  Discount: ৳{discDeduction.toLocaleString()} (Subtotal: ৳{subtotal.toLocaleString()})
+                </div>
+              )}
+            </div>
 
-        {/* 1-Click Fast Presets */}
-        <div className="mb-4">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-            <Zap className="w-3.5 h-3.5 text-[#004b9b]" />
-            <span>1-Click Full Payment Shortcut</span>
+            <div className="text-right">
+              {remaining > 0 ? (
+                <div>
+                  <div className="text-xs text-rose-300 font-bold">Remaining Due</div>
+                  <div className="text-lg sm:text-xl font-extrabold text-rose-400">৳ {remaining.toLocaleString()}</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-xs text-emerald-300 font-bold">Change Return</div>
+                  <div className="text-lg sm:text-xl font-extrabold text-emerald-400">৳ {changeReturn.toLocaleString()}</div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            <button
-              type="button"
-              id="preset-all-cash"
-              onClick={handleFillAllCash}
-              className="py-2 px-1 text-center bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <Banknote className="w-4 h-4 text-emerald-600" />
-              <span>Full Cash</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-bkash"
-              onClick={handleFillAllBkash}
-              className="py-2 px-1 text-center bg-pink-50 hover:bg-pink-100 border border-pink-300 text-pink-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <Smartphone className="w-4 h-4 text-pink-600" />
-              <span>Full bKash</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-nagad"
-              onClick={handleFillAllNagad}
-              className="py-2 px-1 text-center bg-orange-50 hover:bg-orange-100 border border-orange-300 text-orange-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <Smartphone className="w-4 h-4 text-orange-600" />
-              <span>Full Nagad</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-card"
-              onClick={handleFillAllCard}
-              className="py-2 px-1 text-center bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <CreditCard className="w-4 h-4 text-blue-600" />
-              <span>Full Card</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-due"
-              onClick={handleFillAllDue}
-              className="py-2 px-1 text-center bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <UserX className="w-4 h-4 text-amber-600" />
-              <span>Full Due</span>
-            </button>
-          </div>
-        </div>
 
-        {/* Multi-Split Payment Form */}
-        <form onSubmit={handleSettle} className="space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {/* 1-Click Fast Presets */}
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 text-[#004b9b]" />
+              <span>1-Click Full Payment Shortcut</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <button
+                type="button"
+                id="preset-all-cash"
+                onClick={handleFillAllCash}
+                className="py-2 px-1 text-center bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
+              >
+                <Banknote className="w-4 h-4 text-emerald-600" />
+                <span>Full Cash</span>
+              </button>
+              <button
+                type="button"
+                id="preset-all-bkash"
+                onClick={handleFillAllBkash}
+                className="py-2 px-1 text-center bg-pink-50 hover:bg-pink-100 border border-pink-300 text-pink-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
+              >
+                <Smartphone className="w-4 h-4 text-pink-600" />
+                <span>Full bKash</span>
+              </button>
+              <button
+                type="button"
+                id="preset-all-nagad"
+                onClick={handleFillAllNagad}
+                className="py-2 px-1 text-center bg-orange-50 hover:bg-orange-100 border border-orange-300 text-orange-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
+              >
+                <Smartphone className="w-4 h-4 text-orange-600" />
+                <span>Full Nagad</span>
+              </button>
+              <button
+                type="button"
+                id="preset-all-card"
+                onClick={handleFillAllCard}
+                className="py-2 px-1 text-center bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
+              >
+                <CreditCard className="w-4 h-4 text-blue-600" />
+                <span>Full Card</span>
+              </button>
+              <button
+                type="button"
+                id="preset-all-due"
+                onClick={handleFillAllDue}
+                className="py-2 px-1 text-center bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-1"
+              >
+                <UserX className="w-4 h-4 text-amber-600" />
+                <span>Full Due</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Multi-Split Payment Form Inputs */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
             {/* Cash */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
@@ -392,31 +393,32 @@ export const SplitPaymentModal: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Action buttons */}
-          <div className="pt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={closeSettleModal}
-              className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 text-sm transition cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              id="submit-settle-payment"
-              disabled={totalEntered < netTotal}
-              className={`flex-1 py-3 rounded-xl font-extrabold text-sm shadow-md transition flex items-center justify-center gap-2 ${
-                totalEntered >= netTotal 
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>Confirm Payment & Settle Bill</span>
-            </button>
-          </div>
         </form>
+
+        {/* Sticky Action Footer */}
+        <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50/90 backdrop-blur-xs flex gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={closeSettleModal}
+            className="flex-1 py-2.5 sm:py-3 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 text-xs sm:text-sm transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="settle-split-form"
+            id="submit-settle-payment"
+            disabled={totalEntered < netTotal}
+            className={`flex-1 py-2.5 sm:py-3 rounded-xl font-extrabold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-1.5 sm:gap-2 ${
+              totalEntered >= netTotal 
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+            <span>Confirm Payment & Settle Bill</span>
+          </button>
+        </div>
       </div>
     </div>
   );
