@@ -27,6 +27,7 @@ export const ThermalBillModal: React.FC = () => {
   const { printableReceipt, closePrintReceipt, data } = useRestaurant();
 
   const isCancelKot = printableReceipt?.receiptType === 'CANCEL_KOT';
+  const isVoidBill = printableReceipt?.receiptType === 'VOID_BILL' || printableReceipt?.status === 'voided';
   const isKot = isCancelKot || printableReceipt?.receiptType === 'KOT';
   const profile = data?.restaurantProfile;
   const restaurantName = profile?.name || 'BARCODE CAFE BANANI';
@@ -438,7 +439,9 @@ export const ThermalBillModal: React.FC = () => {
     }
 
     // CUSTOMER BILL / CASH MEMO (Exact 100% match to 'localhost:3000 this is ok' thermal slip)
-    const titleText = printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL';
+    const titleText = isVoidBill 
+      ? '*** VOIDED / CANCELLED INVOICE ***' 
+      : (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
     const lines: string[] = [];
 
     lines.push(centerLine(restaurantName || 'BARCODE CAFE BANANI'));
@@ -467,6 +470,15 @@ export const ThermalBillModal: React.FC = () => {
 
     lines.push('------------------------------------------');
     lines.push(centerLine(titleText));
+    if (isVoidBill) {
+      lines.push(centerLine('STATUS: VOIDED (REVERSED)'));
+      if (printableReceipt.voidAuthorizedBy) {
+        lines.push(line2Col('Voided By  :', printableReceipt.voidAuthorizedBy));
+      }
+      if (printableReceipt.voidReason) {
+        lines.push(line2Col('Void Reason:', printableReceipt.voidReason));
+      }
+    }
     lines.push('------------------------------------------');
 
     lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo));
@@ -1051,10 +1063,38 @@ export const ThermalBillModal: React.FC = () => {
                     BIN / VAT Reg: {restaurantBin}
                   </p>
                 )}
-                <div className="mt-2 inline-block px-2 py-0.5 bg-slate-200 text-slate-800 rounded text-[10px] font-bold uppercase tracking-wider font-sans">
-                  {activeTemplate?.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'TABLE RUNNING BILL')}
+                <div className={`mt-2 inline-block px-2.5 py-1 rounded text-[11px] font-black uppercase tracking-wider font-sans ${
+                  isVoidBill 
+                    ? 'bg-rose-600 text-white shadow-xs' 
+                    : 'bg-slate-200 text-slate-800'
+                }`}>
+                  {isVoidBill 
+                    ? '*** VOIDED / CANCELLED INVOICE ***' 
+                    : (activeTemplate?.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'TABLE RUNNING BILL'))}
                 </div>
               </div>
+
+              {/* Void Audit Box */}
+              {isVoidBill && (
+                <div className="my-2 p-2.5 bg-rose-50 border border-rose-300 rounded-xl space-y-1 text-rose-950 font-sans">
+                  <div className="font-black text-rose-700 flex items-center justify-between text-xs">
+                    <span>⚠️ STATUS: VOIDED (REVERSED)</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-rose-200 text-rose-900 rounded font-bold">Audit Recorded</span>
+                  </div>
+                  {printableReceipt.voidAuthorizedBy && (
+                    <div className="text-[11px]">
+                      <span className="text-slate-600 font-medium">Void Authorized By:</span>{' '}
+                      <span className="font-extrabold text-slate-900">{printableReceipt.voidAuthorizedBy}</span>
+                    </div>
+                  )}
+                  {printableReceipt.voidReason && (
+                    <div className="text-[11px]">
+                      <span className="text-slate-600 font-medium">Mandatory Reason:</span>{' '}
+                      <span className="font-extrabold text-rose-900 font-mono">"{printableReceipt.voidReason}"</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Invoice Info with Table & Zone */}
               <div className="py-2 border-b border-dashed border-slate-300 space-y-1 text-[11px]">

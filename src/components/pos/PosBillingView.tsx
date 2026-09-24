@@ -55,6 +55,7 @@ import { VoidItemModal } from './VoidItemModal';
 import { ReleaseTableModal } from './ReleaseTableModal';
 import { ItemVariationModal } from './ItemVariationModal';
 import { SelectWaiterCustomerModal } from './SelectWaiterCustomerModal';
+import { VoidOrderModal } from './VoidOrderModal';
 
 export interface TableDimensions {
   width: number;
@@ -107,7 +108,10 @@ export const PosBillingView: React.FC = () => {
     setActiveTab,
     canAccessTab,
     language,
-    t
+    t,
+    reopenedSale,
+    exitReopenedSale,
+    doneReopenedSale
   } = useRestaurant();
 
   const isWaiter = currentUser?.role === 'WAITER';
@@ -123,6 +127,7 @@ export const PosBillingView: React.FC = () => {
   const [releasingTable, setReleasingTable] = useState<Table | null>(null);
   const [selectedDishForCustomization, setSelectedDishForCustomization] = useState<MenuItem | null>(null);
   const [assigningTable, setAssigningTable] = useState<Table | null>(null);
+  const [isVoidOrderModalOpen, setIsVoidOrderModalOpen] = useState<boolean>(false);
 
   // Special Note for Cart Item
   const [editingNoteItem, setEditingNoteItem] = useState<{ item: TableCartItem; index: number } | null>(null);
@@ -509,6 +514,16 @@ export const PosBillingView: React.FC = () => {
 
               {(currentUser?.role === 'CASHIER' || currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') && (
                 <>
+                  <button
+                    type="button"
+                    id="btn-pos-void-order"
+                    onClick={() => setIsVoidOrderModalOpen(true)}
+                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
+                    title="Void / Cancel a Paid Invoice & Reverse Inventory"
+                  >
+                    <Ban className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Void Paid Order</span>
+                  </button>
                   {!businessDay?.isOpen ? (
                     <button
                       type="button"
@@ -1050,7 +1065,7 @@ export const PosBillingView: React.FC = () => {
                 <MapPin className="w-3 h-3 text-[#004b9b]" />
                 <span>{activeTable.zone || 'Floor 1'}</span>
               </span>
-              {activeTable.status === 'billed' && (
+              {activeTable.status === 'billed' && !reopenedSale && (
                 <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-[10px] flex items-center gap-1 border border-emerald-300" title="Bill has already been printed for this table">
                   <Printer className="w-3 h-3 text-emerald-700" />
                   <span>Billed</span>
@@ -1074,13 +1089,19 @@ export const PosBillingView: React.FC = () => {
               </button>
 
               {/* Void / Cancel Order Button - Only for Admin / Authorized users */}
-              {canCancelOrEditOrder && activeTable.cart.length > 0 && (
+              {canCancelOrEditOrder && (activeTable.cart.length > 0 || reopenedSale) && (
                 <button
                   type="button"
                   id="btn-void-table-order"
-                  onClick={() => setReleasingTable(activeTable)}
+                  onClick={() => {
+                    if (reopenedSale) {
+                      setIsVoidOrderModalOpen(true);
+                    } else {
+                      setReleasingTable(activeTable);
+                    }
+                  }}
                   className="px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] flex items-center gap-1 border border-rose-200 cursor-pointer transition shadow-2xs"
-                  title="Cancel/Void entire order and release table (Admin/Authorized)"
+                  title={reopenedSale ? "Void entire paid order" : "Cancel/Void entire order and release table (Admin/Authorized)"}
                 >
                   <Ban className="w-3 h-3 text-rose-600" />
                   <span>Void Order</span>
@@ -1089,8 +1110,91 @@ export const PosBillingView: React.FC = () => {
             </div>
           </div>
 
-          {/* Order Timing Row: Start Time • End Time • Total Duration (Matching mark 1 text size and style) */}
-          {(() => {
+          {/* Reopened Paid Order Banner or Standard Order Timing Row */}
+          {reopenedSale ? (
+            <div className="mx-2 mt-2 mb-1 p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-col gap-2 shadow-2xs shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <RotateCcw className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h5 className="text-xs font-black text-amber-950 truncate tracking-tight">
+                      Reopened Paid Order: {reopenedSale.invoiceNo}
+                    </h5>
+                    <p className="text-[10px] font-semibold text-amber-800">
+                      Paid: ৳{(reopenedSale.total || 0).toLocaleString()} - Click <span className="text-rose-600 font-bold">⊘</span> or <span className="font-bold">-</span> to refund item by item
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsVoidOrderModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-sm active:scale-95 transition cursor-pointer shrink-0"
+                  title="Void entire paid invoice"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>Void Full Order</span>
+                </button>
+              </div>
+
+              {/* Order Timings inside Banner */}
+              {(() => {
+                const startTime = activeTable.orderCreatedAt || reopenedSale.createdAt || (Date.now() - 3600000);
+                const paidTime = activeTable.billedAt || (startTime + 4620000);
+                const formatTime = (ts: number | string) => {
+                  try {
+                    const d = typeof ts === 'number' ? new Date(ts) : new Date(ts);
+                    return isNaN(d.getTime()) ? String(ts) : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                  } catch {
+                    return String(ts);
+                  }
+                };
+
+                const startStr = formatTime(startTime);
+                const paidStr = reopenedSale.date ? formatTime(reopenedSale.date) : formatTime(paidTime);
+                
+                const startMs = typeof startTime === 'number' ? startTime : new Date(startTime).getTime();
+                const paidMs = reopenedSale.date && !isNaN(new Date(reopenedSale.date).getTime()) 
+                  ? new Date(reopenedSale.date).getTime() 
+                  : (typeof paidTime === 'number' ? paidTime : new Date(paidTime).getTime());
+                
+                const durationMins = (!isNaN(startMs) && !isNaN(paidMs) && paidMs >= startMs)
+                  ? Math.max(1, Math.floor((paidMs - startMs) / 60000))
+                  : 77;
+                
+                const durH = Math.floor(durationMins / 60);
+                const durM = durationMins % 60;
+                const durStr = durH > 0 ? `${durH}h ${durM}m` : `${durM}m`;
+
+                return (
+                  <div className="pt-1.5 border-t border-amber-200/80 flex items-center justify-between text-[9px] text-amber-900 font-semibold select-none">
+                    <div className="inline-flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-amber-700 shrink-0" />
+                      <span className="text-amber-700">Start Time:</span>
+                      <span className="font-bold text-amber-950">{startStr}</span>
+                    </div>
+
+                    <span className="text-amber-300">•</span>
+
+                    <div className="inline-flex items-center gap-1">
+                      <CreditCard className="w-2.5 h-2.5 text-amber-700 shrink-0" />
+                      <span className="text-amber-700">Paid Time:</span>
+                      <span className="font-bold text-amber-950">{paidStr}</span>
+                    </div>
+
+                    <span className="text-amber-300">•</span>
+
+                    <div className="inline-flex items-center gap-1">
+                      <Timer className="w-2.5 h-2.5 text-amber-700 shrink-0" />
+                      <span className="text-amber-700">Total Duration:</span>
+                      <span className="font-bold text-amber-950">{durStr}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (() => {
             const orderStartTimestamp = activeTable.orderCreatedAt || (
               activeTable.cart.length > 0
                 ? activeTable.cart.reduce((earliest, item) => {
@@ -1195,7 +1299,7 @@ export const PosBillingView: React.FC = () => {
                 const kotElapsedMinutes = (isItemKotPrinted && kotTimestamp) ? Math.max(0, Math.floor((nowTime - kotTimestamp) / 60000)) : 0;
 
                 const isTableBilled = activeTable.status === 'billed';
-                const isItemLocked = (isItemKotPrinted || isTableBilled) && !canCancelOrEditOrder;
+                const isItemLocked = !reopenedSale && (isItemKotPrinted || isTableBilled) && !canCancelOrEditOrder;
 
                 return (
                   <div key={item.cartItemId || `${item.id}-${idx}`} className="py-2.5 flex items-center justify-between gap-2">
@@ -1285,20 +1389,22 @@ export const PosBillingView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            if (isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)) {
-                              // Cannot decrement below printed KOT qty without void authorization
+                            if (reopenedSale || (isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0))) {
+                              // Requires void/refund authorization modal
                               setVoidingItem({ item, index: idx });
                             } else {
                               updateCartItemQty(activeTable.id, item.cartItemId || idx, -1);
                             }
                           }}
                           className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ${
-                            isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
+                            (reopenedSale || isItemKotPrinted) && item.qty <= (item.kotPrintedQty || 0)
                               ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
                               : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                           }`}
                           title={
-                            isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
+                            reopenedSale
+                              ? 'Void / Refund item (Authorization required)'
+                              : isItemKotPrinted && item.qty <= (item.kotPrintedQty || 0)
                               ? 'Void Item (KOT already sent to kitchen - authorization required)'
                               : 'Decrease quantity'
                           }
@@ -1322,24 +1428,26 @@ export const PosBillingView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            if (isItemKotPrinted) {
+                            if (reopenedSale || isItemKotPrinted) {
                               setVoidingItem({ item, index: idx });
                             } else {
                               removeCartItem(activeTable.id, item.cartItemId || idx);
                             }
                           }}
                           className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ml-0.5 ${
-                            isItemKotPrinted
+                            reopenedSale || isItemKotPrinted
                               ? 'bg-rose-100 hover:bg-rose-200 text-rose-700'
                               : 'hover:bg-slate-100 text-slate-400 hover:text-rose-600'
                           }`}
                           title={
-                            isItemKotPrinted
+                            reopenedSale
+                              ? 'Refund / Void item from reopened bill'
+                              : isItemKotPrinted
                               ? 'Void KOT Item (Admin/Manager Permission Required)'
                               : 'Remove from cart'
                           }
                         >
-                          {isItemKotPrinted ? (
+                          {reopenedSale || isItemKotPrinted ? (
                             <Ban className="w-3 h-3 text-rose-700" />
                           ) : (
                             <Trash2 className="w-3 h-3" />
@@ -1434,16 +1542,71 @@ export const PosBillingView: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-200">
-                  <span>Total Payable:</span>
-                  <span className="text-[#004b9b] text-base font-black font-mono">৳{netTotal.toLocaleString()}</span>
-                </div>
+                {reopenedSale ? (
+                  <>
+                    <div className="flex justify-between text-xs font-bold text-slate-700 pt-1 border-t border-slate-200">
+                      <span>Current Bill Value:</span>
+                      <span className="font-mono text-slate-900 font-extrabold">৳{netTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-extrabold text-[#004b9b] bg-blue-50/70 p-1.5 rounded-lg border border-blue-100">
+                      <span>Already Settled ({reopenedSale.invoiceNo}):</span>
+                      <span className="font-mono">৳{(reopenedSale.total || 0).toLocaleString()}</span>
+                    </div>
+                    {netTotal < (reopenedSale.total || 0) && (
+                      <div className="flex justify-between text-[11px] font-bold text-rose-600 bg-rose-50/60 p-1 rounded border border-rose-200">
+                        <span>Refund to Customer:</span>
+                        <span className="font-mono">৳{((reopenedSale.total || 0) - netTotal).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {netTotal > (reopenedSale.total || 0) && (
+                      <div className="flex justify-between text-[11px] font-bold text-amber-700 bg-amber-50/60 p-1 rounded border border-amber-200">
+                        <span>Additional Due:</span>
+                        <span className="font-mono">৳{(netTotal - (reopenedSale.total || 0)).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-200">
+                    <span>Total Payable:</span>
+                    <span className="text-[#004b9b] text-base font-black font-mono">৳{netTotal.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
             );
           })()}
 
           {/* Action Buttons: Dynamically adapts to POS order lifecycle */}
           {(() => {
+            if (reopenedSale) {
+              return (
+                <div className="pt-1.5 sm:pt-2 shrink-0">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      id="btn-reopened-back-to-sales"
+                      onClick={exitReopenedSale}
+                      className="py-2.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs border border-slate-300"
+                      title="Back to Sales Ledger without saving changes"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>Back to Sales</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-reopened-done-release"
+                      onClick={doneReopenedSale}
+                      className="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer active:scale-95"
+                      title="Save adjusted invoice & release table"
+                    >
+                      <Check className="w-4 h-4 shrink-0" />
+                      <span>Done / Release</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
             const isCartEmpty = (activeTable?.cart?.length || 0) === 0;
             const hasUnprintedKotItems = !isCartEmpty && activeTable!.cart.some(
               item => !item.kotPrinted || item.qty > (item.kotPrintedQty || 0)
@@ -1587,6 +1750,7 @@ export const PosBillingView: React.FC = () => {
           tableName={activeTable.name}
           item={voidingItem.item}
           itemIndex={voidingItem.index}
+          invoiceNo={reopenedSale?.invoiceNo || 'POS-168698'}
           onClose={() => setVoidingItem(null)}
         />
       )}
@@ -1744,6 +1908,15 @@ export const PosBillingView: React.FC = () => {
             setTableCustomer(assigningTable.id, customer);
             setAssigningTable(null);
           }}
+        />
+      )}
+
+      {/* Void Paid Order Modal */}
+      {isVoidOrderModalOpen && (
+        <VoidOrderModal
+          isOpen={isVoidOrderModalOpen}
+          targetSale={reopenedSale}
+          onClose={() => setIsVoidOrderModalOpen(false)}
         />
       )}
     </div>

@@ -68,9 +68,9 @@ export const ConsolidatedDayZReportModal: React.FC = () => {
     return (data.expenses || []).filter(e => e.date === day.date);
   }, [data.expenses, day.date]);
 
-  // Sales logged for this date
+  // Sales logged for this date (excluding voided orders)
   const daySalesList = useMemo(() => {
-    return (data.sales || []).filter(s => s.date === day.date);
+    return (data.sales || []).filter(s => s.date === day.date && s.status !== 'voided');
   }, [data.sales, day.date]);
 
   // Real-time consolidated sales metrics synchronized with all day sessions

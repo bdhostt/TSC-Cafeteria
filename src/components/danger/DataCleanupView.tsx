@@ -80,7 +80,7 @@ export const DataCleanupView: React.FC = () => {
     setIsProcessing(true);
     try {
       resetAllData();
-      showSuccess('Entire restaurant system has been successfully reset to factory defaults!');
+      showSuccess('All transactional and accounting history has been successfully purged! Menu items, recipes, tables, and system configurations remain 100% intact.');
     } catch (e: any) {
       showError('Failed to reset system: ' + (e?.message || 'Error'));
     } finally {
@@ -330,17 +330,32 @@ export const DataCleanupView: React.FC = () => {
         })}
       </div>
 
-      {/* Dangerous Full Factory Reset */}
-      <div className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-6 shadow-sm">
+      {/* Transaction-Only Factory Reset (Preserve Masters & Configurations) */}
+      <div className="bg-amber-50/80 border-2 border-amber-300 rounded-2xl p-6 shadow-sm">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-extrabold text-rose-900 text-base">Factory Reset All Data (Complete Purge)</h3>
-            <p className="text-xs text-rose-800 mt-1 leading-relaxed">
-              Warning: This will permanently wipe all transactions, menu items, stock data, configurations, and reset the app back to initial factory demo state.
-            </p>
+          <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-base">
+                Transaction-Only Factory Reset (Preserve Masters & Configurations)
+              </h3>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Purges all transactional, ledger, and accounting records for a clean financial fresh start. <strong>All master data and configurations are strictly preserved.</strong>
+              </p>
+            </div>
 
-            <div className="mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-900">
+                <span className="font-bold text-rose-700 block mb-1">🗑️ Wiped / Purged Records:</span>
+                Sales invoices, purchase vouchers, operational expenses, supplier payments, customer dues & advances, stock adjustments/ledger, drawer sessions, shift reports, and running table carts.
+              </div>
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900">
+                <span className="font-bold text-emerald-700 block mb-1">🛡️ 100% Safe & Preserved:</span>
+                Dishes catalog & recipe BOMs, raw material masters, operator accounts & permissions, floor layout tables & zones, restaurant profile, printer configurations, and chart of accounts.
+              </div>
+            </div>
+
+            <div className="pt-1">
               <button
                 type="button"
                 id="btn-factory-reset-all"
@@ -348,7 +363,7 @@ export const DataCleanupView: React.FC = () => {
                 className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer active:scale-98"
               >
                 <RefreshCcw className="w-4 h-4" />
-                <span>Reset to Factory Defaults</span>
+                <span>Reset All Transactions (Keep Masters)</span>
               </button>
             </div>
           </div>
@@ -445,15 +460,18 @@ export const DataCleanupView: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-rose-950 leading-relaxed space-y-1">
-                  <p className="font-extrabold text-rose-900 text-sm">
-                    Are you sure you want to reset everything?
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-800 leading-relaxed space-y-1.5">
+                  <p className="font-extrabold text-slate-900 text-sm">
+                    Confirm Transaction-Only System Reset
                   </p>
                   <p>
-                    This will wipe all sales invoices, supplier purchase vouchers, stock adjustments, dish catalogs, expenses, customer dues, and user accounts.
+                    This will permanently clear all <strong>sales invoices, purchase bills, daily expenses, customer dues, stock movements, and shift records</strong>.
                   </p>
+                  <div className="p-2 bg-emerald-100/70 border border-emerald-300 rounded-lg text-emerald-900 font-bold text-[11px]">
+                    ✓ Preserved: Dishes, Recipes, Raw Masters, Staff, Tables, Printers, and Chart of Accounts will NOT be deleted.
+                  </div>
                 </div>
               </div>
 
@@ -479,7 +497,7 @@ export const DataCleanupView: React.FC = () => {
                 className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <RefreshCcw className="w-3.5 h-3.5" />
-                <span>{isProcessing ? 'Resetting...' : 'Yes, Confirm Factory Reset'}</span>
+                <span>{isProcessing ? 'Purging...' : 'Yes, Purge Transactions'}</span>
               </button>
             </div>
           </div>

@@ -25,9 +25,10 @@ export const CommissionReports: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Extract all sales that have an associated commission agent / channel
+  // Extract all sales that have an associated commission agent / channel (excluding voided orders)
   const commissionSales = useMemo(() => {
     return (data.sales || []).filter(sale => {
+      if (sale.status === 'voided') return false;
       // Check date range
       if (startDate && sale.date < startDate) return false;
       if (endDate && sale.date > endDate) return false;

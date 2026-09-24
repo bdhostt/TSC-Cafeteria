@@ -70,7 +70,7 @@ const MainLayout: React.FC = () => {
   };
 
   const handleMouseLeaveSidebar = () => {
-    if (hoverTimeoutRef.current) {
+    if (hoverTimeoutRef.current) {  
       clearTimeout(hoverTimeoutRef.current);
     }
     hoverTimeoutRef.current = setTimeout(() => {

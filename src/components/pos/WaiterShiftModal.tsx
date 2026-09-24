@@ -70,14 +70,16 @@ export const WaiterShiftModal: React.FC = () => {
     );
   }, [data.tables, activeWaiter]);
 
-  // Compute today's sales served by this waiter
+  // Compute today's sales served by this waiter (excluding voided orders)
   const today = new Date().toISOString().split('T')[0];
   const waiterSales = useMemo(() => {
     return (data.sales || []).filter(s => {
+      if (s.status === 'voided') return false;
       if (s.date !== today) return false;
       const details = (s.details || '').toLowerCase();
       const wName = activeWaiter.toLowerCase();
-      return details.includes(wName);
+      const directWaiter = (s.waiterName || '').toLowerCase();
+      return directWaiter === wName || details.includes(wName);
     });
   }, [data.sales, today, activeWaiter]);
 

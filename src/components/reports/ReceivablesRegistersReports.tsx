@@ -69,6 +69,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
 
     // POS Sales
     data.sales.forEach(s => {
+      if (s.status === 'voided') return;
       if (!matchesDate(s.date)) return;
       const custName = s.dueCustomer || (s.details.includes('•') ? s.details.split('•').pop()?.trim() : 'Walk-in Customer') || 'Walk-in Customer';
       
@@ -146,6 +147,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
       }> = {};
 
       data.sales.forEach(s => {
+        if (s.status === 'voided') return;
         if ((s.dueGiven || 0) <= 0) return;
         const custName = s.dueCustomer || 'Walk-in Customer';
         if (!custAging[custName]) {
@@ -235,6 +237,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
 
     // 1. POS Sales Inflows
     data.sales.forEach(s => {
+      if (s.status === 'voided') return;
       if (!matchesDate(s.date)) return;
       const directCash = (s.cash || 0) + (s.card || 0) + (s.bkash || 0) + (s.nagad || 0);
       if (directCash > 0) {
@@ -359,6 +362,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
     if (activeHead.id === '1010' || activeHead.id === '1020') {
       // Cash in Hand
       data.sales.forEach(s => {
+        if (s.status === 'voided') return;
         if (!matchesDate(s.date)) return;
         if (s.cash > 0) {
           currentBalance += s.cash;
@@ -414,6 +418,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
     } else if (activeHead.id === '1050') {
       // Accounts Receivable
       data.sales.forEach(s => {
+        if (s.status === 'voided') return;
         if (!matchesDate(s.date)) return;
         if (s.dueGiven > 0) {
           currentBalance += s.dueGiven;
@@ -473,6 +478,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
     } else if (activeHead.type === 'REVENUE') {
       // Sales Revenue
       data.sales.forEach(s => {
+        if (s.status === 'voided') return;
         if (!matchesDate(s.date)) return;
         currentBalance += s.total;
         entries.push({
@@ -533,6 +539,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
     let dueColCash = 0;
 
     data.sales.forEach(s => {
+      if (s.status === 'voided') return;
       if (!matchesDate(s.date)) return;
       salesCash += (s.cash || 0);
       salesBank += ((s.card || 0) + (s.bkash || 0) + (s.nagad || 0));

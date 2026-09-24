@@ -32,9 +32,10 @@ export const KitchenDepartmentSalesReport: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [activeDepartmentDrilldown, setActiveDepartmentDrilldown] = useState<string | null>(null);
 
-  // Filter sales by date
+  // Filter sales by date (excluding voided orders)
   const filteredSales = useMemo(() => {
     return (data.sales || []).filter(sale => {
+      if (sale.status === 'voided') return false;
       if (startDate && sale.date < startDate) return false;
       if (endDate && sale.date > endDate) return false;
       return true;

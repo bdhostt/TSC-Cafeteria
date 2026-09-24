@@ -427,6 +427,10 @@ export interface SaleRecord {
   orderCreatedRole?: string;
   shift?: string;
   createdAt?: number;
+  status?: 'completed' | 'voided';
+  voidedBy?: string;
+  voidedAt?: string;
+  voidReason?: string;
 }
 
 export interface ExpenseRecord {
@@ -687,7 +691,8 @@ export interface PrintableReceipt {
   };
   changeReturn?: number;
   isSettled: boolean;
-  receiptType?: 'BILL' | 'KOT' | 'PAID_MEMO' | 'CANCEL_KOT';
+  receiptType?: 'BILL' | 'KOT' | 'PAID_MEMO' | 'CANCEL_KOT' | 'VOID_BILL';
+  status?: 'completed' | 'voided';
   voidReason?: string;
   voidAuthorizedBy?: string;
   cancelledItems?: {

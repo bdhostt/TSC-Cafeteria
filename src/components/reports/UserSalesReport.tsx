@@ -61,9 +61,10 @@ export const UserSalesReport: React.FC = () => {
     return 'Main Cashier';
   };
 
-  // Filter sales based on date range, shift session, and search
+  // Filter sales based on date range, shift session, and search (excluding voided orders)
   const filteredSales = useMemo(() => {
     return (data.sales || []).filter(sale => {
+      if (sale.status === 'voided') return false;
       // Shift session filter
       if (selectedSessionId !== 'ALL') {
         if (selectedSessionId === 'ACTIVE') {

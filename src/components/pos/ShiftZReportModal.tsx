@@ -21,6 +21,7 @@ export const ShiftZReportModal: React.FC = () => {
   // Filter session sales
   const sessionSales = useMemo(() => {
     return (data.sales || []).filter(s => {
+      if (s.status === 'voided') return false;
       // 1. If session has explicit saleIds list, only match those exact sales
       if (session.saleIds && session.saleIds.length > 0) {
         return session.saleIds.includes(s.id);

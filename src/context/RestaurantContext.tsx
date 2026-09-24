@@ -1232,6 +1232,13 @@ interface RestaurantContextType {
   saveDirectDueCollection: (date: string, customer: string, amount: number, method: string) => void;
   deleteSale: (id: number) => void;
   updateSaleWaiter: (id: number, waiterName: string) => void;
+  voidSaleOrder: (saleId: number, reason: string, authorizedBy: string, printVoidReceipt?: boolean) => { success: boolean; message: string };
+  openPrintVoidReceipt: (saleId: number, customReason?: string, customAuthorizer?: string, customTime?: string) => void;
+  reopenedSale: SaleRecord | null;
+  setReopenedSale: (sale: SaleRecord | null) => void;
+  reopenSaleInPos: (sale: SaleRecord) => void;
+  exitReopenedSale: () => void;
+  doneReopenedSale: () => void;
   
   // Menu & Recipe
   saveMenuItem: (item: Partial<MenuItem> & { id?: number }) => void;
@@ -1329,6 +1336,8 @@ interface RestaurantContextType {
   metrics: {
     totalSales: number;
     salesCount: number;
+    voidedSalesCount?: number;
+    totalVoidedAmount?: number;
     totalPurchases: number;
     purchaseCount: number;
     totalExpenses: number;
@@ -1601,6 +1610,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [pendingLogoutAfterShiftClose, setPendingLogoutAfterShiftClose] = useState(false);
   const [activeSettlingTable, setActiveSettlingTable] = useState<Table | null>(null);
   const [printableReceipt, setPrintableReceipt] = useState<PrintableReceipt | null>(null);
+  const [reopenedSale, setReopenedSale] = useState<SaleRecord | null>(null);
   const printableReceiptRef = useRef<PrintableReceipt | null>(null);
   useEffect(() => {
     printableReceiptRef.current = printableReceipt;
@@ -2047,9 +2057,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return (currentUser.permissions || []).includes(tab);
   };
 
-  // Compute live Auto-BOM usage map from all sales
+  // Compute live Auto-BOM usage map from all active non-voided sales
   const autoBomUsageMap: Record<number, number> = {};
   data.sales.forEach(sale => {
+    if (sale.status === 'voided') return; // Exclude voided sales to restore inventory stock
     if (sale.items && Array.isArray(sale.items)) {
       sale.items.forEach(soldItem => {
         const menuItem = data.menuItems.find(m => m.id === soldItem.id);
@@ -2063,9 +2074,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
 
-  // Calculate Metrics
-  const totalSales = data.sales.reduce((sum, s) => sum + (s.total || 0), 0);
-  const salesCount = data.sales.length;
+  // Calculate Metrics (Excluding voided sales)
+  const completedSales = data.sales.filter(s => s.status !== 'voided');
+  const voidedSales = data.sales.filter(s => s.status === 'voided');
+  const totalSales = completedSales.reduce((sum, s) => sum + (s.total || 0), 0);
+  const salesCount = completedSales.length;
+  const voidedSalesCount = voidedSales.length;
+  const totalVoidedAmount = voidedSales.reduce((sum, s) => sum + (s.total || 0), 0);
 
   let totalPurchases = 0;
   let purchaseCount = 0;
@@ -2081,7 +2096,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Customer Receivables (Due)
   const custMap: Record<string, { due: number; coll: number }> = {};
   data.customers.forEach(c => { custMap[c] = { due: 0, coll: 0 }; });
-  data.sales.forEach(s => {
+  completedSales.forEach(s => {
     if (s.dueGiven > 0 && s.dueCustomer) {
       if (!custMap[s.dueCustomer]) custMap[s.dueCustomer] = { due: 0, coll: 0 };
       custMap[s.dueCustomer].due += s.dueGiven;
@@ -2188,17 +2203,17 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const estimatedProfit = totalSales - (totalBomCostVal + totalExpenses);
 
-  const payCash = data.sales.reduce((sum, s) => sum + (s.cash || 0), 0);
-  const payCard = data.sales.reduce((sum, s) => sum + (s.card || 0), 0);
-  const payBkash = data.sales.reduce((sum, s) => sum + (s.bkash || 0), 0);
-  const payNagad = data.sales.reduce((sum, s) => sum + (s.nagad || 0), 0);
+  const payCash = completedSales.reduce((sum, s) => sum + (s.cash || 0), 0);
+  const payCard = completedSales.reduce((sum, s) => sum + (s.card || 0), 0);
+  const payBkash = completedSales.reduce((sum, s) => sum + (s.bkash || 0), 0);
+  const payNagad = completedSales.reduce((sum, s) => sum + (s.nagad || 0), 0);
 
   // Payment Account Live Balances (Cash Drawer, Bank Transfer, Cheque, bKash Merchant, Nagad Merchant)
   const totalCashExpenses = data.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalCashPurchases = data.purchases
     .filter(p => p.status !== 'DRAFT' && p.paymentType === 'CASH')
     .reduce((sum, p) => sum + (p.total || 0), 0);
-  const totalCashDueCollected = data.sales.reduce((sum, s) => sum + (s.dueCollected || 0), 0);
+  const totalCashDueCollected = completedSales.reduce((sum, s) => sum + (s.dueCollected || 0), 0);
 
   const advCash = (data.customerAdvances || [])
     .filter(a => (a.method || '').toUpperCase() === 'CASH')
@@ -2259,9 +2274,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const occupiedTablesCount = data.tables.filter(t => t.status !== 'free').length;
   const freeTablesCount = data.tables.length - occupiedTablesCount;
 
-  // Top Selling items
+  // Top Selling items (Excluding voided sales)
   const itemSalesCountMap: Record<string, number> = {};
-  data.sales.forEach(s => {
+  completedSales.forEach(s => {
     if (s.items && Array.isArray(s.items)) {
       s.items.forEach(i => {
         itemSalesCountMap[i.name] = (itemSalesCountMap[i.name] || 0) + (i.qty || 1);
@@ -2273,7 +2288,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 6);
 
-  // Active Session Live Statistics
+  // Active Session Live Statistics (Excludes voided sales)
   const activeSessionStats = useMemo(() => {
     if (!data.session || !data.session.isActive) {
       return {
@@ -2294,6 +2309,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const sessionStartDate = data.session.startDate || new Date().toISOString().split('T')[0];
 
     const sessionSales = data.sales.filter(s => {
+      if (s.status === 'voided') return false; // Exclude voided sales from live cash drawer session
       // 1. Exact match by sessionId if present
       if (s.sessionId && currentSessionId) {
         return s.sessionId === currentSessionId;
@@ -3079,23 +3095,49 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     reason: string, 
     authorizedBy: string
   ) => {
-    const table = data.tables.find(t => t.id === tableId);
+    lastLocalCartEditTimeRef.current = Date.now();
+    const table = data.tables.find(t => 
+      t.id === tableId || 
+      t.name.toLowerCase() === String(tableId).toLowerCase()
+    );
     if (!table) return;
 
     let targetItem: TableCartItem | undefined;
     let targetIdx = -1;
 
-    if (typeof cartItemIdOrIdx === 'number') {
+    if (typeof cartItemIdOrIdx === 'number' && cartItemIdOrIdx >= 0 && cartItemIdOrIdx < table.cart.length) {
       targetIdx = cartItemIdOrIdx;
       targetItem = table.cart[cartItemIdOrIdx];
     } else {
-      targetIdx = table.cart.findIndex(c => (c.cartItemId || `${c.id}`) === cartItemIdOrIdx || c.id === Number(cartItemIdOrIdx));
+      targetIdx = table.cart.findIndex(c => 
+        (c.cartItemId && c.cartItemId === cartItemIdOrIdx) || 
+        `${c.id}` === `${cartItemIdOrIdx}`
+      );
       if (targetIdx !== -1) {
         targetItem = table.cart[targetIdx];
+      } else {
+        // Fallback: search by item name or number index
+        targetIdx = table.cart.findIndex(c => String(c.name) === String(cartItemIdOrIdx));
+        if (targetIdx !== -1) {
+          targetItem = table.cart[targetIdx];
+        } else if (!isNaN(Number(cartItemIdOrIdx))) {
+          const numIdx = Number(cartItemIdOrIdx);
+          if (numIdx >= 0 && numIdx < table.cart.length) {
+            targetIdx = numIdx;
+            targetItem = table.cart[numIdx];
+          }
+        }
       }
     }
 
-    if (!targetItem || targetIdx === -1) return;
+    if (!targetItem || targetIdx === -1) {
+      if (table.cart.length > 0) {
+        targetIdx = 0;
+        targetItem = table.cart[0];
+      } else {
+        return;
+      }
+    }
 
     const actualVoidQty = Math.min(targetItem.qty, Math.max(1, voidQty));
     const variationSuffix = targetItem.selectedVariation ? ` (${targetItem.selectedVariation.name})` : '';
@@ -3114,7 +3156,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Update cart in state
     setData(prev => {
       const updatedTables = prev.tables.map(t => {
-        if (t.id !== tableId) return t;
+        if (t.id !== table.id) return t;
         const newCart = [...t.cart];
         const itm = newCart[targetIdx];
         if (!itm) return t;
@@ -3154,8 +3196,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Direct hardware dispatch Cancel KOT without opening preview modal
     const printers = data?.printers || [];
     const getPrinterForDept = (dept: string) => {
-      const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
-      return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
+      const p = printers.find(pr => pr && pr.departments?.includes(dept) && pr.isActive);
+      return p || printers.find(pr => pr && pr.isDefault && pr.isActive) || printers[0] || null;
     };
 
     const cancelKotPayload = {
@@ -3177,7 +3219,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     // Unified hardware print dispatch
-    dispatchHardwarePrint('/api/hardware/print-kot', cancelKotPayload);
+    dispatchHardwarePrint('/api/hardware/print-kot', cancelKotPayload).catch(() => {});
   };
 
   const releaseTable = (tableId: string, reason?: string, authorizedBy?: string) => {
@@ -3498,8 +3540,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       sellerRole: sellerRole,
       sellerId: sellerId,
       orderCreatedBy: sellerName,
-      orderCreatedRole: sellerRole,
+      table: table.name,
       shift: data.session?.shiftType || 'Shift 1',
+      status: 'completed',
       createdAt: Date.now()
     };
 
@@ -4292,6 +4335,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       cashierRole: currentUser?.role || 'CASHIER',
       cashierId: currentUser?.id,
       shift: data.session?.shiftType || 'Shift 1',
+      status: 'completed',
       createdAt: Date.now()
     };
 
@@ -4320,6 +4364,404 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
       })
     }));
+  };
+
+  const voidSaleOrder = (
+    saleId: number, 
+    reason: string, 
+    authorizedBy: string, 
+    printVoidReceipt: boolean = true
+  ): { success: boolean; message: string } => {
+    const sale = data.sales.find(s => s.id === saleId);
+    if (!sale) {
+      return { success: false, message: 'Sale invoice record not found.' };
+    }
+    if (sale.status === 'voided') {
+      return { success: false, message: 'This sales order is already voided.' };
+    }
+    if (!reason || !reason.trim()) {
+      return { success: false, message: 'A mandatory void reason is required.' };
+    }
+
+    const voidReason = reason.trim();
+    const voidAuthorizer = authorizedBy || currentUser?.name || 'Authorized Supervisor';
+    const voidTimeStr = new Date().toLocaleString('en-US');
+
+    // 1. Gracefully handle Table State:
+    // If the sale was associated with a table, check whether that table is currently in 'billed' state or needs freeing.
+    // If table is occupied by a new guest's active order, keep the table untouched so we don't wipe active guests.
+    let updatedTables = [...data.tables];
+    const targetTableName = sale.table || (sale.details?.match(/(Table\s*\w+|T-\w+|Takeaway|Delivery|VIP\s*Lounge\s*\d+|Rooftop\s*\d+)/i)?.[0]);
+    if (targetTableName) {
+      const targetTableIndex = updatedTables.findIndex(t => 
+        t.name.toLowerCase() === targetTableName.toLowerCase() || 
+        t.id.toLowerCase() === targetTableName.toLowerCase()
+      );
+      if (targetTableIndex !== -1) {
+        const tbl = updatedTables[targetTableIndex];
+        // If table is currently billed or has 0 items or cart matches voided sale:
+        if (tbl.status === 'billed' || (tbl.status === 'hold' && (!tbl.cart || tbl.cart.length === 0))) {
+          updatedTables[targetTableIndex] = {
+            ...tbl,
+            status: 'free',
+            waiter: '',
+            customer: 'Walk-in Customer',
+            channelOrAgentId: 'dine_in',
+            discountType: 'taka',
+            discountVal: 0,
+            cart: [],
+            orderCreatedBy: undefined,
+            orderCreatedRole: undefined,
+            orderCreatedId: undefined,
+            orderCreatedAt: undefined,
+            billedAt: undefined,
+            billedAtTime: undefined
+          };
+        }
+      }
+    }
+
+    // 2. Adjust PosSession if closed session recorded this sale
+    let updatedPosSessions = (data.posSessions || []).map(sess => {
+      const hasSale = (sess.saleIds && sess.saleIds.includes(sale.id)) || (sess.id && sess.id === sale.sessionId);
+      if (!hasSale) return sess;
+
+      const newCash = Math.max(0, (sess.cashSales || 0) - (sale.cash || 0));
+      const newCard = Math.max(0, (sess.cardSales || 0) - (sale.card || 0));
+      const newBkash = Math.max(0, (sess.bkashSales || 0) - (sale.bkash || 0));
+      const newNagad = Math.max(0, (sess.nagadSales || 0) - (sale.nagad || 0));
+      const newDue = Math.max(0, (sess.dueSales || 0) - (sale.dueGiven || 0));
+      const newTotal = Math.max(0, (sess.totalSales || 0) - (sale.total || 0));
+      const newOrders = Math.max(0, (sess.orderCount || 1) - 1);
+      const newExpected = (sess.openingCash || 0) + newCash;
+      const newDiff = (sess.actualClosingCash !== undefined) ? (sess.actualClosingCash - newExpected) : sess.cashDifference;
+
+      return {
+        ...sess,
+        cashSales: newCash,
+        cardSales: newCard,
+        bkashSales: newBkash,
+        nagadSales: newNagad,
+        dueSales: newDue,
+        totalSales: newTotal,
+        orderCount: newOrders,
+        expectedCash: newExpected,
+        cashDifference: newDiff,
+        saleIds: (sess.saleIds || []).filter(id => id !== sale.id)
+      };
+    });
+
+    // 3. Adjust DayEndRecords if closed day recorded this sale
+    let updatedDayEndRecords = (data.dayEndRecords || []).map(dayRec => {
+      if (dayRec.date !== sale.date) return dayRec;
+      const newCash = Math.max(0, (dayRec.totalCash || 0) - (sale.cash || 0));
+      const newTotal = Math.max(0, (dayRec.totalDaySales || 0) - (sale.total || 0));
+      const newOrders = Math.max(0, (dayRec.totalDayOrders || 1) - 1);
+      return {
+        ...dayRec,
+        totalCash: newCash,
+        totalCard: Math.max(0, (dayRec.totalCard || 0) - (sale.card || 0)),
+        totalBkash: Math.max(0, (dayRec.totalBkash || 0) - (sale.bkash || 0)),
+        totalNagad: Math.max(0, (dayRec.totalNagad || 0) - (sale.nagad || 0)),
+        totalDue: Math.max(0, (dayRec.totalDue || 0) - (sale.dueGiven || 0)),
+        totalDaySales: newTotal,
+        totalDayOrders: newOrders,
+        netCashToVault: Math.max(0, newCash - (dayRec.totalExpenses || 0))
+      };
+    });
+
+    // 4. Update Sales List with status: 'voided' and audit log
+    const updatedSales = data.sales.map(s => {
+      if (s.id !== sale.id) return s;
+      return {
+        ...s,
+        status: 'voided' as const,
+        voidedBy: voidAuthorizer,
+        voidedAt: voidTimeStr,
+        voidReason: voidReason
+      };
+    });
+
+    // 5. Update state (immediately recalculates metrics and reverses BOM inventory deductions)
+    setData(prev => ({
+      ...prev,
+      sales: updatedSales,
+      tables: updatedTables,
+      posSessions: updatedPosSessions,
+      dayEndRecords: updatedDayEndRecords
+    }));
+
+    // 6. Handle Thermal Receipt Printing
+    if (printVoidReceipt) {
+      openPrintVoidReceipt(sale.id, voidReason, voidAuthorizer, voidTimeStr);
+    }
+
+    return {
+      success: true,
+      message: `Invoice #${sale.invoiceNo} successfully voided! Stock deductions reversed and revenue adjusted.`
+    };
+  };
+
+  const openPrintVoidReceipt = (
+    saleId: number, 
+    customReason?: string, 
+    customAuthorizer?: string, 
+    customTime?: string
+  ) => {
+    const sale = data.sales.find(s => s.id === saleId);
+    if (!sale) return;
+
+    let tableName = sale.table || 'Table';
+    let tableZone = 'Floor 1';
+    let waiter = (sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A') ? sale.waiterName : 'Staff';
+    let customer = sale.dueCustomer || sale.dueCollectedFrom || 'Walk-in Customer';
+
+    const detailsStr = sale.details || '';
+    if (!sale.table && detailsStr) {
+      const tableMatch = detailsStr.match(/(Table\s*\w+|T-\w+|Takeaway|Delivery|VIP\s*Lounge\s*\d+|Rooftop\s*\d+)/i);
+      if (tableMatch) tableName = tableMatch[0];
+    }
+    if (detailsStr) {
+      const zoneMatch = detailsStr.match(/Zone:\s*([^\]]+)/i);
+      if (zoneMatch) tableZone = zoneMatch[1].trim();
+      const waiterMatch = detailsStr.match(/W:\s*([^):,]+)/i);
+      if (waiterMatch && waiterMatch[1].trim() !== 'N/A' && waiterMatch[1].trim() !== 'Staff') {
+        waiter = waiterMatch[1].trim();
+      }
+    }
+
+    let receiptItems: TableCartItem[] = [];
+    if (Array.isArray(sale.items) && sale.items.length > 0) {
+      receiptItems = sale.items;
+    } else {
+      if (detailsStr.includes(':')) {
+        const itemsPart = detailsStr.split(':').slice(1).join(':').trim();
+        if (itemsPart) {
+          const rawItems = itemsPart.split(',').map((s: string) => s.trim()).filter(Boolean);
+          if (rawItems.length > 0) {
+            receiptItems = rawItems.map((str: string, idx: number) => {
+              const qtyMatch = str.match(/^(\d+)\s*[xX*]\s*(.+)$/);
+              if (qtyMatch) {
+                return {
+                  id: idx + 1,
+                  name: qtyMatch[2].trim(),
+                  qty: parseInt(qtyMatch[1], 10),
+                  price: Math.round(sale.total / rawItems.length)
+                };
+              }
+              return {
+                id: idx + 1,
+                name: str,
+                qty: 1,
+                price: Math.round(sale.total / rawItems.length)
+              };
+            });
+          }
+        }
+      }
+    }
+
+    const voidReceipt: PrintableReceipt = {
+      invoiceNo: sale.invoiceNo,
+      dateTime: customTime || sale.voidedAt || new Date().toLocaleString('en-US'),
+      tableName,
+      tableZone,
+      waiter,
+      customer,
+      items: receiptItems,
+      subtotal: sale.subtotal || sale.total,
+      discountDeduction: sale.discountAmount || 0,
+      discountType: 'taka',
+      discountVal: sale.discountVal || 0,
+      netTotal: sale.total,
+      paymentBreakdown: {
+        cash: sale.cash,
+        card: sale.card,
+        bkash: sale.bkash,
+        nagad: sale.nagad,
+        due: sale.dueGiven
+      },
+      isSettled: false,
+      status: 'voided',
+      receiptType: 'VOID_BILL',
+      voidReason: customReason || sale.voidReason || 'Order Voided by Supervisor',
+      voidAuthorizedBy: customAuthorizer || sale.voidedBy || currentUser?.name || 'Admin',
+      isDirectPrint: false
+    };
+
+    setPrintableReceipt(voidReceipt);
+
+    // Also trigger hardware thermal print if configured
+    dispatchHardwarePrint('/api/hardware/print-bill', voidReceipt).catch(err => {
+      console.warn('Hardware void receipt print warning:', err);
+    });
+  };
+
+  const reopenSaleInPos = (sale: SaleRecord) => {
+    // Ensure day / session is active so POS view doesn't block or redirect
+    if (!data.session?.isActive) {
+      startSession(1000, 'Reopened Order Session', currentUser?.name || 'Cashier', 'Shift 1');
+    }
+
+    setReopenedSale(sale);
+
+    // Identify target table or use first available table
+    const targetTableName = sale.table || (sale.details?.match(/(Table\s*\w+|T-\w+|Takeaway|Delivery|VIP\s*Lounge\s*\d+|Rooftop\s*\d+)/i)?.[0]) || 'Table 01';
+    
+    let targetTable = data.tables.find(t => 
+      t.name.toLowerCase() === targetTableName.toLowerCase() || 
+      t.id.toLowerCase() === targetTableName.toLowerCase()
+    );
+    if (!targetTable) {
+      targetTable = data.tables[0];
+    }
+
+    // Convert sale items into TableCartItem
+    let cartItems: TableCartItem[] = [];
+    if (Array.isArray(sale.items) && sale.items.length > 0) {
+      cartItems = sale.items.map((item, idx) => ({
+        id: item.id || idx + 1,
+        cartItemId: `item-${sale.id}-${idx}`,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+        category: item.category || 'General',
+        addedAt: sale.createdAt || Date.now(),
+        kotPrinted: true,
+        kotPrintedQty: item.qty,
+        kotPrintedAt: sale.date || 'Paid',
+        isKotSubmitted: true
+      }));
+    } else if (sale.details && sale.details.includes(':')) {
+      const itemsPart = sale.details.split(':').slice(1).join(':').trim();
+      const rawItems = itemsPart.split(',').map((s: string) => s.trim()).filter(Boolean);
+      cartItems = rawItems.map((str: string, idx: number) => {
+        const qtyMatch = str.match(/^(\d+)\s*[xX*]\s*(.+)$/);
+        const q = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+        const n = qtyMatch ? qtyMatch[2].trim() : str;
+        return {
+          id: idx + 1,
+          cartItemId: `item-${sale.id}-${idx}`,
+          name: n,
+          price: Math.round(sale.total / (rawItems.length || 1)),
+          qty: q,
+          category: 'General',
+          addedAt: sale.createdAt || Date.now(),
+          kotPrinted: true,
+          kotPrintedQty: q,
+          kotPrintedAt: sale.date || 'Paid',
+          isKotSubmitted: true
+        };
+      });
+    } else {
+      cartItems = [
+        {
+          id: 1,
+          cartItemId: `item-${sale.id}-0`,
+          name: sale.details || 'Restaurant Order',
+          price: sale.total,
+          qty: 1,
+          category: 'General',
+          addedAt: sale.createdAt || Date.now(),
+          kotPrinted: true,
+          kotPrintedQty: 1,
+          kotPrintedAt: sale.date || 'Paid',
+          isKotSubmitted: true
+        }
+      ];
+    }
+
+    const sub = sale.subtotal || sale.total;
+    const discVal = sale.discountVal ?? Math.max(0, sub - sale.total);
+    const discType: DiscountType = (sale.discountType as any) || 'taka';
+
+    setData(prev => ({
+      ...prev,
+      tables: prev.tables.map(t => {
+        if (t.id === targetTable!.id) {
+          return {
+            ...t,
+            status: 'billed',
+            cart: cartItems,
+            waiter: (sale.waiterName && sale.waiterName !== 'Staff' && sale.waiterName !== 'N/A') ? sale.waiterName : (t.waiter || 'Staff'),
+            customer: sale.dueCustomer || 'Walk-in Customer',
+            discountType: discType,
+            discountVal: discVal,
+            orderCreatedAt: sale.createdAt || (Date.now() - 3600000),
+            billedAt: sale.createdAt ? sale.createdAt + 1800000 : Date.now()
+          };
+        }
+        return t;
+      })
+    }));
+
+    setActiveTableId(targetTable.id);
+    setActiveTab('pos');
+    setPosView('order');
+  };
+
+  const exitReopenedSale = () => {
+    if (activeTableId) {
+      releaseTable(activeTableId);
+    }
+    setReopenedSale(null);
+    setActiveTab('sales');
+  };
+
+  const doneReopenedSale = () => {
+    if (reopenedSale && activeTableId) {
+      const activeTable = data.tables.find(t => t.id === activeTableId);
+      if (activeTable) {
+        const newItems = (activeTable.cart || []).map(ci => ({
+          id: ci.id,
+          name: ci.name,
+          price: ci.price,
+          qty: ci.qty,
+          category: ci.category
+        }));
+        const newSubtotal = (activeTable.cart || []).reduce((s, ci) => s + (ci.price * ci.qty), 0);
+        let newDisc = 0;
+        if (activeTable.discountType === 'percent') {
+          newDisc = (newSubtotal * (activeTable.discountVal || 0)) / 100;
+        } else {
+          newDisc = activeTable.discountVal || 0;
+        }
+        const newNetTotal = Math.round(Math.max(0, newSubtotal - newDisc));
+
+        setData(prev => ({
+          ...prev,
+          sales: prev.sales.map(s => {
+            if (s.id === reopenedSale.id) {
+              const prevTotal = s.total || 1;
+              const ratio = prevTotal > 0 ? (newNetTotal / prevTotal) : 1;
+              const updatedCash = Math.round((s.cash || 0) * ratio);
+              const updatedCard = Math.round((s.card || 0) * ratio);
+              const updatedBkash = Math.round((s.bkash || 0) * ratio);
+              const updatedNagad = Math.max(0, newNetTotal - updatedCash - updatedCard - updatedBkash);
+
+              return {
+                ...s,
+                items: newItems,
+                subtotal: newSubtotal,
+                discountVal: newDisc,
+                discountType: activeTable.discountType,
+                cash: updatedCash,
+                card: updatedCard,
+                bkash: updatedBkash,
+                nagad: updatedNagad,
+                total: newNetTotal,
+                netRestaurantRevenue: newNetTotal,
+                details: newItems.map(i => `${i.name} (${i.qty})`).join(', ')
+              };
+            }
+            return s;
+          })
+        }));
+      }
+      releaseTable(activeTableId);
+    }
+    setReopenedSale(null);
+    setActiveTab('sales');
   };
 
   const saveMenuItem = (item: Partial<MenuItem> & { id?: number }) => {
@@ -5066,19 +5508,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       } else if (moduleType === 'users') {
         return { ...prev, users: DEFAULT_USERS, rolePermissions: DEFAULT_ROLE_PERMISSIONS };
       } else if (moduleType === 'all') {
-        return {
-          ...DEFAULT_DATA,
-          sales: [],
-          purchases: [],
-          purchaseOrders: [],
-          purchaseReturns: [],
-          expenses: [],
-          payments: [],
-          inventory: [],
-          customerAdvances: [],
-          tables: DEFAULT_DATA.tables.map(t => ({ ...t, status: 'free', waiter: '', cart: [], discountVal: 0 })),
-          session: { isActive: false, openingCash: 0, startTime: "" }
-        };
+        return getTransactionResetData(prev);
       }
       return prev;
     });
@@ -5088,20 +5518,52 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     resetModuleData(moduleType);
   };
 
+  // Helper for Transaction-Only Factory Reset:
+  // Strictly preserves masters and configurations: menu dishes, recipes, raw items, users,
+  // role permissions, table and floor plan layouts/zones, restaurant profile, printers, and COA.
+  // Wipes all transactional records: sales, purchases, POs/returns, expenses, payments, stock ledger,
+  // customer advances, drawer sessions, shift records, journal entries, and running table carts.
+  const getTransactionResetData = (prev: AppData): AppData => ({
+    ...prev,
+    sales: [],
+    purchases: [],
+    purchaseOrders: [],
+    purchaseReturns: [],
+    expenses: [],
+    payments: [],
+    inventory: [],
+    customerAdvances: [],
+    journalEntries: [],
+    posSessions: [],
+    dayEndRecords: [],
+    session: { isActive: false, openingCash: 0, startTime: "" },
+    businessDay: { date: new Date().toISOString().split('T')[0], isOpen: false, dayNumber: 1 },
+    chefShifts: [],
+    activeChefShift: null,
+    waiterShifts: [],
+    activeWaiterShift: null,
+    attendanceRecords: [],
+    leaveApplications: [],
+    tables: (prev.tables || []).map(t => ({
+      ...t,
+      status: 'free' as const,
+      waiter: '',
+      customer: 'Walk-in Customer',
+      channelOrAgentId: 'dine_in',
+      discountType: 'taka' as const,
+      discountVal: 0,
+      cart: [],
+      orderCreatedBy: undefined,
+      orderCreatedRole: undefined,
+      orderCreatedId: undefined,
+      orderCreatedAt: undefined,
+      billedAt: undefined,
+      billedAtTime: undefined
+    }))
+  });
+
   const resetAllData = () => {
-    setData({
-      ...DEFAULT_DATA,
-      sales: [],
-      purchases: [],
-      purchaseOrders: [],
-      purchaseReturns: [],
-      expenses: [],
-      payments: [],
-      inventory: [],
-      customerAdvances: [],
-      tables: DEFAULT_DATA.tables.map(t => ({ ...t, status: 'free', waiter: '', cart: [], discountVal: 0 })),
-      session: { isActive: false, openingCash: 0, startTime: "" }
-    });
+    setData(prev => getTransactionResetData(prev));
   };
 
   const cleanAllSystemData = () => {
@@ -5276,6 +5738,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       saveDirectDueCollection,
       deleteSale,
       updateSaleWaiter,
+      voidSaleOrder,
+      openPrintVoidReceipt,
+      reopenedSale,
+      setReopenedSale,
+      reopenSaleInPos,
+      exitReopenedSale,
+      doneReopenedSale,
       saveMenuItem,
       deleteMenuItem,
       saveMasterItem,
@@ -5339,6 +5808,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       metrics: {
         totalSales,
         salesCount,
+        voidedSalesCount,
+        totalVoidedAmount,
         totalPurchases,
         purchaseCount,
         totalExpenses,

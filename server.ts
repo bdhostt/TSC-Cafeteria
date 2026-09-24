@@ -247,6 +247,10 @@ async function startServer() {
       discountVal?: number;
       netTotal: number;
       isSettled?: boolean;
+      receiptType?: string;
+      status?: string;
+      voidReason?: string;
+      voidAuthorizedBy?: string;
     }
   ): Buffer {
     const chunks: Buffer[] = [];
@@ -309,9 +313,15 @@ async function startServer() {
     if (rawBin) {
       pushStr(`BIN/VAT Reg: ${rawBin}\n`);
     }
+    const isVoid = bill.receiptType === 'VOID_BILL' || bill.status === 'voided';
     pushStr("------------------------------------------\n");
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(`${bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL"}\n`);
+    pushStr(`${isVoid ? "*** VOIDED / CANCELLED INVOICE ***" : (bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL")}\n`);
+    if (isVoid) {
+      pushStr("STATUS: VOIDED (REVERSED)\n");
+      if (bill.voidAuthorizedBy) pushStr(line2Col("Voided By  :", bill.voidAuthorizedBy));
+      if (bill.voidReason) pushStr(line2Col("Void Reason:", bill.voidReason));
+    }
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
