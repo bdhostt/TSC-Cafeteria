@@ -45,7 +45,7 @@ export const VoidItemModal: React.FC<VoidItemModalProps> = ({
   invoiceNo,
   onClose
 }) => {
-  const { voidCartItem, currentUser, data, setData, reopenedSale, setReopenedSale } = useRestaurant();
+  const { voidCartItem, currentUser, data, reopenedSale, setReopenedSale } = useRestaurant();
 
   const maxTotalQty = parseInt(String(item.qty), 10) || 1;
   const [voidQty, setVoidQty] = useState<number>(maxTotalQty);

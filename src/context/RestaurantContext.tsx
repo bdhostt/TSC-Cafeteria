@@ -533,8 +533,8 @@ export const DEFAULT_PRINT_TEMPLATES: PrintTemplate[] = [
     showPricesOnKot: true,
     showNotes: true,
     fontSize: "base",
-    footerMessage: "Thank you for dining at Barcode Cafe Banani!",
-    footerNotes: "Powered by Barcode Cafe ERP • VAT & SD Included",
+    footerMessage: "Thank you for dining at BD HOSTT!",
+    footerNotes: "Powered by BD HOSTT ERP • VAT & SD Included",
     showVatBreakdown: true,
     showPaymentBreakdown: true,
     showOrderCount: true,
@@ -572,14 +572,14 @@ export const DEFAULT_PRINT_TEMPLATES: PrintTemplate[] = [
 ];
 
 export const DEFAULT_RESTAURANT_PROFILE: RestaurantProfile = {
-  name: "Barcode Cafe Banani",
+  name: "BD HOSTT",
   tagline: "Restaurant POS & Recipe BOM ERP",
   logoUrl: "",
   logoType: "preset",
   presetIcon: "flame",
   address: "House #42, Road #11, Block D, Banani, Dhaka-1213",
   phone: "+880 1700-000000",
-  email: "banani@barcodecafe.com",
+  email: "info@bdhostt.com",
   binOrVat: "0029381-01",
   currencySymbol: "৳",
   outletSecurityKey: "BANANI-2026"
@@ -3388,7 +3388,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const billDateTime = new Date().toLocaleString('en-US');
 
     const billPayload: PrintableReceipt = {
-      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BARCODE CAFE BANANI',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT',
       restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
       restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1700-000000',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
@@ -3575,7 +3575,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Paid Cash Memo receipt payload for hardware printing
     const memoReceipt: PrintableReceipt = {
-      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BARCODE CAFE BANANI',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT',
       restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
       restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1700-000000',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
@@ -4015,7 +4015,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     // Direct hardware print Z-Report on shift close
     const zReportPayload = {
-      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BARCODE CAFE BANANI',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT',
       restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
       restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1700-000000',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
@@ -4110,7 +4110,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Unified hardware print dispatch
     dispatchHardwarePrint('/api/hardware/print-dayend', {
-      restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
+      restaurantName: data.restaurantProfile?.name || 'BD HOSTT',
       dayRecord,
       daySessions
     });
@@ -4197,7 +4197,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Unified hardware print dispatch
     dispatchHardwarePrint('/api/hardware/print-chef-slip', {
-      restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
+      restaurantName: data.restaurantProfile?.name || 'BD HOSTT',
       restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
       shift: completedShift
     });
@@ -4665,15 +4665,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           addedAt: sale.createdAt || Date.now(),
           kotPrinted: true,
           kotPrintedQty: 1,
-          kotPrintedAt: sale.date || 'Paid',
-          isKotSubmitted: true
-        }
+          kotPrintedAt: sale.date || 'Paid'
+        } as TableCartItem
       ];
     }
 
     const sub = sale.subtotal || sale.total;
     const discVal = sale.discountVal ?? Math.max(0, sub - sale.total);
-    const discType: DiscountType = (sale.discountType as any) || 'taka';
+    const discType: DiscountType = ((sale as any).discountType as any) || 'taka';
 
     setData(prev => ({
       ...prev,

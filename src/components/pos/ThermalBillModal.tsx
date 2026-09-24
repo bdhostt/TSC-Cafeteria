@@ -30,7 +30,7 @@ export const ThermalBillModal: React.FC = () => {
   const isVoidBill = printableReceipt?.receiptType === 'VOID_BILL' || printableReceipt?.status === 'voided';
   const isKot = isCancelKot || printableReceipt?.receiptType === 'KOT';
   const profile = data?.restaurantProfile;
-  const restaurantName = profile?.name || 'BARCODE CAFE BANANI';
+  const restaurantName = profile?.name || 'BD HOSTT';
   const restaurantAddress = profile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
   const restaurantHotline = profile?.phone || '+880 1700-000000';
   const restaurantBin = profile?.binOrVat || '0029381-01';
@@ -444,7 +444,7 @@ export const ThermalBillModal: React.FC = () => {
       : (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
     const lines: string[] = [];
 
-    lines.push(centerLine(restaurantName || 'BARCODE CAFE BANANI'));
+    lines.push(centerLine(restaurantName || 'BD HOSTT'));
     const rawAddress = restaurantAddress || 'House #42, Road #11, Block D, Banani';
     if (rawAddress) {
       if (rawAddress.includes(',')) {
@@ -1253,7 +1253,7 @@ export const ThermalBillModal: React.FC = () => {
                   {activeTemplate?.footerMessage || `Thank you for dining at ${restaurantName}!`}
                 </p>
                 <p>
-                  {activeTemplate?.footerNotes || 'Powered by Barcode Cafe ERP • All VAT & Taxes Included'}
+                  {activeTemplate?.footerNotes || 'Powered by BD HOSTT ERP • All VAT & Taxes Included'}
                 </p>
               </div>
             </div>

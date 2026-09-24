@@ -92,14 +92,14 @@ export const HeadsConfigView: React.FC = () => {
 
   // Restaurant Profile & Logo State
   const [profileForm, setProfileForm] = useState<RestaurantProfile>({
-    name: data.restaurantProfile?.name || 'Barcode Cafe Banani',
+    name: data.restaurantProfile?.name || 'BD HOSTT',
     tagline: data.restaurantProfile?.tagline || 'Restaurant POS & Recipe BOM ERP',
     logoUrl: data.restaurantProfile?.logoUrl || '',
     logoType: data.restaurantProfile?.logoType || 'preset',
     presetIcon: data.restaurantProfile?.presetIcon || 'flame',
     address: data.restaurantProfile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
     phone: data.restaurantProfile?.phone || '+880 1700-000000',
-    email: data.restaurantProfile?.email || 'banani@barcodecafe.com',
+    email: data.restaurantProfile?.email || 'info@bdhostt.com',
     binOrVat: data.restaurantProfile?.binOrVat || '0029381-01',
     currencySymbol: data.restaurantProfile?.currencySymbol || '৳'
   });
@@ -758,7 +758,7 @@ export const HeadsConfigView: React.FC = () => {
                       required
                       value={profileForm.name}
                       onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Barcode Cafe Banani"
+                      placeholder="BD HOSTT"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>
@@ -815,7 +815,7 @@ export const HeadsConfigView: React.FC = () => {
                         type="email"
                         value={profileForm.email}
                         onChange={e => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="banani@barcodecafe.com"
+                        placeholder="info@bdhostt.com"
                         className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                       />
                     </div>
@@ -886,7 +886,7 @@ export const HeadsConfigView: React.FC = () => {
                     </div>
                   )}
                   <div className="font-extrabold text-sm uppercase text-slate-900 tracking-wide font-sans">
-                    {profileForm.name || 'BARCODE CAFE BANANI'}
+                    {profileForm.name || 'BD HOSTT'}
                   </div>
                   <div className="text-[10px] text-slate-600 font-sans mt-0.5">
                     {profileForm.address || 'House #42, Road #11, Block D, Banani, Dhaka'}

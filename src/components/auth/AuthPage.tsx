@@ -26,7 +26,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const restaurantProfile = data.restaurantProfile || {
-    name: 'Barcode Cafe',
+    name: 'BD HOSTT',
     tagline: 'TAKING TECHNOLOGY FORWARD'
   };
 

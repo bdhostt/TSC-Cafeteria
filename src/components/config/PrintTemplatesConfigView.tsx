@@ -62,7 +62,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
   const [showNotes, setShowNotes] = useState(true);
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
   const [footerMessage, setFooterMessage] = useState('⚡ Fast Kitchen Dispatch Required');
-  const [footerNotes, setFooterNotes] = useState('Generated via Barcode Cafe POS');
+  const [footerNotes, setFooterNotes] = useState('Generated via BD HOSTT POS');
   const [showVatBreakdown, setShowVatBreakdown] = useState(false);
   const [showPaymentBreakdown, setShowPaymentBreakdown] = useState(false);
   const [showOrderCount, setShowOrderCount] = useState(true);
@@ -90,8 +90,8 @@ export const PrintTemplatesConfigView: React.FC = () => {
     setShowPricesOnKot(type === 'BILL');
     setShowNotes(true);
     setFontSize('base');
-    setFooterMessage(type === 'KOT' ? '⚡ Fast Kitchen Dispatch Required' : 'Thank you for dining at Barcode Cafe Banani!');
-    setFooterNotes(type === 'KOT' ? 'Generated via POS Kitchen Link' : 'Powered by Barcode Cafe ERP • VAT & SD Included');
+    setFooterMessage(type === 'KOT' ? '⚡ Fast Kitchen Dispatch Required' : 'Thank you for dining at BD HOSTT!');
+    setFooterNotes(type === 'KOT' ? 'Generated via POS Kitchen Link' : 'Powered by BD HOSTT ERP • VAT & SD Included');
     setShowVatBreakdown(type === 'BILL');
     setShowPaymentBreakdown(type === 'BILL');
     setShowOrderCount(true);
@@ -749,7 +749,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
                       type="text"
                       value={footerNotes}
                       onChange={e => setFooterNotes(e.target.value)}
-                      placeholder="e.g. Powered by Barcode Cafe ERP"
+                      placeholder="e.g. Powered by BD HOSTT ERP"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>
@@ -811,7 +811,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
                       </div>
                     )}
                     <h3 className="font-extrabold font-sans text-sm text-slate-900">
-                      {profile?.name || 'BARCODE CAFE BANANI'}
+                      {profile?.name || 'BD HOSTT'}
                     </h3>
                     {showTagline && profile?.tagline && (
                       <p className="text-[9px] text-slate-500 font-sans italic">{profile.tagline}</p>

@@ -12,14 +12,14 @@
       "shiftType": "Shift 1"
     },
     "restaurantProfile": {
-      "name": "BD HOSTT POS",
+      "name": "BD HOSTT",
       "tagline": "Restaurant POS & Recipe BOM ERP",
       "logoUrl": "",
       "logoType": "preset",
       "presetIcon": "flame",
       "address": "House #42, Road #11, Block D, Banani, Dhaka-1213",
       "phone": "+880 1700-000000",
-      "email": "banani@barcodecafe.com",
+      "email": "info@bdhostt.com",
       "binOrVat": "0029381-01",
       "currencySymbol": "৳"
     },
@@ -239,8 +239,8 @@
         "showPricesOnKot": true,
         "showNotes": true,
         "fontSize": "base",
-        "footerMessage": "Thank you for dining at BD Hostt POS!",
-        "footerNotes": "Powered by BD Hostt ERP • VAT & SD Included",
+        "footerMessage": "Thank you for dining at BD HOSTT!",
+        "footerNotes": "Powered by BD HOSTT ERP • VAT & SD Included",
         "showVatBreakdown": true,
         "showPaymentBreakdown": true,
         "showOrderCount": true,
