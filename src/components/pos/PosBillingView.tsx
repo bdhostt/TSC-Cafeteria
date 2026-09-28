@@ -705,7 +705,7 @@ export const PosBillingView: React.FC = () => {
                         setIsStartSessionModalOpen(true);
                         return;
                       }
-                      setAssigningTable(table);
+                      selectTable(table.id);
                     }
                   }}
                   className={`${cardPadding} border-2 transition-all duration-150 flex flex-col justify-between relative overflow-hidden group shadow-xs hover:shadow-md select-none ${

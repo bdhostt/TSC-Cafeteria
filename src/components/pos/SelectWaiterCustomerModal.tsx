@@ -34,11 +34,7 @@ export const SelectWaiterCustomerModal: React.FC<SelectWaiterCustomerModalProps>
 
   const handleProceed = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedWaiter.trim()) {
-      setError('Please select a waiter');
-      return;
-    }
-    onConfirm(selectedWaiter, selectedCustomer.trim() || 'Walk-in Customer');
+    onConfirm(selectedWaiter.trim() || 'Staff', selectedCustomer.trim() || 'Walk-in Customer');
   };
 
   const waiters = data.waiters || [];
@@ -68,7 +64,7 @@ export const SelectWaiterCustomerModal: React.FC<SelectWaiterCustomerModalProps>
                 </span>
               </div>
               <p className="text-xs text-blue-100 font-medium">
-                Select waiter and customer before taking order
+                Select waiter and customer (optional)
               </p>
             </div>
           </div>
@@ -96,7 +92,7 @@ export const SelectWaiterCustomerModal: React.FC<SelectWaiterCustomerModalProps>
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <UserCheck className="w-4 h-4 text-[#004b9b]" />
-                <span>Select Waiter *</span>
+                <span>Select Waiter (Optional)</span>
               </label>
               {selectedWaiter && (
                 <span className="text-[11px] font-bold text-[#004b9b] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
