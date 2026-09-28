@@ -18,19 +18,20 @@ import {
   Scissors,
   Send,
   RefreshCw,
-  Download
+  Download,
+  RotateCcw
 } from 'lucide-react';
 import { PrinterConfig, PrintTemplate, ThermalPaperWidth } from '../../types';
 import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
 
 export const ThermalBillModal: React.FC = () => {
-  const { printableReceipt, closePrintReceipt, data } = useRestaurant();
+  const { printableReceipt, closePrintReceipt, data, voidSale } = useRestaurant();
 
   const isCancelKot = printableReceipt?.receiptType === 'CANCEL_KOT';
-  const isVoidBill = printableReceipt?.receiptType === 'VOID_BILL' || printableReceipt?.status === 'voided';
+  const isVoidMemo = printableReceipt?.receiptType === 'VOID_MEMO';
   const isKot = isCancelKot || printableReceipt?.receiptType === 'KOT';
   const profile = data?.restaurantProfile;
-  const restaurantName = profile?.name || 'BD HOSTT';
+  const restaurantName = profile?.name || 'RESTAURANT POS';
   const restaurantAddress = profile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
   const restaurantHotline = profile?.phone || '+880 1700-000000';
   const restaurantBin = profile?.binOrVat || '0029381-01';
@@ -439,12 +440,10 @@ export const ThermalBillModal: React.FC = () => {
     }
 
     // CUSTOMER BILL / CASH MEMO (Exact 100% match to 'localhost:3000 this is ok' thermal slip)
-    const titleText = isVoidBill 
-      ? '*** VOIDED / CANCELLED INVOICE ***' 
-      : (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
+    const titleText = printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL';
     const lines: string[] = [];
 
-    lines.push(centerLine(restaurantName || 'BD HOSTT'));
+    lines.push(centerLine(restaurantName || 'BARCODE CAFE BANANI'));
     const rawAddress = restaurantAddress || 'House #42, Road #11, Block D, Banani';
     if (rawAddress) {
       if (rawAddress.includes(',')) {
@@ -470,15 +469,6 @@ export const ThermalBillModal: React.FC = () => {
 
     lines.push('------------------------------------------');
     lines.push(centerLine(titleText));
-    if (isVoidBill) {
-      lines.push(centerLine('STATUS: VOIDED (REVERSED)'));
-      if (printableReceipt.voidAuthorizedBy) {
-        lines.push(line2Col('Voided By  :', printableReceipt.voidAuthorizedBy));
-      }
-      if (printableReceipt.voidReason) {
-        lines.push(line2Col('Void Reason:', printableReceipt.voidReason));
-      }
-    }
     lines.push('------------------------------------------');
 
     lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo));
@@ -576,7 +566,16 @@ export const ThermalBillModal: React.FC = () => {
     }
 
     lines.push('------------------------------------------');
-    if (printableReceipt.isSettled) {
+    if (printableReceipt.receiptType === 'VOID_MEMO') {
+      lines.push(centerLine('*** ORDER CANCELLED / VOIDED ***'));
+      lines.push(centerLine(`*** REFUND: ${printableReceipt.refundStatus || 'REFUNDED'} ***`));
+      if (printableReceipt.voidReason) {
+        lines.push(line2Col('Void Reason:', printableReceipt.voidReason));
+      }
+      if (printableReceipt.voidAuthorizedBy) {
+        lines.push(line2Col('Auth By    :', printableReceipt.voidAuthorizedBy));
+      }
+    } else if (printableReceipt.isSettled) {
       lines.push(centerLine('*** PAID & SETTLED ***'));
     }
     lines.push(centerLine('Thank you for dining with us!'));
@@ -1063,38 +1062,10 @@ export const ThermalBillModal: React.FC = () => {
                     BIN / VAT Reg: {restaurantBin}
                   </p>
                 )}
-                <div className={`mt-2 inline-block px-2.5 py-1 rounded text-[11px] font-black uppercase tracking-wider font-sans ${
-                  isVoidBill 
-                    ? 'bg-rose-600 text-white shadow-xs' 
-                    : 'bg-slate-200 text-slate-800'
-                }`}>
-                  {isVoidBill 
-                    ? '*** VOIDED / CANCELLED INVOICE ***' 
-                    : (activeTemplate?.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'TABLE RUNNING BILL'))}
+                <div className="mt-2 inline-block px-2 py-0.5 bg-slate-200 text-slate-800 rounded text-[10px] font-bold uppercase tracking-wider font-sans">
+                  {activeTemplate?.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'TABLE RUNNING BILL')}
                 </div>
               </div>
-
-              {/* Void Audit Box */}
-              {isVoidBill && (
-                <div className="my-2 p-2.5 bg-rose-50 border border-rose-300 rounded-xl space-y-1 text-rose-950 font-sans">
-                  <div className="font-black text-rose-700 flex items-center justify-between text-xs">
-                    <span>⚠️ STATUS: VOIDED (REVERSED)</span>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-rose-200 text-rose-900 rounded font-bold">Audit Recorded</span>
-                  </div>
-                  {printableReceipt.voidAuthorizedBy && (
-                    <div className="text-[11px]">
-                      <span className="text-slate-600 font-medium">Void Authorized By:</span>{' '}
-                      <span className="font-extrabold text-slate-900">{printableReceipt.voidAuthorizedBy}</span>
-                    </div>
-                  )}
-                  {printableReceipt.voidReason && (
-                    <div className="text-[11px]">
-                      <span className="text-slate-600 font-medium">Mandatory Reason:</span>{' '}
-                      <span className="font-extrabold text-rose-900 font-mono">"{printableReceipt.voidReason}"</span>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Invoice Info with Table & Zone */}
               <div className="py-2 border-b border-dashed border-slate-300 space-y-1 text-[11px]">
@@ -1253,7 +1224,7 @@ export const ThermalBillModal: React.FC = () => {
                   {activeTemplate?.footerMessage || `Thank you for dining at ${restaurantName}!`}
                 </p>
                 <p>
-                  {activeTemplate?.footerNotes || 'Powered by BD HOSTT ERP • All VAT & Taxes Included'}
+                  {activeTemplate?.footerNotes || `Powered by ${restaurantName} • All VAT & Taxes Included`}
                 </p>
               </div>
             </div>
@@ -1269,6 +1240,32 @@ export const ThermalBillModal: React.FC = () => {
           >
             Close
           </button>
+
+          {printableReceipt?.receiptType === 'PAID_MEMO' && (
+            <button
+              type="button"
+              id="btn-undo-paid-memo"
+              onClick={() => {
+                const matchingSale = data.sales.find(s => s.invoiceNo === printableReceipt.invoiceNo) || data.sales[data.sales.length - 1];
+                if (matchingSale) {
+                  const confirmed = window.confirm(`Undo settlement for ${printableReceipt.tableName || 'this table'} (${printableReceipt.invoiceNo}) and return order back to POS Cart?`);
+                  if (confirmed) {
+                    voidSale(matchingSale.id, {
+                      reason: 'Accidental settlement - Returned to table for edit/item cancellation',
+                      refundPayment: true,
+                      refundMethod: 'CASH',
+                      restoreToTable: true
+                    });
+                  }
+                }
+              }}
+              className="px-3.5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95"
+              title="Undo settlement, refund payment, and re-open order in POS Cart"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Undo Settle & Edit</span>
+            </button>
+          )}
 
           <button
             type="button"

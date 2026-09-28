@@ -9,7 +9,7 @@ export const ShiftZReportModal: React.FC = () => {
   if (!selectedZReportSession) return null;
 
   const profile = data.restaurantProfile;
-  const restaurantName = profile?.name || 'BD HOSTT';
+  const restaurantName = profile?.name || 'RESTAURANT POS';
   const restaurantAddress = profile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
   const restaurantHotline = profile?.phone || '+880 1700-000000';
   const restaurantBin = profile?.binOrVat || '0029381-01';
@@ -18,10 +18,10 @@ export const ShiftZReportModal: React.FC = () => {
   const isMatch = (session.cashDifference || 0) === 0;
   const isShort = (session.cashDifference || 0) < 0;
 
-  // Filter session sales
+  // Filter session sales (excluding voided / cancelled orders)
   const sessionSales = useMemo(() => {
     return (data.sales || []).filter(s => {
-      if (s.status === 'voided') return false;
+      if (s.isVoid || s.status === 'VOIDED' || s.status === 'CANCELLED') return false;
       // 1. If session has explicit saleIds list, only match those exact sales
       if (session.saleIds && session.saleIds.length > 0) {
         return session.saleIds.includes(s.id);

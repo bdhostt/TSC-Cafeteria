@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, isSaleActive } from '../../context/RestaurantContext';
 import { RawMasterItem } from '../../types';
 import { ReportFilters, DatePreset, exportCsvHelper } from './ReportFilters';
 import { 
@@ -168,7 +168,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
 
     // Outward 1: Sales Recipe BOM consumptions
     data.sales.forEach(sale => {
-      if (sale.status === 'voided') return;
+      if (!isSaleActive(sale)) return;
       if (!matchesDate(sale.date)) return;
 
       (sale.items || []).forEach(cartItem => {
@@ -291,7 +291,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
 
       // Sales BOM Recipe consumption records
       data.sales.forEach(sale => {
-        if (sale.status === 'voided') return;
+        if (!isSaleActive(sale)) return;
         const sDate = sale.date ? sale.date.split('T')[0] : '';
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(soldItem => {
@@ -516,7 +516,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
 
       // Event 3: Sales Recipe BOM consumptions
       data.sales.forEach(s => {
-        if (s.status === 'voided') return;
+        if (!isSaleActive(s)) return;
         const sDate = s.date ? s.date.split('T')[0] : '2026-08-01';
         (s.items || []).forEach((cartItem, sIdx) => {
           const menu = data.menuItems.find(m => m.id === cartItem.id);

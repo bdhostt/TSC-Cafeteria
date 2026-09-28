@@ -58,10 +58,9 @@ export const ItemSalesReport: React.FC = () => {
     return Array.from(depts);
   }, [data.menuItems, data.departments]);
 
-  // Filter sales based on date (excluding voided orders)
+  // Filter sales based on date
   const filteredSales = useMemo(() => {
     return (data.sales || []).filter(sale => {
-      if (sale.status === 'voided') return false;
       if (startDate && sale.date < startDate) return false;
       if (endDate && sale.date > endDate) return false;
       return true;

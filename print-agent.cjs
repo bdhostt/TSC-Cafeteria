@@ -211,7 +211,7 @@ function buildBillEscPosBuffer(bill) {
   // 3. Center Align: Restaurant Header
   pushBytes([0x1B, 0x61, 0x01]);
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Restaurant Name
-  pushStr((bill.restaurantName || 'BD HOSTT') + '\n');
+  pushStr((bill.restaurantName || 'BARCODE CAFE BANANI') + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
   const rawAddress = bill.restaurantAddress || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
@@ -241,15 +241,9 @@ function buildBillEscPosBuffer(bill) {
   const rawBin = bill.restaurantBin || '0029381-01';
   if (rawBin) pushStr('BIN/VAT Reg: ' + rawBin + '\n');
 
-  const isVoid = bill.receiptType === 'VOID_BILL' || bill.status === 'voided';
   pushStr('------------------------------------------\n');
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Bill Type
-  pushStr((isVoid ? '*** VOIDED / CANCELLED INVOICE ***' : (bill.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL')) + '\n');
-  if (isVoid) {
-    pushStr('STATUS: VOIDED (REVERSED)\n');
-    if (bill.voidAuthorizedBy) pushStr(line2Col('Voided By  :', bill.voidAuthorizedBy));
-    if (bill.voidReason) pushStr(line2Col('Void Reason:', bill.voidReason));
-  }
+  pushStr((bill.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL') + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
   pushStr('------------------------------------------\n');
 
@@ -385,7 +379,7 @@ function buildZReportEscPosBuffer(report) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((report.restaurantName || 'BD HOSTT') + '\n');
+  pushStr((report.restaurantName || 'BARCODE CAFE BANANI') + '\n');
 
   const rawAddress = report.restaurantAddress || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
   if (rawAddress) pushStr(rawAddress + '\n');
@@ -520,7 +514,7 @@ function buildWaiterSlipEscPosBuffer(data) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((data.restaurantName || 'BD HOSTT') + '\n');
+  pushStr((data.restaurantName || 'BARCODE CAFE BANANI') + '\n');
   pushStr((data.restaurantAddress || 'Banani, Dhaka') + '\n');
   pushStr('------------------------------------------\n');
   pushStr('*** WAITER SERVER SUMMARY SLIP ***\n');
@@ -580,7 +574,7 @@ function buildChefSlipEscPosBuffer(data) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((data.restaurantName || 'BD HOSTT') + '\n');
+  pushStr((data.restaurantName || 'BARCODE CAFE BANANI') + '\n');
   pushStr((data.restaurantAddress || 'Banani, Dhaka') + '\n');
   pushStr('------------------------------------------\n');
   pushStr('*** KITCHEN PRODUCTION & HANDOVER SLIP ***\n');
@@ -639,7 +633,7 @@ function buildDayEndEscPosBuffer(data) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((data.restaurantName || 'BD HOSTT') + '\n');
+  pushStr((data.restaurantName || 'BARCODE CAFE BANANI') + '\n');
   pushStr('House #42, Road #11, Block D, Banani, Dhaka\n');
   pushStr('------------------------------------------\n');
   pushStr('*** DAILY MASTER DAY-END Z-REPORT ***\n');

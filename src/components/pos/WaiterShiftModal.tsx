@@ -70,16 +70,15 @@ export const WaiterShiftModal: React.FC = () => {
     );
   }, [data.tables, activeWaiter]);
 
-  // Compute today's sales served by this waiter (excluding voided orders)
+  // Compute today's sales served by this waiter
   const today = new Date().toISOString().split('T')[0];
   const waiterSales = useMemo(() => {
     return (data.sales || []).filter(s => {
-      if (s.status === 'voided') return false;
+      if (s.isVoid || s.status === 'VOIDED' || s.status === 'CANCELLED') return false;
       if (s.date !== today) return false;
       const details = (s.details || '').toLowerCase();
       const wName = activeWaiter.toLowerCase();
-      const directWaiter = (s.waiterName || '').toLowerCase();
-      return directWaiter === wName || details.includes(wName);
+      return details.includes(wName);
     });
   }, [data.sales, today, activeWaiter]);
 
@@ -110,7 +109,7 @@ export const WaiterShiftModal: React.FC = () => {
   const handlePrintServerSlip = async () => {
     setIsPrintingSlip(true);
     const slipPayload = {
-      restaurantName: data.restaurantProfile?.name || 'BD HOSTT',
+      restaurantName: data.restaurantProfile?.name || 'RESTAURANT POS',
       restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
       waiterName: activeWaiter,
       date: today,

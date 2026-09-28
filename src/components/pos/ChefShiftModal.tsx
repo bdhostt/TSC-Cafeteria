@@ -62,7 +62,7 @@ export const ChefShiftModal: React.FC = () => {
     if (!activeChefShift) return { totalKots: 0, totalDishes: 0, dishBreakdown: [] };
 
     const startTs = activeChefShift.startTimestamp || (Date.now() - 3600000);
-    const shiftSales = (data.sales || []).filter(s => s.status !== 'voided' && s.date === today && (s.createdAt || 0) >= startTs);
+    const shiftSales = (data.sales || []).filter(s => s.date === today && (s.createdAt || 0) >= startTs && !s.isVoid && s.status !== 'VOIDED' && s.status !== 'CANCELLED');
 
     const dishMap: Record<string, number> = {};
     let totalDishes = 0;
@@ -111,7 +111,7 @@ export const ChefShiftModal: React.FC = () => {
     setIsPrintingSlip(true);
     try {
       await dispatchHardwarePrint('/api/hardware/print-chef-slip', {
-        restaurantName: data.restaurantProfile?.name || 'BD HOSTT',
+        restaurantName: data.restaurantProfile?.name || 'RESTAURANT POS',
         restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
         shift: {
           ...activeChefShift,

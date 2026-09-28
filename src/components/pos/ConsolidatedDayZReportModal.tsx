@@ -10,7 +10,7 @@ export const ConsolidatedDayZReportModal: React.FC = () => {
 
   const day = selectedDayEndPreview;
   const profile = data.restaurantProfile;
-  const restaurantName = profile?.name || 'BD HOSTT';
+  const restaurantName = profile?.name || 'RESTAURANT POS';
   const restaurantAddress = profile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
   const restaurantHotline = profile?.phone || '+880 1700-000000';
   const restaurantBin = profile?.binOrVat || '0029381-01';
@@ -68,9 +68,9 @@ export const ConsolidatedDayZReportModal: React.FC = () => {
     return (data.expenses || []).filter(e => e.date === day.date);
   }, [data.expenses, day.date]);
 
-  // Sales logged for this date (excluding voided orders)
+  // Sales logged for this date (excluding voided)
   const daySalesList = useMemo(() => {
-    return (data.sales || []).filter(s => s.date === day.date && s.status !== 'voided');
+    return (data.sales || []).filter(s => s.date === day.date && !s.isVoid && s.status !== 'VOIDED' && s.status !== 'CANCELLED');
   }, [data.sales, day.date]);
 
   // Real-time consolidated sales metrics synchronized with all day sessions

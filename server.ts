@@ -247,10 +247,6 @@ async function startServer() {
       discountVal?: number;
       netTotal: number;
       isSettled?: boolean;
-      receiptType?: string;
-      status?: string;
-      voidReason?: string;
-      voidAuthorizedBy?: string;
     }
   ): Buffer {
     const chunks: Buffer[] = [];
@@ -278,7 +274,7 @@ async function startServer() {
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(`${bill.restaurantName || "BD HOSTT"}\n`);
+    pushStr(`${bill.restaurantName || "RESTAURANT POS"}\n`);
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     const rawAddress = bill.restaurantAddress || "House #42, Road #11, Block D, Banani, Dhaka-1213";
@@ -313,15 +309,9 @@ async function startServer() {
     if (rawBin) {
       pushStr(`BIN/VAT Reg: ${rawBin}\n`);
     }
-    const isVoid = bill.receiptType === 'VOID_BILL' || bill.status === 'voided';
     pushStr("------------------------------------------\n");
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(`${isVoid ? "*** VOIDED / CANCELLED INVOICE ***" : (bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL")}\n`);
-    if (isVoid) {
-      pushStr("STATUS: VOIDED (REVERSED)\n");
-      if (bill.voidAuthorizedBy) pushStr(line2Col("Voided By  :", bill.voidAuthorizedBy));
-      if (bill.voidReason) pushStr(line2Col("Void Reason:", bill.voidReason));
-    }
+    pushStr(`${bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL"}\n`);
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr("------------------------------------------\n");
 
@@ -512,7 +502,7 @@ async function startServer() {
 
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
-    pushStr(`${report.restaurantName || "BD HOSTT"}\n`);
+    pushStr(`${report.restaurantName || "RESTAURANT POS"}\n`);
 
     // Restaurant Address
     const rawAddress = report.restaurantAddress || "House #42, Road #11, Block D, Banani, Dhaka-1213";
@@ -712,7 +702,7 @@ async function startServer() {
     pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushStr(`${data.restaurantName || "BD HOSTT"}\n`);
+    pushStr(`${data.restaurantName || "RESTAURANT POS"}\n`);
     pushStr(`${data.restaurantAddress || "Banani, Dhaka"}\n`);
     pushStr("------------------------------------------\n");
     pushStr("*** WAITER SERVER SUMMARY SLIP ***\n");
@@ -804,7 +794,7 @@ async function startServer() {
     pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushStr(`${data.restaurantName || "BD HOSTT"}\n`);
+    pushStr(`${data.restaurantName || "RESTAURANT POS"}\n`);
     pushStr("House #42, Road #11, Block D, Banani, Dhaka\n");
     pushStr("------------------------------------------\n");
     pushStr("*** DAILY MASTER DAY-END Z-REPORT ***\n");
@@ -920,7 +910,7 @@ async function startServer() {
     pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushStr(`${data.restaurantName || "BD HOSTT"}\n`);
+    pushStr(`${data.restaurantName || "RESTAURANT POS"}\n`);
     pushStr(`${data.restaurantAddress || "Banani, Dhaka"}\n`);
     pushStr("------------------------------------------\n");
     pushStr("*** KITCHEN PRODUCTION & HANDOVER SLIP ***\n");
@@ -1382,10 +1372,9 @@ async function startServer() {
     try {
       const { data: clientData, clientTimestamp } = req.body;
       
-      // If client sent newer timestamp, or if server has no state, overwrite
       const now = Date.now();
       const effectiveClientTs = clientTimestamp || now;
-      if (clientData && (!cachedState || !lastServerUpdate || effectiveClientTs >= (lastServerUpdate - 2000))) {
+      if (clientData) {
         cachedState = clientData;
         lastServerUpdate = Math.max(now, effectiveClientTs);
         
@@ -1468,7 +1457,7 @@ Return ONLY a JSON object with this schema:
 }`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json"
@@ -1529,7 +1518,7 @@ Return ONLY a valid JSON object matching this exact schema:
 }`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json"
