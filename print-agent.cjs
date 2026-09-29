@@ -3,14 +3,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const net = require('net');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 
 const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://tsc-cafeteria.onrender.com').replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
-const POLL_INTERVAL_MS = 800;
+const POLL_INTERVAL_MS = 250;
 
 let cachedPrinters = [];
 let cachedDetailedPrinters = [];
+let cachedUsbDevicePaths = [];
 let cachedLanIps = ['192.168.1.87'];
 let isUsbPhysicallyConnected = false;
 let isLanReachable = false;
@@ -19,7 +20,18 @@ let printerScanPromise = null;
 
 const VIRTUAL_PRINTER_REGEX = /microsoft print to pdf|xps document writer|onenote|fax|adobe pdf|foxit|send to|anydesk|snagit|cutepdf/i;
 
-function checkTcpReachable(host, port, timeoutMs = 450) {
+function ensureFastPrintBinary() {
+  const exePath = path.join(__dirname, 'scripts', 'raw-print.exe');
+  const csPath = path.join(__dirname, 'scripts', 'raw-print.cs');
+  if (fs.existsSync(exePath)) return exePath;
+  const csc = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
+  if (fs.existsSync(csc) && fs.existsSync(csPath)) {
+    execFile(csc, ['/nologo', '/optimize+', '/target:exe', `/out:${exePath}`, csPath], () => {});
+  }
+  return exePath;
+}
+
+function checkTcpReachable(host, port, timeoutMs = 300) {
   return new Promise((resolve) => {
     let done = false;
     const socket = new net.Socket();
@@ -74,6 +86,7 @@ function refreshWindowsPrintersInBackground() {
       printerScanPromise = null;
       const detailed = [];
       const allNames = [];
+      const usbPaths = [];
       const discoveredIps = new Set(['192.168.1.87', '192.168.0.87', '192.168.1.200', '192.168.0.200']);
 
       if (!err && stdout) {
@@ -120,6 +133,10 @@ function refreshWindowsPrintersInBackground() {
 
           // Dynamically include connected USB PnP printer devices (e.g. "USB Receipt Printer" under Unspecified in Devices and Printers)
           for (const u of usbDevList) {
+            const instId = (u && u.InstanceId ? String(u.InstanceId) : '').trim();
+            if (instId) {
+              usbPaths.push('\\\\?\\' + instId.replace(/\\/g, '#') + '#{28d78fad-5a12-11d1-ae5b-0000f803a8c2}');
+            }
             const usbName = (u && u.Name ? String(u.Name) : '').trim();
             if (!usbName) continue;
             if (!detailed.some(d => d.name.toLowerCase() === usbName.toLowerCase())) {
@@ -144,20 +161,19 @@ function refreshWindowsPrintersInBackground() {
         }
       }
 
+      cachedUsbDevicePaths = usbPaths;
       cachedLanIps = Array.from(discoveredIps);
 
-      // Check if any LAN thermal printer is reachable on TCP 9100
-      let foundLan = false;
-      let activeLanIp = '192.168.1.87';
-      for (const ip of cachedLanIps) {
-        if (await checkTcpReachable(ip, 9100, 350)) {
-          foundLan = true;
-          activeLanIp = ip;
-          cachedLanIps = [ip, ...cachedLanIps.filter(x => x !== ip)];
-          break;
-        }
+      // Check if any LAN thermal printer is reachable on TCP 9100 in parallel (max 250ms total instead of sequential)
+      const lanResults = await Promise.all(
+        cachedLanIps.map(async (ip) => ({ ip, ok: await checkTcpReachable(ip, 9100, 250) }))
+      );
+      const reachableEntry = lanResults.find(r => r.ok);
+      isLanReachable = Boolean(reachableEntry);
+      const activeLanIp = reachableEntry ? reachableEntry.ip : '192.168.1.87';
+      if (reachableEntry) {
+        cachedLanIps = [activeLanIp, ...cachedLanIps.filter(x => x !== activeLanIp)];
       }
-      isLanReachable = foundLan;
 
       if (isLanReachable && !detailed.some(d => d.connectionType === 'LAN' && d.ipAddress === activeLanIp)) {
         detailed.unshift({
@@ -198,18 +214,27 @@ function refreshWindowsPrintersInBackground() {
 
 async function getWindowsPrinters(force = false) {
   const now = Date.now();
-  if (force || lastPrinterScan === 0 || (now - lastPrinterScan >= 4000)) {
+  if (force || lastPrinterScan === 0) {
     await refreshWindowsPrintersInBackground();
+    return cachedPrinters;
+  }
+  // If cache is older than 8s, trigger non-blocking background refresh so printing NEVER waits!
+  if (now - lastPrinterScan >= 8000) {
+    refreshWindowsPrintersInBackground();
   }
   return cachedPrinters;
 }
 
 async function hasConnectedHardwarePrinter() {
-  await getWindowsPrinters();
+  if (lastPrinterScan === 0) {
+    await refreshWindowsPrintersInBackground();
+  } else if (Date.now() - lastPrinterScan >= 8000) {
+    refreshWindowsPrintersInBackground();
+  }
   return isUsbPhysicallyConnected || isLanReachable || cachedPrinters.length > 0;
 }
 
-function printTcpRaw(host, port, rawBuffer, timeoutMs = 1200) {
+function printTcpRaw(host, port, rawBuffer, timeoutMs = 450) {
   return new Promise((resolve) => {
     let resolved = false;
     const socket = new net.Socket();
@@ -265,9 +290,38 @@ async function printSlipWindows(printerName, rawBuffer) {
     const tempFile = path.join(os.tmpdir(), 'agent_print_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.bin');
     fs.writeFileSync(tempFile, rawBuffer);
 
+    const safePrinter = (printerName || '80 Printer').trim();
+    const fastExe = ensureFastPrintBinary();
+    const usbDevPath = cachedUsbDevicePaths[0] || '';
+
+    // 1. Ultra-Fast Native C# Binary (~50-80ms, zero PowerShell startup or compilation overhead!)
+    if (fs.existsSync(fastExe)) {
+      execFile(fastExe, [safePrinter, tempFile, usbDevPath], { timeout: 2500 }, (err, stdout) => {
+        if (!err) {
+          try { fs.unlinkSync(tempFile); } catch (e) {}
+          console.log('⚡ [Instant USB/Spooler Print] ' + (stdout || 'SUCCESS').trim());
+          return resolve(true);
+        }
+        // Fallback to PowerShell script only if native binary returned error
+        const scriptPath = path.join(__dirname, 'scripts', 'print-raw.ps1');
+        const psCmd = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + scriptPath + '" -PrinterName "' + safePrinter.replace(/"/g, '`"') + '" -FilePath "' + tempFile.replace(/"/g, '`"') + '"';
+        exec(psCmd, (error, psOut) => {
+          try { fs.unlinkSync(tempFile); } catch (e) {}
+          if (error) {
+            console.error('❌ [Print Error] Hardware print unavailable on "' + safePrinter + '"');
+            resolve(false);
+          } else {
+            console.log('🖨️ [Hardware Print] ' + (psOut || 'SUCCESS').trim());
+            resolve(true);
+          }
+        });
+      });
+      return;
+    }
+
+    // 2. PowerShell fallback if raw-print.exe is not present yet
     const scriptPath = path.join(__dirname, 'scripts', 'print-raw.ps1');
-    const safePrinter = (printerName || '80 Printer').replace(/"/g, '`"');
-    const psCmd = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + scriptPath + '" -PrinterName "' + safePrinter + '" -FilePath "' + tempFile.replace(/"/g, '`"') + '"';
+    const psCmd = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + scriptPath + '" -PrinterName "' + safePrinter.replace(/"/g, '`"') + '" -FilePath "' + tempFile.replace(/"/g, '`"') + '"';
 
     exec(psCmd, (error, stdout) => {
       try { fs.unlinkSync(tempFile); } catch (e) {}
@@ -283,17 +337,18 @@ async function printSlipWindows(printerName, rawBuffer) {
 }
 
 async function printSlipFast(printerName, rawBuffer) {
-  // 1. Always try direct TCP Socket (Port 9100) for any reachable LAN Thermal Printer (works on ANY PC without driver!)
-  for (const ip of cachedLanIps) {
-    const tcpOk = await printTcpRaw(ip, 9100, rawBuffer, 700);
-    if (tcpOk) {
-      isLanReachable = true;
-      console.log('⚡ [Ultra-Fast LAN Print] Sent directly to ' + ip + ':9100');
-      return true;
+  // 1. Only try direct TCP Socket (Port 9100) if a LAN printer is actually reachable (prevents 2.8s timeout delay on USB setups!)
+  if (isLanReachable) {
+    for (const ip of cachedLanIps) {
+      const tcpOk = await printTcpRaw(ip, 9100, rawBuffer, 350);
+      if (tcpOk) {
+        console.log('⚡ [Ultra-Fast LAN Print] Sent directly to ' + ip + ':9100');
+        return true;
+      }
     }
   }
 
-  // 2. Try Direct USB Hardware / Windows Spooler via print-raw.ps1 (works on ANY PC with or without driver!)
+  // 2. Instant Direct USB Hardware / Windows Spooler via raw-print.exe (~80ms!)
   return await printSlipWindows(printerName, rawBuffer);
 }
 

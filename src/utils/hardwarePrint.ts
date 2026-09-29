@@ -13,7 +13,7 @@ export async function dispatchHardwarePrint(endpoint: string, payload: any): Pro
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(1200)
+      signal: AbortSignal.timeout(2500)
     });
     if (localRes.ok) {
       const data = await localRes.json().catch(() => ({}));

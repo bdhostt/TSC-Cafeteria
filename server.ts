@@ -5,7 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import fs from "fs";
 import os from "os";
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import { connectToDatabase, isDbConnected, getLastDbError, RestaurantStateModel } from "./src/db/mongodb";
 
 dotenv.config();
@@ -104,12 +104,30 @@ async function startServer() {
 
   const VIRTUAL_PRINTER_REGEX = /microsoft print to pdf|xps document writer|onenote|fax|adobe pdf|foxit|send to|anydesk|snagit|cutepdf/i;
 
+  let cachedWinDiscovery: { names: string[]; detailed: any[]; isUsbConnected: boolean; usbPaths: string[]; updatedAt: number } = {
+    names: [],
+    detailed: [],
+    isUsbConnected: false,
+    usbPaths: [],
+    updatedAt: 0
+  };
+  let winScanInProgress: Promise<{ names: string[]; detailed: any[]; isUsbConnected: boolean }> | null = null;
+
   // Helper to discover all Windows installed printers & USB PnP receipt printers dynamically
-  async function getWindowsPrintersDetailed(): Promise<{ names: string[]; detailed: any[]; isUsbConnected: boolean }> {
+  async function getWindowsPrintersDetailed(force = false): Promise<{ names: string[]; detailed: any[]; isUsbConnected: boolean }> {
     if (process.platform !== 'win32') {
       return { names: [], detailed: [], isUsbConnected: false };
     }
-    return new Promise((resolve) => {
+    const now = Date.now();
+    if (!force && cachedWinDiscovery.updatedAt > 0) {
+      if (now - cachedWinDiscovery.updatedAt >= 8000 && !winScanInProgress) {
+        getWindowsPrintersDetailed(true).catch(() => {});
+      }
+      return cachedWinDiscovery;
+    }
+    if (winScanInProgress) return winScanInProgress;
+
+    winScanInProgress = new Promise((resolve) => {
       const psCmd = [
         `$usb = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.Service -eq 'usbprint' -and $_.Status -eq 'OK' });`,
         `$usbDevices = @();`,
@@ -124,13 +142,15 @@ async function startServer() {
       ].join(' ');
 
       exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCmd.replace(/"/g, '\\"')}"`, { timeout: 10000 }, (err, stdout) => {
-        if (err || !stdout) return resolve({ names: [], detailed: [], isUsbConnected: false });
+        winScanInProgress = null;
+        if (err || !stdout) return resolve(cachedWinDiscovery);
         try {
           const parsed = JSON.parse(stdout.trim());
           const isUsbConnected = (Number(parsed.usbCount) || 0) > 0;
           const rawList = Array.isArray(parsed.printers) ? parsed.printers : (parsed.printers ? [parsed.printers] : []);
           const usbDevList = Array.isArray(parsed.usbDevices) ? parsed.usbDevices : (parsed.usbDevices ? [parsed.usbDevices] : []);
           const detailed: any[] = [];
+          const usbPaths: string[] = [];
 
           for (const p of rawList) {
             const name = (p && p.Name ? String(p.Name) : '').trim();
@@ -161,6 +181,10 @@ async function startServer() {
           }
 
           for (const u of usbDevList) {
+            const instId = (u && u.InstanceId ? String(u.InstanceId) : '').trim();
+            if (instId) {
+              usbPaths.push('\\\\?\\' + instId.replace(/\\/g, '#') + '#{28d78fad-5a12-11d1-ae5b-0000f803a8c2}');
+            }
             const usbName = (u && u.Name ? String(u.Name) : '').trim();
             if (!usbName) continue;
             if (!detailed.some(d => d.name.toLowerCase() === usbName.toLowerCase())) {
@@ -188,20 +212,24 @@ async function startServer() {
             return String(a.name).localeCompare(String(b.name));
           });
 
-          resolve({
+          cachedWinDiscovery = {
             names: detailed.map(d => d.name),
             detailed,
-            isUsbConnected
-          });
+            isUsbConnected,
+            usbPaths,
+            updatedAt: Date.now()
+          };
+          resolve(cachedWinDiscovery);
         } catch {
-          resolve({ names: [], detailed: [], isUsbConnected: false });
+          resolve(cachedWinDiscovery);
         }
       });
     });
+    return winScanInProgress;
   }
 
   async function getWindowsPrinters(): Promise<string[]> {
-    const res = await getWindowsPrintersDetailed();
+    const res = await getWindowsPrintersDetailed(false);
     return res.names;
   }
 
@@ -1060,14 +1088,34 @@ async function startServer() {
     return Buffer.concat(chunks);
   }
 
-  // Print individual slip as an isolated RAW ESC/POS Windows print job
+  // Print individual slip as an isolated RAW ESC/POS Windows print job (~80ms via native raw-print.exe)
   async function printSlipWindows(printerName: string, rawBuffer: Buffer): Promise<boolean> {
     return new Promise((resolve) => {
       const tempFile = path.join(os.tmpdir(), `kot_slip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.bin`);
       fs.writeFileSync(tempFile, rawBuffer);
 
+      const safePrinter = (printerName || "80 Printer").trim();
+      const fastExe = path.join(process.cwd(), "scripts", "raw-print.exe");
+      const usbDevPath = cachedWinDiscovery.usbPaths[0] || "";
+
+      if (fs.existsSync(fastExe)) {
+        execFile(fastExe, [safePrinter, tempFile, usbDevPath], { timeout: 2500 }, (err) => {
+          if (!err) {
+            try { fs.unlinkSync(tempFile); } catch (e) {}
+            return resolve(true);
+          }
+          const scriptPath = path.join(process.cwd(), "scripts", "print-raw.ps1");
+          const psCmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" -PrinterName "${safePrinter.replace(/"/g, '`"')}" -FilePath "${tempFile.replace(/"/g, '`"')}"`;
+          exec(psCmd, (error) => {
+            try { fs.unlinkSync(tempFile); } catch (e) {}
+            resolve(!error);
+          });
+        });
+        return;
+      }
+
       const scriptPath = path.join(process.cwd(), "scripts", "print-raw.ps1");
-      const psCmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" -PrinterName "${printerName.replace(/"/g, '`"')}" -FilePath "${tempFile.replace(/"/g, '`"')}"`;
+      const psCmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" -PrinterName "${safePrinter.replace(/"/g, '`"')}" -FilePath "${tempFile.replace(/"/g, '`"')}"`;
 
       exec(psCmd, (error) => {
         try { fs.unlinkSync(tempFile); } catch (e) {}
@@ -1490,7 +1538,7 @@ async function startServer() {
           }
 
           if (i < slips.length - 1) {
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => setTimeout(r, 60));
           }
         }
 

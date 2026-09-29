@@ -50,6 +50,8 @@ if not exist "%SRC_DIR%print-agent.cjs" (
     copy /y "%SRC_DIR%run-printer-silent.vbs" "%INSTALL_DIR%\" >nul
     copy /y "%SRC_DIR%start-printer-agent.bat" "%INSTALL_DIR%\" >nul
     if exist "%SRC_DIR%scripts\print-raw.ps1" copy /y "%SRC_DIR%scripts\print-raw.ps1" "%INSTALL_DIR%\scripts\" >nul
+    if exist "%SRC_DIR%scripts\raw-print.exe" copy /y "%SRC_DIR%scripts\raw-print.exe" "%INSTALL_DIR%\scripts\" >nul
+    if exist "%SRC_DIR%scripts\raw-print.cs" copy /y "%SRC_DIR%scripts\raw-print.cs" "%INSTALL_DIR%\scripts\" >nul
     if exist "%SRC_DIR%scripts\setup-autostart.ps1" copy /y "%SRC_DIR%scripts\setup-autostart.ps1" "%INSTALL_DIR%\scripts\" >nul
     if exist "%SRC_DIR%scripts\stop-agent.ps1" copy /y "%SRC_DIR%scripts\stop-agent.ps1" "%INSTALL_DIR%\scripts\" >nul
 )
