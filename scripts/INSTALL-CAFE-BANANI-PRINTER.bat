@@ -1,10 +1,10 @@
 @echo off
-title Cafe Banani Printer - 1-Click Installer
+title BD HOSTT POS Printer - 1-Click Installer
 color 0A
 setlocal enabledelayedexpansion
 
 echo ====================================================================
-echo     CAFE BANANI POS - 1-CLICK THERMAL PRINTER INSTALLER
+echo     BD HOSTT POS - 1-CLICK THERMAL PRINTER INSTALLER
 echo ====================================================================
 echo.
 echo [1/4] Checking environment...
@@ -30,8 +30,8 @@ if %errorlevel% neq 0 (
 
 echo       [OK] Node.js is ready.
 
-:: Target install directory: %LOCALAPPDATA%\CafeBananiPrinter
-set "INSTALL_DIR=%LOCALAPPDATA%\CafeBananiPrinter"
+:: Target install directory: %LOCALAPPDATA%\BDHosttPOSPrinter
+set "INSTALL_DIR=%LOCALAPPDATA%\BDHosttPOSPrinter"
 echo.
 echo [2/4] Installing files to: "%INSTALL_DIR%"...
 
@@ -59,9 +59,9 @@ echo [4/4] Verifying background service...
 timeout /t 2 /nobreak >nul
 
 echo ====================================================================
-echo   SUCCESS! CAFE BANANI PRINTER IS READY AND RUNNING!
+echo   SUCCESS! BD HOSTT POS PRINTER IS READY AND RUNNING!
 echo.
-echo   * Desktop shortcut created: "Cafe Banani Printer"
+echo   * Desktop shortcut created: "POS Printer Agent"
 echo   * Starts automatically every time you start Windows
 echo   * Zero terminal popups (completely silent in background)
 echo ====================================================================

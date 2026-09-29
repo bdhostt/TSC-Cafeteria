@@ -9,9 +9,9 @@ export const ShiftZReportModal: React.FC = () => {
   if (!selectedZReportSession) return null;
 
   const profile = data.restaurantProfile;
-  const restaurantName = profile?.name || 'RESTAURANT POS';
-  const restaurantAddress = profile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
-  const restaurantHotline = profile?.phone || '+880 1700-000000';
+  const restaurantName = profile?.name || 'BD HOSTT POS';
+  const restaurantAddress = profile?.address || 'Chattogram, Bangladesh';
+  const restaurantHotline = profile?.phone || '+880 1756-007600';
   const restaurantBin = profile?.binOrVat || '0029381-01';
 
   const session = selectedZReportSession;

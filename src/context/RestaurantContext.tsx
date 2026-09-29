@@ -582,12 +582,12 @@ export const DEFAULT_RESTAURANT_PROFILE: RestaurantProfile = {
   logoUrl: "",
   logoType: "preset",
   presetIcon: "flame",
-  address: "House #42, Road #11, Block D, Banani, Dhaka-1213",
-  phone: "+880 1700-000000",
-  email: "banani@barcodecafe.com",
+  address: "Chattogram, Bangladesh",
+  phone: "+880 1756-007600",
+  email: "bdhosttpos@gmail.com",
   binOrVat: "0029381-01",
   currencySymbol: "৳",
-  outletSecurityKey: "BANANI-2026"
+  outletSecurityKey: "BDHOSTT-2026"
 };
 
 export const DEFAULT_EMPLOYEES: Employee[] = [
@@ -601,8 +601,8 @@ export const DEFAULT_EMPLOYEES: Employee[] = [
     shiftId: "shift-1",
     basicSalary: 35000,
     phone: "+880 1711-223344",
-    email: "sajjad.mgr@barcodecafe.com",
-    address: "Banani, Dhaka",
+    email: "sajjad.mgr@bdhosttpos.com",
+    address: "Chattogram",
     joiningDate: "2025-01-10",
     status: "ACTIVE"
   },
@@ -616,8 +616,8 @@ export const DEFAULT_EMPLOYEES: Employee[] = [
     shiftId: "shift-1",
     basicSalary: 28000,
     phone: "+880 1811-334455",
-    email: "rahim.chef@barcodecafe.com",
-    address: "Mohakhali, Dhaka",
+    email: "rahim.chef@bdhosttpos.com",
+    address: "Chattogram",
     joiningDate: "2025-02-15",
     status: "ACTIVE"
   },
@@ -631,7 +631,7 @@ export const DEFAULT_EMPLOYEES: Employee[] = [
     shiftId: "shift-2",
     basicSalary: 18000,
     phone: "+880 1911-445566",
-    address: "Gulshan, Dhaka",
+    address: "Chattogram",
     joiningDate: "2025-03-01",
     status: "ACTIVE"
   },
@@ -645,7 +645,7 @@ export const DEFAULT_EMPLOYEES: Employee[] = [
     shiftId: "shift-2",
     basicSalary: 20000,
     phone: "+880 1611-556677",
-    address: "Banani, Dhaka",
+    address: "Chattogram",
     joiningDate: "2025-04-12",
     status: "ACTIVE"
   },
@@ -3446,9 +3446,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const billDateTime = new Date().toLocaleString('en-US');
 
     const billPayload: PrintableReceipt = {
-      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BARCODE CAFE BANANI',
-      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
-      restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1700-000000',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT POS',
+      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'Chattogram, Bangladesh',
+      restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
       invoiceNo: billInvoiceNo,
       dateTime: billDateTime,
@@ -3637,9 +3637,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Paid Cash Memo receipt payload for hardware printing
     const memoReceipt: PrintableReceipt = {
-      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BARCODE CAFE BANANI',
-      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
-      restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1700-000000',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT POS',
+      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'Chattogram, Bangladesh',
+      restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
       invoiceNo,
       dateTime: new Date().toLocaleString('en-US'),
@@ -4079,9 +4079,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     // Direct hardware print Z-Report on shift close
     const zReportPayload = {
-      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BARCODE CAFE BANANI',
-      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
-      restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1700-000000',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT POS',
+      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'Chattogram, Bangladesh',
+      restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
       session: completedSession
     };
@@ -4174,7 +4174,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Unified hardware print dispatch
     dispatchHardwarePrint('/api/hardware/print-dayend', {
-      restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT POS',
+      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'Chattogram, Bangladesh',
       dayRecord,
       daySessions
     });
@@ -4261,8 +4262,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Unified hardware print dispatch
     dispatchHardwarePrint('/api/hardware/print-chef-slip', {
-      restaurantName: data.restaurantProfile?.name || 'BARCODE CAFE BANANI',
-      restaurantAddress: data.restaurantProfile?.address || 'Banani, Dhaka',
+      restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT POS',
+      restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'Chattogram, Bangladesh',
       shift: completedShift
     });
 

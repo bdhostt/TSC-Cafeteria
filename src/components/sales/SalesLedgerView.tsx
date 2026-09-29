@@ -155,9 +155,9 @@ export const SalesLedgerView: React.FC = () => {
   const handlePrintVoidSlip = (sale: SaleRecord) => {
     let tableName = sale.table || 'Table';
     setPrintableReceipt({
-      restaurantName: data.restaurantProfile?.name || 'RESTAURANT POS',
-      restaurantAddress: data.restaurantProfile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
-      restaurantHotline: data.restaurantProfile?.phone || '+880 1700-000000',
+      restaurantName: data.restaurantProfile?.name || 'BD HOSTT POS',
+      restaurantAddress: data.restaurantProfile?.address || 'Chattogram, Bangladesh',
+      restaurantHotline: data.restaurantProfile?.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || '0029381-01',
       invoiceNo: sale.invoiceNo || `POS-${sale.id}`,
       dateTime: sale.date || new Date().toISOString().split('T')[0],
@@ -274,9 +274,9 @@ export const SalesLedgerView: React.FC = () => {
     const discountDeduction = Math.max(0, subtotal - sale.total);
 
     setPrintableReceipt({
-      restaurantName: data.restaurantProfile?.name || 'RESTAURANT POS',
-      restaurantAddress: data.restaurantProfile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
-      restaurantHotline: data.restaurantProfile?.phone || '+880 1700-000000',
+      restaurantName: data.restaurantProfile?.name || 'BD HOSTT POS',
+      restaurantAddress: data.restaurantProfile?.address || 'Chattogram, Bangladesh',
+      restaurantHotline: data.restaurantProfile?.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || '0029381-01',
       invoiceNo: sale.invoiceNo || `POS-${sale.id}`,
       dateTime: sale.date || new Date().toISOString().split('T')[0],
@@ -310,9 +310,9 @@ export const SalesLedgerView: React.FC = () => {
   };
 
   const generateReportHtml = () => {
-    const restaurantName = data.restaurantProfile?.name || 'RESTAURANT POS';
-    const address = data.restaurantProfile?.address || 'Banani, Dhaka - 1213';
-    const phone = data.restaurantProfile?.phone || '+880 1700-000000';
+    const restaurantName = data.restaurantProfile?.name || 'BD HOSTT POS';
+    const address = data.restaurantProfile?.address || 'Chattogram, Bangladesh';
+    const phone = data.restaurantProfile?.phone || '+880 1756-007600';
     const reportDateRange = startDate && endDate 
       ? `${startDate} to ${endDate}` 
       : startDate 
@@ -1252,10 +1252,10 @@ export const SalesLedgerView: React.FC = () => {
                 {/* Document Header */}
                 <div className="text-center border-b-2 border-slate-900 pb-4">
                   <h2 className="text-xl font-black text-slate-900 tracking-wider uppercase">
-                    {data.restaurantProfile?.name || 'RESTAURANT POS'}
+                    {data.restaurantProfile?.name || 'BD HOSTT POS'}
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {data.restaurantProfile?.address || 'Banani, Dhaka - 1213'} • Phone: {data.restaurantProfile?.phone || '+880 1700-000000'}
+                    {data.restaurantProfile?.address || 'Chattogram, Bangladesh'} • Phone: {data.restaurantProfile?.phone || '+880 1756-007600'}
                   </p>
                   <div className="text-sm font-bold text-[#004b9b] uppercase tracking-wide mt-2">
                     Sales Invoices & Revenue Statement

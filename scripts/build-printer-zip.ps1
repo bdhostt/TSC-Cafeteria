@@ -12,6 +12,7 @@ Copy-Item (Join-Path $rootDir "print-agent.cjs") $pkgDir -Force
 Copy-Item (Join-Path $rootDir "run-printer-silent.vbs") $pkgDir -Force
 Copy-Item (Join-Path $rootDir "start-printer-agent.bat") $pkgDir -Force
 Copy-Item (Join-Path $rootDir "stop-printer-agent.bat") $pkgDir -Force
+Copy-Item (Join-Path $rootDir "scripts\INSTALL-CAFE-BANANI-PRINTER.bat") (Join-Path $pkgDir "INSTALL-POS-PRINTER.bat") -Force
 Copy-Item (Join-Path $rootDir "scripts\INSTALL-CAFE-BANANI-PRINTER.bat") $pkgDir -Force
 Copy-Item (Join-Path $rootDir "scripts\README-INSTRUCTIONS.txt") $pkgDir -Force
 

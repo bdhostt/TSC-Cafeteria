@@ -92,14 +92,14 @@ export const HeadsConfigView: React.FC = () => {
 
   // Restaurant Profile & Logo State
   const [profileForm, setProfileForm] = useState<RestaurantProfile>({
-    name: data.restaurantProfile?.name || 'Restaurant POS',
+    name: data.restaurantProfile?.name || 'BD HOSTT POS',
     tagline: data.restaurantProfile?.tagline || 'Restaurant POS & Recipe BOM ERP',
     logoUrl: data.restaurantProfile?.logoUrl || '',
     logoType: data.restaurantProfile?.logoType || 'preset',
     presetIcon: data.restaurantProfile?.presetIcon || 'flame',
-    address: data.restaurantProfile?.address || 'House #42, Road #11, Block D, Banani, Dhaka-1213',
-    phone: data.restaurantProfile?.phone || '+880 1700-000000',
-    email: data.restaurantProfile?.email || 'info@restaurant.com',
+    address: data.restaurantProfile?.address || 'Chattogram, Bangladesh',
+    phone: data.restaurantProfile?.phone || '+880 1756-007600',
+    email: data.restaurantProfile?.email || 'bdhosttpos@gmail.com',
     binOrVat: data.restaurantProfile?.binOrVat || '0029381-01',
     currencySymbol: data.restaurantProfile?.currencySymbol || '৳'
   });
@@ -758,7 +758,7 @@ export const HeadsConfigView: React.FC = () => {
                       required
                       value={profileForm.name}
                       onChange={e => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Barcode Cafe Banani"
+                      placeholder="BD HOSTT POS"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>
@@ -784,7 +784,7 @@ export const HeadsConfigView: React.FC = () => {
                       type="text"
                       value={profileForm.address}
                       onChange={e => setProfileForm(prev => ({ ...prev, address: e.target.value }))}
-                      placeholder="House #42, Road #11, Block D, Banani, Dhaka-1213"
+                      placeholder="Chattogram, Bangladesh"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>
@@ -799,7 +799,7 @@ export const HeadsConfigView: React.FC = () => {
                         type="text"
                         value={profileForm.phone}
                         onChange={e => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
-                        placeholder="+880 1700-000000"
+                        placeholder="+880 1756-007600"
                         className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                       />
                     </div>
@@ -815,7 +815,7 @@ export const HeadsConfigView: React.FC = () => {
                         type="email"
                         value={profileForm.email}
                         onChange={e => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="banani@barcodecafe.com"
+                        placeholder="bdhosttpos@gmail.com"
                         className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                       />
                     </div>
@@ -886,13 +886,13 @@ export const HeadsConfigView: React.FC = () => {
                     </div>
                   )}
                   <div className="font-extrabold text-sm uppercase text-slate-900 tracking-wide font-sans">
-                    {profileForm.name || 'RESTAURANT POS'}
+                    {profileForm.name || 'BD HOSTT POS'}
                   </div>
                   <div className="text-[10px] text-slate-600 font-sans mt-0.5">
-                    {profileForm.address || 'House #42, Road #11, Block D, Banani, Dhaka'}
+                    {profileForm.address || 'Chattogram, Bangladesh'}
                   </div>
                   <div className="text-[9px] text-slate-500 font-sans">
-                    Hotline: {profileForm.phone || '+880 1700-000000'} &bull; VAT Reg: {profileForm.binOrVat || '0029381-01'}
+                    Hotline: {profileForm.phone || '+880 1756-007600'} &bull; VAT Reg: {profileForm.binOrVat || '0029381-01'}
                   </div>
                   <div className="mt-1.5 inline-block px-2 py-0.5 bg-slate-200 text-slate-800 rounded text-[9px] font-bold uppercase tracking-wider">
                     PAID CASH MEMO #INV-16001

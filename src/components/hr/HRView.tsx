@@ -111,7 +111,7 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
     phone: '+880 1700-000000',
     email: '',
     nid: '',
-    address: 'Banani, Dhaka',
+    address: data.restaurantProfile?.address || 'Chattogram, Bangladesh',
     joiningDate: new Date().toISOString().split('T')[0],
     status: 'ACTIVE'
   });

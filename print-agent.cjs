@@ -5,7 +5,7 @@ const path = require('path');
 const net = require('net');
 const { exec } = require('child_process');
 
-const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://erp-pos-sdv3.onrender.com').replace(/\/+$/, '');
+const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://tsc-cafeteria.onrender.com').replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 800;
 
@@ -211,10 +211,10 @@ function buildBillEscPosBuffer(bill) {
   // 3. Center Align: Restaurant Header
   pushBytes([0x1B, 0x61, 0x01]);
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Restaurant Name
-  pushStr((bill.restaurantName || 'BARCODE CAFE BANANI') + '\n');
+  pushStr((bill.restaurantName || 'BD HOSTT POS') + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
-  const rawAddress = bill.restaurantAddress || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
+  const rawAddress = bill.restaurantAddress || 'Chattogram, Bangladesh';
   if (rawAddress) {
     if (rawAddress.includes(',')) {
       const parts = rawAddress.split(',').map(p => p.trim());
@@ -379,11 +379,11 @@ function buildZReportEscPosBuffer(report) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((report.restaurantName || 'BARCODE CAFE BANANI') + '\n');
+  pushStr((report.restaurantName || 'BD HOSTT POS') + '\n');
 
-  const rawAddress = report.restaurantAddress || 'House #42, Road #11, Block D, Banani, Dhaka-1213';
+  const rawAddress = report.restaurantAddress || 'Chattogram, Bangladesh';
   if (rawAddress) pushStr(rawAddress + '\n');
-  const rawHotline = report.restaurantHotline || '+880 1700-000000';
+  const rawHotline = report.restaurantHotline || '+880 1756-007600';
   if (rawHotline) pushStr('Hotline: ' + rawHotline + '\n');
   const rawBin = report.restaurantBin || '0029381-01';
   if (rawBin) pushStr('BIN/VAT Reg: ' + rawBin + '\n');
@@ -514,8 +514,8 @@ function buildWaiterSlipEscPosBuffer(data) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((data.restaurantName || 'BARCODE CAFE BANANI') + '\n');
-  pushStr((data.restaurantAddress || 'Banani, Dhaka') + '\n');
+  pushStr((data.restaurantName || 'BD HOSTT POS') + '\n');
+  pushStr((data.restaurantAddress || 'Chattogram, Bangladesh') + '\n');
   pushStr('------------------------------------------\n');
   pushStr('*** WAITER SERVER SUMMARY SLIP ***\n');
   pushStr('------------------------------------------\n');
@@ -574,8 +574,8 @@ function buildChefSlipEscPosBuffer(data) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((data.restaurantName || 'BARCODE CAFE BANANI') + '\n');
-  pushStr((data.restaurantAddress || 'Banani, Dhaka') + '\n');
+  pushStr((data.restaurantName || 'BD HOSTT POS') + '\n');
+  pushStr((data.restaurantAddress || 'Chattogram, Bangladesh') + '\n');
   pushStr('------------------------------------------\n');
   pushStr('*** KITCHEN PRODUCTION & HANDOVER SLIP ***\n');
   pushStr('------------------------------------------\n');
@@ -633,8 +633,8 @@ function buildDayEndEscPosBuffer(data) {
   pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform 42 columns
 
   pushBytes([0x1B, 0x61, 0x01]);
-  pushStr((data.restaurantName || 'BARCODE CAFE BANANI') + '\n');
-  pushStr('House #42, Road #11, Block D, Banani, Dhaka\n');
+  pushStr((data.restaurantName || 'BD HOSTT POS') + '\n');
+  pushStr((data.restaurantAddress || 'Chattogram, Bangladesh') + '\n');
   pushStr('------------------------------------------\n');
   pushStr('*** DAILY MASTER DAY-END Z-REPORT ***\n');
   pushStr('------------------------------------------\n');
@@ -906,7 +906,7 @@ async function pollCloudPrintQueue() {
 
 async function init() {
   console.log('================================================================');
-  console.log('   🚀 CAFE BANANI - THERMAL PRINTER CLOUD BRIDGE (ACTIVE)');
+  console.log('   🚀 BD HOSTT POS - THERMAL PRINTER CLOUD BRIDGE (ACTIVE)');
   console.log('================================================================');
   console.log('  [+] Cloud Target   : ' + CLOUD_SERVER_URL);
   console.log('  [+] Local Bridge   : http://127.0.0.1:' + LOCAL_PORT + ' (Instant 0ms Print)');

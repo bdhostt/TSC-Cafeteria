@@ -287,10 +287,10 @@ async function startServer() {
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(`${bill.restaurantName || "RESTAURANT POS"}\n`);
+    pushStr(`${bill.restaurantName || cachedState?.restaurantProfile?.name || "BD HOSTT POS"}\n`);
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
-    const rawAddress = bill.restaurantAddress || "House #42, Road #11, Block D, Banani, Dhaka-1213";
+    const rawAddress = bill.restaurantAddress || cachedState?.restaurantProfile?.address || "Chattogram, Bangladesh";
     if (rawAddress) {
       if (rawAddress.includes(",")) {
         const parts = rawAddress.split(",").map(p => p.trim());
@@ -313,7 +313,7 @@ async function startServer() {
       }
     }
 
-    const rawHotline = bill.restaurantHotline || "+880 1700-000000";
+    const rawHotline = bill.restaurantHotline || cachedState?.restaurantProfile?.phone || "+880 1756-007600";
     if (rawHotline) {
       pushStr(`Hotline: ${rawHotline}\n`);
     }
@@ -515,10 +515,10 @@ async function startServer() {
 
     // 3. Center Align: Restaurant Header
     pushBytes([0x1B, 0x61, 0x01]); // Center
-    pushStr(`${report.restaurantName || "RESTAURANT POS"}\n`);
+    pushStr(`${report.restaurantName || cachedState?.restaurantProfile?.name || "BD HOSTT POS"}\n`);
 
     // Restaurant Address
-    const rawAddress = report.restaurantAddress || "House #42, Road #11, Block D, Banani, Dhaka-1213";
+    const rawAddress = report.restaurantAddress || cachedState?.restaurantProfile?.address || "Chattogram, Bangladesh";
     if (rawAddress) {
       if (rawAddress.includes(",")) {
         const parts = rawAddress.split(",").map(p => p.trim());
@@ -541,7 +541,7 @@ async function startServer() {
       }
     }
 
-    const rawHotline = report.restaurantHotline || "+880 1700-000000";
+    const rawHotline = report.restaurantHotline || cachedState?.restaurantProfile?.phone || "+880 1756-007600";
     if (rawHotline) {
       pushStr(`Hotline: ${rawHotline}\n`);
     }
@@ -715,8 +715,8 @@ async function startServer() {
     pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushStr(`${data.restaurantName || "RESTAURANT POS"}\n`);
-    pushStr(`${data.restaurantAddress || "Banani, Dhaka"}\n`);
+    pushStr(`${data.restaurantName || cachedState?.restaurantProfile?.name || "BD HOSTT POS"}\n`);
+    pushStr(`${data.restaurantAddress || cachedState?.restaurantProfile?.address || "Chattogram, Bangladesh"}\n`);
     pushStr("------------------------------------------\n");
     pushStr("*** WAITER SERVER SUMMARY SLIP ***\n");
     pushStr("------------------------------------------\n");
@@ -763,6 +763,7 @@ async function startServer() {
   // Build ESC/POS binary buffer for Daily Consolidated Day-End Master Z-Report
   function buildDayEndEscPosBuffer(data: {
     restaurantName?: string;
+    restaurantAddress?: string;
     dayRecord: {
       id: string;
       date: string;
@@ -807,8 +808,8 @@ async function startServer() {
     pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushStr(`${data.restaurantName || "RESTAURANT POS"}\n`);
-    pushStr("House #42, Road #11, Block D, Banani, Dhaka\n");
+    pushStr(`${data.restaurantName || cachedState?.restaurantProfile?.name || "BD HOSTT POS"}\n`);
+    pushStr(`${data.restaurantAddress || cachedState?.restaurantProfile?.address || "Chattogram, Bangladesh"}\n`);
     pushStr("------------------------------------------\n");
     pushStr("*** DAILY MASTER DAY-END Z-REPORT ***\n");
     pushStr("------------------------------------------\n");
@@ -923,8 +924,8 @@ async function startServer() {
     pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform font A (42 columns)
 
     pushBytes([0x1B, 0x61, 0x01]);
-    pushStr(`${data.restaurantName || "RESTAURANT POS"}\n`);
-    pushStr(`${data.restaurantAddress || "Banani, Dhaka"}\n`);
+    pushStr(`${data.restaurantName || cachedState?.restaurantProfile?.name || "BD HOSTT POS"}\n`);
+    pushStr(`${data.restaurantAddress || cachedState?.restaurantProfile?.address || "Chattogram, Bangladesh"}\n`);
     pushStr("------------------------------------------\n");
     pushStr("*** KITCHEN PRODUCTION & HANDOVER SLIP ***\n");
     pushStr("------------------------------------------\n");
@@ -1066,13 +1067,14 @@ async function startServer() {
 
   // Download 1-Click Printer Agent Setup ZIP
   app.get("/api/download/printer-agent-zip", (req, res) => {
+    const brandSlug = (cachedState?.restaurantProfile?.name || "POS").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "POS";
     const candidates = [
       path.join(process.cwd(), "public", "downloads", "CafeBananiPrinter-Setup.zip"),
       path.join(process.cwd(), "dist", "downloads", "CafeBananiPrinter-Setup.zip")
     ];
     for (const zipPath of candidates) {
       if (fs.existsSync(zipPath)) {
-        res.setHeader('Content-Disposition', 'attachment; filename="CafeBananiPrinter-Setup.zip"');
+        res.setHeader('Content-Disposition', `attachment; filename="${brandSlug}-Printer-Setup.zip"`);
         res.setHeader('Content-Type', 'application/zip');
         return res.sendFile(zipPath);
       }
@@ -1082,9 +1084,10 @@ async function startServer() {
 
   // Download 1-Click Installer BAT directly
   app.get("/api/download/printer-installer-bat", (req, res) => {
+    const brandSlug = (cachedState?.restaurantProfile?.name || "POS").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "POS";
     const batPath = path.join(process.cwd(), "scripts", "INSTALL-CAFE-BANANI-PRINTER.bat");
     if (fs.existsSync(batPath)) {
-      res.setHeader('Content-Disposition', 'attachment; filename="INSTALL-CAFE-BANANI-PRINTER.bat"');
+      res.setHeader('Content-Disposition', `attachment; filename="INSTALL-${brandSlug}-PRINTER.bat"`);
       res.setHeader('Content-Type', 'application/x-bat');
       return res.sendFile(batPath);
     }

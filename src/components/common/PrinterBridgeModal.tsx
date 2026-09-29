@@ -279,7 +279,7 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
               <div className="w-5 h-5 rounded-full bg-[#004b9b] text-white font-bold text-[10px] flex items-center justify-center mb-1.5">2</div>
               <div className="font-bold text-xs text-slate-800">Run Installer</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                Double-click the <strong>INSTALL-CAFE-BANANI-PRINTER.bat</strong> file.
+                Double-click the <strong>INSTALL-{safeFileSlug.toUpperCase()}-PRINTER.bat</strong> file.
               </div>
             </div>
 

@@ -1,6 +1,6 @@
-# Cafe Banani POS - Stop Printer Agent
+# BD HOSTT POS - Stop Printer Agent
 Write-Host "====================================================================" -ForegroundColor Cyan
-Write-Host "               STOPPING CAFE BANANI PRINTER AGENT" -ForegroundColor Cyan
+Write-Host "               STOPPING BD HOSTT POS PRINTER AGENT" -ForegroundColor Cyan
 Write-Host "====================================================================" -ForegroundColor Cyan
 Write-Host ""
 

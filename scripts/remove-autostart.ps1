@@ -1,13 +1,13 @@
-# Cafe Banani POS - Remove Auto-Start
+# BD HOSTT POS - Remove Auto-Start
 Write-Host "====================================================================" -ForegroundColor Cyan
-Write-Host "        REMOVING CAFE BANANI PRINTER AUTO-START SHORTCUTS" -ForegroundColor Cyan
+Write-Host "        REMOVING BD HOSTT POS PRINTER AUTO-START SHORTCUTS" -ForegroundColor Cyan
 Write-Host "====================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 $startupFolder = [System.IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs\Startup')
-$startupShortcut = Join-Path $startupFolder "CafeBananiPrinterAgent.lnk"
+$startupShortcut = Join-Path $startupFolder "POSPrinterAgent.lnk"
 $desktopFolder = [Environment]::GetFolderPath('Desktop')
-$desktopShortcut = Join-Path $desktopFolder "Cafe Banani Printer.lnk"
+$desktopShortcut = Join-Path $desktopFolder "POS Printer Agent.lnk"
 
 if (Test-Path $startupShortcut) {
     Remove-Item -Force $startupShortcut
