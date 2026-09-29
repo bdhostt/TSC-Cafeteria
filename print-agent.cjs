@@ -59,15 +59,21 @@ function refreshWindowsPrintersInBackground() {
   printerScanPromise = new Promise((resolve) => {
     const psCmd = [
       `$usb = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.Service -eq 'usbprint' -and $_.Status -eq 'OK' });`,
-      `$usbQueues = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -match '^USBPRINT\\\\' -and $_.Status -eq 'OK' });`,
-      `$printers = @(Get-Printer -ErrorAction SilentlyContinue | Select-Object Name, PortName, DriverName, WorkOffline);`,
-      `[PSCustomObject]@{ usbCount = $usb.Count; usbNames = @($usbQueues | Select-Object -ExpandProperty FriendlyName); usbHardwareIds = @($usb | Select-Object -ExpandProperty InstanceId); printers = $printers } | ConvertTo-Json -Compress`
+      `$usbDevices = @();`,
+      `foreach ($u in $usb) {`,
+      `  $busDesc = (Get-PnpDeviceProperty -InstanceId $u.InstanceId -KeyName 'DEVPKEY_Device_BusReportedDeviceDesc' -ErrorAction SilentlyContinue).Data;`,
+      `  $friendly = $u.FriendlyName;`,
+      `  $label = if ($busDesc) { [string]$busDesc } elseif ($friendly) { [string]$friendly } else { 'USB Receipt Printer' };`,
+      `  $usbDevices += [PSCustomObject]@{ Name = $label.Trim(); InstanceId = [string]$u.InstanceId; FriendlyName = [string]$friendly };`,
+      `}`,
+      `$printers = @(Get-Printer -ErrorAction SilentlyContinue | Select-Object Name, PortName, DriverName, WorkOffline, PrinterStatus);`,
+      `[PSCustomObject]@{ usbCount = $usb.Count; usbDevices = $usbDevices; printers = $printers } | ConvertTo-Json -Depth 4 -Compress`
     ].join(' ');
 
     exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCmd.replace(/"/g, '\\"')}"`, { timeout: 12000 }, async (err, stdout) => {
       printerScanPromise = null;
       const detailed = [];
-      const realNames = [];
+      const allNames = [];
       const discoveredIps = new Set(['192.168.1.87', '192.168.0.87', '192.168.1.200', '192.168.0.200']);
 
       if (!err && stdout) {
@@ -75,51 +81,62 @@ function refreshWindowsPrintersInBackground() {
           const parsed = JSON.parse(stdout.trim());
           isUsbPhysicallyConnected = (Number(parsed.usbCount) || 0) > 0;
           const rawList = Array.isArray(parsed.printers) ? parsed.printers : (parsed.printers ? [parsed.printers] : []);
+          const usbDevList = Array.isArray(parsed.usbDevices) ? parsed.usbDevices : (parsed.usbDevices ? [parsed.usbDevices] : []);
 
           for (const p of rawList) {
             const name = (p && p.Name ? String(p.Name) : '').trim();
-            const port = (p && p.PortName ? String(p.PortName) : '').trim();
-            if (!name || VIRTUAL_PRINTER_REGEX.test(name)) continue;
+            const rawPort = (p && p.PortName ? String(p.PortName) : '').trim();
+            if (!name) continue;
 
-            const ipMatch = port.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+            const ipMatch = rawPort.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
             if (ipMatch) discoveredIps.add(ipMatch[1]);
 
-            const isUsbPort = /^USB/i.test(port);
-            const isLanPort = Boolean(ipMatch) || /^(IP_|WSD|TCP)/i.test(port);
+            const isVirtual = VIRTUAL_PRINTER_REGEX.test(name) || /^(PORTPROMPT:|SHRFAX:|nul:|FILE:)/i.test(rawPort) || /^Microsoft\.Office\./i.test(rawPort);
+            const isUsbPort = /^USB/i.test(rawPort);
+            const isLanPort = Boolean(ipMatch) || /^(IP_|WSD|TCP)/i.test(rawPort);
             const connType = isLanPort ? 'LAN' : 'USB';
+            const displayPort = /^Microsoft\.Office\.OneNote/i.test(rawPort)
+              ? 'OneNote Port'
+              : (rawPort.length > 28 ? rawPort.slice(0, 25) + '...' : (rawPort || 'USB001'));
             const connectedNow = isUsbPort ? isUsbPhysicallyConnected : (!p.WorkOffline);
 
             detailed.push({
               name,
-              portName: port || 'USB001',
+              portName: displayPort,
               driverName: (p && p.DriverName ? String(p.DriverName) : ''),
               connectionType: connType,
               ipAddress: ipMatch ? ipMatch[1] : (connType === 'LAN' ? '192.168.1.87' : undefined),
               port: 9100,
-              usbPort: isUsbPort ? port : 'USB001',
-              isConnected: connectedNow
+              usbPort: isUsbPort ? rawPort : displayPort,
+              isConnected: connectedNow,
+              isVirtual,
+              deviceCategory: 'Printers'
             });
 
-            if (isUsbPort && !isUsbPhysicallyConnected) continue;
-            realNames.push(name);
+            if (!allNames.some(n => n.toLowerCase() === name.toLowerCase())) {
+              allNames.push(name);
+            }
           }
 
-          // Also include Direct USB PnP hardware printer if plugged in (even without Windows driver)
-          if (isUsbPhysicallyConnected) {
-            const usbFriendlyList = Array.isArray(parsed.usbNames) ? parsed.usbNames.filter(Boolean) : [];
-            const hwLabel = usbFriendlyList[0] ? `${usbFriendlyList[0]} (Direct USB)` : 'Direct USB Thermal Printer (USB001)';
-            if (!realNames.length) {
-              realNames.push(hwLabel);
-            }
-            if (!detailed.some(d => d.connectionType === 'USB' && d.isConnected)) {
-              detailed.unshift({
-                name: hwLabel,
+          // Dynamically include connected USB PnP printer devices (e.g. "USB Receipt Printer" under Unspecified in Devices and Printers)
+          for (const u of usbDevList) {
+            const usbName = (u && u.Name ? String(u.Name) : '').trim();
+            if (!usbName) continue;
+            if (!detailed.some(d => d.name.toLowerCase() === usbName.toLowerCase())) {
+              detailed.push({
+                name: usbName,
                 portName: 'USB001',
-                driverName: 'Direct USB (Driverless)',
+                driverName: (u && u.FriendlyName ? String(u.FriendlyName) : 'USB Printing Support'),
                 connectionType: 'USB',
+                port: 9100,
                 usbPort: 'USB001',
-                isConnected: true
+                isConnected: true,
+                isVirtual: false,
+                deviceCategory: 'Unspecified (USB)'
               });
+            }
+            if (!allNames.some(n => n.toLowerCase() === usbName.toLowerCase())) {
+              allNames.push(usbName);
             }
           }
         } catch (parseErr) {
@@ -150,15 +167,28 @@ function refreshWindowsPrintersInBackground() {
           connectionType: 'LAN',
           ipAddress: activeLanIp,
           port: 9100,
-          isConnected: true
+          isConnected: true,
+          isVirtual: false,
+          deviceCategory: 'LAN Printer'
         });
-        if (!realNames.includes('80 Printer')) {
-          realNames.unshift('80 Printer');
+        if (!allNames.includes('80 Printer')) {
+          allNames.unshift('80 Printer');
         }
       }
 
-      cachedPrinters = realNames;
+      // Sort so physical hardware printers (USB / LAN) appear first, then system printers alphabetically
+      detailed.sort((a, b) => {
+        if (Boolean(a.isVirtual) !== Boolean(b.isVirtual)) {
+          return a.isVirtual ? 1 : -1;
+        }
+        if (Boolean(a.isConnected) !== Boolean(b.isConnected)) {
+          return a.isConnected ? -1 : 1;
+        }
+        return String(a.name).localeCompare(String(b.name));
+      });
+
       cachedDetailedPrinters = detailed;
+      cachedPrinters = detailed.map(d => d.name);
       lastPrinterScan = Date.now();
       resolve(cachedPrinters);
     });

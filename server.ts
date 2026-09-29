@@ -102,18 +102,108 @@ async function startServer() {
     });
   });
 
-  // Helper to discover all Windows installed printers
-  async function getWindowsPrinters(): Promise<string[]> {
+  const VIRTUAL_PRINTER_REGEX = /microsoft print to pdf|xps document writer|onenote|fax|adobe pdf|foxit|send to|anydesk|snagit|cutepdf/i;
+
+  // Helper to discover all Windows installed printers & USB PnP receipt printers dynamically
+  async function getWindowsPrintersDetailed(): Promise<{ names: string[]; detailed: any[]; isUsbConnected: boolean }> {
+    if (process.platform !== 'win32') {
+      return { names: [], detailed: [], isUsbConnected: false };
+    }
     return new Promise((resolve) => {
-      exec(`powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"`, (err, stdout) => {
-        if (err || !stdout) return resolve([]);
-        const list = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-        resolve(list);
+      const psCmd = [
+        `$usb = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.Service -eq 'usbprint' -and $_.Status -eq 'OK' });`,
+        `$usbDevices = @();`,
+        `foreach ($u in $usb) {`,
+        `  $busDesc = (Get-PnpDeviceProperty -InstanceId $u.InstanceId -KeyName 'DEVPKEY_Device_BusReportedDeviceDesc' -ErrorAction SilentlyContinue).Data;`,
+        `  $friendly = $u.FriendlyName;`,
+        `  $label = if ($busDesc) { [string]$busDesc } elseif ($friendly) { [string]$friendly } else { 'USB Receipt Printer' };`,
+        `  $usbDevices += [PSCustomObject]@{ Name = $label.Trim(); InstanceId = [string]$u.InstanceId; FriendlyName = [string]$friendly };`,
+        `}`,
+        `$printers = @(Get-Printer -ErrorAction SilentlyContinue | Select-Object Name, PortName, DriverName, WorkOffline, PrinterStatus);`,
+        `[PSCustomObject]@{ usbCount = $usb.Count; usbDevices = $usbDevices; printers = $printers } | ConvertTo-Json -Depth 4 -Compress`
+      ].join(' ');
+
+      exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCmd.replace(/"/g, '\\"')}"`, { timeout: 10000 }, (err, stdout) => {
+        if (err || !stdout) return resolve({ names: [], detailed: [], isUsbConnected: false });
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          const isUsbConnected = (Number(parsed.usbCount) || 0) > 0;
+          const rawList = Array.isArray(parsed.printers) ? parsed.printers : (parsed.printers ? [parsed.printers] : []);
+          const usbDevList = Array.isArray(parsed.usbDevices) ? parsed.usbDevices : (parsed.usbDevices ? [parsed.usbDevices] : []);
+          const detailed: any[] = [];
+
+          for (const p of rawList) {
+            const name = (p && p.Name ? String(p.Name) : '').trim();
+            const rawPort = (p && p.PortName ? String(p.PortName) : '').trim();
+            if (!name) continue;
+
+            const ipMatch = rawPort.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+            const isVirtual = VIRTUAL_PRINTER_REGEX.test(name) || /^(PORTPROMPT:|SHRFAX:|nul:|FILE:)/i.test(rawPort) || /^Microsoft\.Office\./i.test(rawPort);
+            const isUsbPort = /^USB/i.test(rawPort);
+            const isLanPort = Boolean(ipMatch) || /^(IP_|WSD|TCP)/i.test(rawPort);
+            const connType = isLanPort ? 'LAN' : 'USB';
+            const displayPort = /^Microsoft\.Office\.OneNote/i.test(rawPort)
+              ? 'OneNote Port'
+              : (rawPort.length > 28 ? rawPort.slice(0, 25) + '...' : (rawPort || 'USB001'));
+
+            detailed.push({
+              name,
+              portName: displayPort,
+              driverName: (p && p.DriverName ? String(p.DriverName) : ''),
+              connectionType: connType,
+              ipAddress: ipMatch ? ipMatch[1] : (connType === 'LAN' ? '192.168.1.87' : undefined),
+              port: 9100,
+              usbPort: isUsbPort ? rawPort : displayPort,
+              isConnected: isUsbPort ? isUsbConnected : (!p.WorkOffline),
+              isVirtual,
+              deviceCategory: 'Printers'
+            });
+          }
+
+          for (const u of usbDevList) {
+            const usbName = (u && u.Name ? String(u.Name) : '').trim();
+            if (!usbName) continue;
+            if (!detailed.some(d => d.name.toLowerCase() === usbName.toLowerCase())) {
+              detailed.push({
+                name: usbName,
+                portName: 'USB001',
+                driverName: (u && u.FriendlyName ? String(u.FriendlyName) : 'USB Printing Support'),
+                connectionType: 'USB',
+                port: 9100,
+                usbPort: 'USB001',
+                isConnected: true,
+                isVirtual: false,
+                deviceCategory: 'Unspecified (USB)'
+              });
+            }
+          }
+
+          detailed.sort((a, b) => {
+            if (Boolean(a.isVirtual) !== Boolean(b.isVirtual)) {
+              return a.isVirtual ? 1 : -1;
+            }
+            if (Boolean(a.isConnected) !== Boolean(b.isConnected)) {
+              return a.isConnected ? -1 : 1;
+            }
+            return String(a.name).localeCompare(String(b.name));
+          });
+
+          resolve({
+            names: detailed.map(d => d.name),
+            detailed,
+            isUsbConnected
+          });
+        } catch {
+          resolve({ names: [], detailed: [], isUsbConnected: false });
+        }
       });
     });
   }
 
-  const VIRTUAL_PRINTER_REGEX = /microsoft print to pdf|xps document writer|onenote|fax|adobe pdf|foxit|send to|anydesk|snagit|cutepdf/i;
+  async function getWindowsPrinters(): Promise<string[]> {
+    const res = await getWindowsPrintersDetailed();
+    return res.names;
+  }
 
   // Resolve active thermal printer: Prioritizes 80 Printer (LAN 192.168.1.87) or Kot Printer (USB001)
   function resolveThermalPrinter(installedPrinters: string[], requestedName?: string): string {
@@ -1028,19 +1118,32 @@ async function startServer() {
     return job;
   }
 
-  // REST endpoint: Discover connected Windows physical printers (either from local Windows server or active floor agent)
+  // REST endpoint: Discover connected Windows printers & USB devices dynamically (from local Windows server or active floor agent)
   app.get("/api/hardware/printers", async (req, res) => {
     try {
       const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
-      const localPrinters = process.platform === 'win32' ? await getWindowsPrinters() : [];
-      const filteredLocal = localPrinters.filter(p => !VIRTUAL_PRINTER_REGEX.test(p));
+      const localDiscovery = process.platform === 'win32'
+        ? await getWindowsPrintersDetailed()
+        : { names: [], detailed: [], isUsbConnected: false };
 
       const agentPrinters = (isAgentOnline && Array.isArray(lastAgentTelemetry.printers)) ? lastAgentTelemetry.printers : [];
-      const mergedPrinters = Array.from(new Set([...agentPrinters, ...filteredLocal]));
+      const mergedPrinters = Array.from(new Set([...agentPrinters, ...localDiscovery.names]));
       const activePrinter = (isAgentOnline && lastAgentTelemetry.activePrinter) || resolveThermalPrinter(mergedPrinters);
-      const detailedPrinters = (isAgentOnline && Array.isArray(lastAgentTelemetry.detailedPrinters) && lastAgentTelemetry.detailedPrinters.length > 0)
-        ? lastAgentTelemetry.detailedPrinters
-        : mergedPrinters.map(name => ({
+
+      const mergedDetailedMap = new Map<string, any>();
+      if (isAgentOnline && Array.isArray(lastAgentTelemetry.detailedPrinters)) {
+        for (const item of lastAgentTelemetry.detailedPrinters) {
+          if (item && item.name) mergedDetailedMap.set(item.name.toLowerCase(), item);
+        }
+      }
+      for (const item of localDiscovery.detailed) {
+        if (item && item.name && !mergedDetailedMap.has(item.name.toLowerCase())) {
+          mergedDetailedMap.set(item.name.toLowerCase(), item);
+        }
+      }
+      for (const name of mergedPrinters) {
+        if (name && !mergedDetailedMap.has(name.toLowerCase())) {
+          mergedDetailedMap.set(name.toLowerCase(), {
             name,
             portName: /80\s*printer/i.test(name) ? 'USB001 / 192.168.1.87' : 'USB001',
             connectionType: /lan|192\./i.test(name) ? 'LAN' : 'USB',
@@ -1048,12 +1151,16 @@ async function startServer() {
             port: 9100,
             usbPort: 'USB001',
             isConnected: true
-          }));
+          });
+        }
+      }
+
+      const detailedPrinters = Array.from(mergedDetailedMap.values());
 
       res.json({
         success: true,
         isAgentOnline,
-        isUsbConnected: isAgentOnline ? Boolean(lastAgentTelemetry.isUsbConnected) : (filteredLocal.length > 0),
+        isUsbConnected: isAgentOnline ? Boolean(lastAgentTelemetry.isUsbConnected) : localDiscovery.isUsbConnected,
         isLanReachable: isAgentOnline ? Boolean(lastAgentTelemetry.isLanReachable) : false,
         printers: mergedPrinters,
         detailedPrinters,

@@ -37,6 +37,8 @@ interface DetectedSystemPrinter {
   port?: number;
   usbPort?: string;
   isConnected: boolean;
+  isVirtual?: boolean;
+  deviceCategory?: string;
 }
 
 export const PrintersConfigView: React.FC = () => {
@@ -90,11 +92,19 @@ export const PrintersConfigView: React.FC = () => {
     let foundOnline = false;
     const mergedMap = new Map<string, DetectedSystemPrinter>();
 
+    const addItem = (item: DetectedSystemPrinter) => {
+      if (!item || !item.name) return;
+      const key = item.name.trim().toLowerCase();
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, item);
+      }
+    };
+
     // 1. Try direct local agent on 127.0.0.1:9123
     try {
       const localRes = await fetch(`http://127.0.0.1:9123/health${force ? '?force=1' : ''}`, {
         method: 'GET',
-        signal: AbortSignal.timeout(1800)
+        signal: AbortSignal.timeout(2500)
       });
       if (localRes.ok) {
         const d = await localRes.json();
@@ -102,11 +112,12 @@ export const PrintersConfigView: React.FC = () => {
         if (d.activePrinter) setActiveHardwarePrinter(d.activePrinter);
         if (Array.isArray(d.detailedPrinters)) {
           for (const item of d.detailedPrinters) {
-            if (item && item.name) mergedMap.set(item.name, item);
+            addItem(item);
           }
-        } else if (Array.isArray(d.printers)) {
+        }
+        if (Array.isArray(d.printers)) {
           for (const pName of d.printers) {
-            mergedMap.set(pName, {
+            addItem({
               name: pName,
               portName: d.isLanReachable ? '192.168.1.87:9100' : 'USB001',
               connectionType: d.isLanReachable && !d.isUsbConnected ? 'LAN' : 'USB',
@@ -119,14 +130,14 @@ export const PrintersConfigView: React.FC = () => {
         }
       }
     } catch {
-      // Local HTTP may be blocked by HTTPS mixed-content in Chrome; fallback to server bridge below
+      // Local HTTP may be blocked by HTTPS mixed-content in some browsers; fallback to server bridge below
     }
 
     // 2. Also query server /api/hardware/printers & /api/print-bridge/status (works on https://tsc-cafeteria.onrender.com!)
     try {
       const [hwRes, bridgeRes] = await Promise.all([
-        fetch('/api/hardware/printers', { signal: AbortSignal.timeout(3000) }).catch(() => null),
-        fetch('/api/print-bridge/status', { signal: AbortSignal.timeout(3000) }).catch(() => null)
+        fetch('/api/hardware/printers', { signal: AbortSignal.timeout(4000) }).catch(() => null),
+        fetch('/api/print-bridge/status', { signal: AbortSignal.timeout(4000) }).catch(() => null)
       ]);
 
       if (bridgeRes && bridgeRes.ok) {
@@ -135,9 +146,20 @@ export const PrintersConfigView: React.FC = () => {
         if (bData.activePrinter) setActiveHardwarePrinter(bData.activePrinter);
         if (Array.isArray(bData.detailedPrinters)) {
           for (const item of bData.detailedPrinters) {
-            if (item && item.name && !mergedMap.has(item.name)) {
-              mergedMap.set(item.name, item);
-            }
+            addItem(item);
+          }
+        }
+        if (Array.isArray(bData.printers)) {
+          for (const pName of bData.printers) {
+            addItem({
+              name: pName,
+              portName: 'USB001',
+              connectionType: /lan|192\./i.test(pName) ? 'LAN' : 'USB',
+              ipAddress: '192.168.1.87',
+              port: 9100,
+              usbPort: 'USB001',
+              isConnected: true
+            });
           }
         }
       }
@@ -148,23 +170,20 @@ export const PrintersConfigView: React.FC = () => {
         if (hwData.activePrinter && !activeHardwarePrinter) setActiveHardwarePrinter(hwData.activePrinter);
         if (Array.isArray(hwData.detailedPrinters)) {
           for (const item of hwData.detailedPrinters) {
-            if (item && item.name && !mergedMap.has(item.name)) {
-              mergedMap.set(item.name, item);
-            }
+            addItem(item);
           }
-        } else if (Array.isArray(hwData.printers)) {
+        }
+        if (Array.isArray(hwData.printers)) {
           for (const pName of hwData.printers) {
-            if (!mergedMap.has(pName)) {
-              mergedMap.set(pName, {
-                name: pName,
-                portName: 'USB001',
-                connectionType: /lan|192\./i.test(pName) ? 'LAN' : 'USB',
-                ipAddress: '192.168.1.87',
-                port: 9100,
-                usbPort: 'USB001',
-                isConnected: true
-              });
-            }
+            addItem({
+              name: pName,
+              portName: 'USB001',
+              connectionType: /lan|192\./i.test(pName) ? 'LAN' : 'USB',
+              ipAddress: '192.168.1.87',
+              port: 9100,
+              usbPort: 'USB001',
+              isConnected: true
+            });
           }
         }
       }
@@ -779,13 +798,9 @@ export const PrintersConfigView: React.FC = () => {
                 </div>
 
                 {detectedSystemPrinters.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-56 overflow-y-auto pr-1">
                     {detectedSystemPrinters.map((sysP, idx) => {
-                      const isSelected =
-                        name.trim().toLowerCase() === sysP.name.trim().toLowerCase() ||
-                        (connectionType === sysP.connectionType &&
-                          ((sysP.connectionType === 'USB' && usbPort === sysP.usbPort) ||
-                            (sysP.connectionType === 'LAN' && ipAddress === sysP.ipAddress)));
+                      const isSelected = name.trim().toLowerCase() === sysP.name.trim().toLowerCase();
                       return (
                         <button
                           key={`${sysP.name}-${idx}`}
@@ -801,15 +816,18 @@ export const PrintersConfigView: React.FC = () => {
                             <div className="flex items-center gap-1.5">
                               {sysP.connectionType === 'LAN' ? (
                                 <Wifi className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-blue-600'}`} />
+                              ) : sysP.isVirtual ? (
+                                <Printer className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
                               ) : (
                                 <Usb className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-amber-600'}`} />
                               )}
-                              <span className="font-extrabold text-xs truncate">{sysP.name}</span>
+                              <span className="font-extrabold text-xs truncate" title={sysP.name}>{sysP.name}</span>
                             </div>
-                            <div className={`text-[10px] font-mono mt-0.5 ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
+                            <div className={`text-[10px] font-mono mt-0.5 truncate ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
                               {sysP.connectionType === 'LAN'
                                 ? `LAN IP: ${sysP.ipAddress || '192.168.1.87'}:${sysP.port || 9100}`
-                                : `Port: ${sysP.usbPort || sysP.portName || 'USB001'}`}
+                                : `Port: ${sysP.portName || sysP.usbPort || 'USB001'}`}
+                              {sysP.deviceCategory === 'Unspecified (USB)' ? ' • USB Device' : ''}
                             </div>
                           </div>
 
