@@ -39,7 +39,8 @@ async function initDatabase() {
       const doc = await RestaurantStateModel.findOne({ stateKey: STATE_KEY }).lean() as any;
       if (doc && doc.data) {
         cachedState = doc.data;
-        lastServerUpdate = doc.timestamp || Date.now();
+        const now = Date.now();
+        lastServerUpdate = (doc.timestamp && doc.timestamp <= now + 60000) ? doc.timestamp : now;
         isLoadedFromMongo = true;
         console.log("📦 Loaded restaurant state from MongoDB successfully.");
       } else if (cachedState) {
@@ -1614,8 +1615,7 @@ async function startServer() {
 
       if (clientData) {
         cachedState = clientData;
-        // Always use monotonic server timestamp so client clock differences (e.g. 2025 vs 2026) never block updates
-        lastServerUpdate = Math.max(Date.now(), (lastServerUpdate || 0) + 1);
+        lastServerUpdate = Date.now();
 
         // Save to MongoDB if connected
         if (isDbConnected()) {
