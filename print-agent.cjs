@@ -9,25 +9,34 @@ const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'ht
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 800;
 
-let cachedPrinters = [];
+let cachedPrinters = ['80 Printer'];
 let lastPrinterScan = 0;
+let printerScanPromise = null;
 
-async function getWindowsPrinters(force = false) {
-  const now = Date.now();
-  if (!force && cachedPrinters.length > 0 && (now - lastPrinterScan < 60000)) {
-    return cachedPrinters;
-  }
-  return new Promise((resolve) => {
-    exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', (err, stdout) => {
-      if (err || !stdout) return resolve(cachedPrinters.length > 0 ? cachedPrinters : []);
-      const list = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      if (list.length > 0) {
-        cachedPrinters = list;
-        lastPrinterScan = Date.now();
+function refreshWindowsPrintersInBackground() {
+  if (printerScanPromise) return printerScanPromise;
+  printerScanPromise = new Promise((resolve) => {
+    exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', { timeout: 15000 }, (err, stdout) => {
+      printerScanPromise = null;
+      if (!err && stdout) {
+        const list = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        if (list.length > 0) {
+          cachedPrinters = list;
+          lastPrinterScan = Date.now();
+        }
       }
       resolve(cachedPrinters);
     });
   });
+  return printerScanPromise;
+}
+
+async function getWindowsPrinters(force = false) {
+  const now = Date.now();
+  if (force || lastPrinterScan === 0 || (now - lastPrinterScan >= 60000)) {
+    refreshWindowsPrintersInBackground();
+  }
+  return cachedPrinters;
 }
 
 function printTcpRaw(host, port, rawBuffer, timeoutMs = 1000) {
@@ -871,10 +880,26 @@ function startLocalHttpServer() {
     res.end();
   });
 
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.log('ℹ️ [Local Bridge] Port ' + LOCAL_PORT + ' is already active in another background instance.');
+      process.exit(42);
+    }
+    console.error('⚠️ [Local Bridge Server Error]:', err.message);
+  });
+
   server.listen(LOCAL_PORT, '127.0.0.1', () => {
     console.log('⚡ [Local Bridge] Direct HTTP Service ready on http://127.0.0.1:' + LOCAL_PORT);
   });
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [Uncaught Exception]:', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ [Unhandled Rejection]:', reason);
+});
 
 async function pollCloudPrintQueue() {
   try {
@@ -913,7 +938,11 @@ async function init() {
   console.log('  [+] Queue Polling  : Active (Every ' + (POLL_INTERVAL_MS / 1000) + 's)');
   console.log('================================================================\n');
 
-  const printers = await getWindowsPrinters();
+  // Start HTTP health/print server and cloud polling immediately (0ms delay)
+  startLocalHttpServer();
+  pollCloudPrintQueue();
+
+  const printers = await refreshWindowsPrintersInBackground();
   const primaryThermal = resolveThermalPrinter(printers);
 
   console.log('📋 Detected Installed Windows Printers:');
@@ -927,9 +956,6 @@ async function init() {
 
   console.log('\n🖨️ Active Output Device : "' + primaryThermal + '"');
   console.log('🟢 Status: Listening for print orders from ' + CLOUD_SERVER_URL + '...\n');
-
-  startLocalHttpServer();
-  pollCloudPrintQueue();
 }
 
 init();

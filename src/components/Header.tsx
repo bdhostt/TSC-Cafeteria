@@ -32,29 +32,39 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
   const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
   const [isPrinterOnline, setIsPrinterOnline] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    const checkPrinterHealth = async () => {
-      try {
-        const res = await fetch('http://127.0.0.1:9123/health', {
-          method: 'GET',
-          signal: AbortSignal.timeout(1500)
-        });
-        if (isMounted) {
-          setIsPrinterOnline(res.ok);
-        }
-      } catch {
-        if (isMounted) {
-          setIsPrinterOnline(false);
-        }
+  const checkPrinterHealth = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:9123/health', {
+        method: 'GET',
+        signal: AbortSignal.timeout(3500)
+      });
+      if (res.ok) {
+        setIsPrinterOnline(true);
+        return;
       }
-    };
+    } catch {
+      // Fallback to cloud bridge heartbeat check
+    }
+
+    try {
+      const cRes = await fetch('/api/print-bridge/status', {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        setIsPrinterOnline(Boolean(cData.isAgentOnline));
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    setIsPrinterOnline(false);
+  };
+
+  useEffect(() => {
     checkPrinterHealth();
-    const interval = setInterval(checkPrinterHealth, 12000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    const interval = setInterval(checkPrinterHealth, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleMouseEnterUser = () => {
@@ -264,7 +274,10 @@ export const Header: React.FC<{ onOpenMobileSidebar?: () => void }> = ({
       {/* Printer Bridge Live Inspection & Download Modal */}
       <PrinterBridgeModal
         isOpen={isPrinterModalOpen}
-        onClose={() => setIsPrinterModalOpen(false)}
+        onClose={() => {
+          setIsPrinterModalOpen(false);
+          checkPrinterHealth();
+        }}
       />
     </header>
   );

@@ -40,13 +40,19 @@ if not exist "%INSTALL_DIR%\scripts" mkdir "%INSTALL_DIR%\scripts"
 
 set "SRC_DIR=%~dp0"
 
-:: Copy files
-copy /y "%SRC_DIR%print-agent.cjs" "%INSTALL_DIR%\" >nul
-copy /y "%SRC_DIR%run-printer-silent.vbs" "%INSTALL_DIR%\" >nul
-copy /y "%SRC_DIR%start-printer-agent.bat" "%INSTALL_DIR%\" >nul
-if exist "%SRC_DIR%scripts\print-raw.ps1" copy /y "%SRC_DIR%scripts\print-raw.ps1" "%INSTALL_DIR%\scripts\" >nul
-if exist "%SRC_DIR%scripts\setup-autostart.ps1" copy /y "%SRC_DIR%scripts\setup-autostart.ps1" "%INSTALL_DIR%\scripts\" >nul
-if exist "%SRC_DIR%scripts\stop-agent.ps1" copy /y "%SRC_DIR%scripts\stop-agent.ps1" "%INSTALL_DIR%\scripts\" >nul
+:: If run as a standalone Direct .BAT from Downloads without the extracted ZIP files, auto-download package from cloud
+if not exist "%SRC_DIR%print-agent.cjs" (
+    echo       Downloading printer agent files from cloud server...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$zip = Join-Path $env:TEMP 'pos-printer-setup.zip'; Invoke-WebRequest -Uri 'https://tsc-cafeteria.onrender.com/api/download/printer-agent-zip' -OutFile $zip -UseBasicParsing; Expand-Archive -Path $zip -DestinationPath '%INSTALL_DIR%' -Force"
+) else (
+    :: Copy files from local folder
+    copy /y "%SRC_DIR%print-agent.cjs" "%INSTALL_DIR%\" >nul
+    copy /y "%SRC_DIR%run-printer-silent.vbs" "%INSTALL_DIR%\" >nul
+    copy /y "%SRC_DIR%start-printer-agent.bat" "%INSTALL_DIR%\" >nul
+    if exist "%SRC_DIR%scripts\print-raw.ps1" copy /y "%SRC_DIR%scripts\print-raw.ps1" "%INSTALL_DIR%\scripts\" >nul
+    if exist "%SRC_DIR%scripts\setup-autostart.ps1" copy /y "%SRC_DIR%scripts\setup-autostart.ps1" "%INSTALL_DIR%\scripts\" >nul
+    if exist "%SRC_DIR%scripts\stop-agent.ps1" copy /y "%SRC_DIR%scripts\stop-agent.ps1" "%INSTALL_DIR%\scripts\" >nul
+)
 
 echo       [OK] All printer bridge files deployed.
 

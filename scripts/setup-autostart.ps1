@@ -44,9 +44,17 @@ $s2.Description = "Start BD HOSTT POS Printer Service"
 $s2.Save()
 Write-Host "      [OK] Desktop shortcut created: 'POS Printer Agent'" -ForegroundColor Green
 
-# 3. Launch the agent right away
+# 3. Launch the agent right away (detached via WMI Win32_Process so it survives shell exit)
 Write-Host "`n[3/3] Starting Printer Agent in Background now..." -ForegroundColor Yellow
-Start-Process "wscript.exe" -ArgumentList "`"$vbsPath`"" -WorkingDirectory $rootDir
+try {
+    $cmdLine = "wscript.exe `"$vbsPath`""
+    $null = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+        CommandLine = $cmdLine
+        CurrentDirectory = $rootDir
+    }
+} catch {
+    Start-Process "wscript.exe" -ArgumentList "`"$vbsPath`"" -WorkingDirectory $rootDir
+}
 Write-Host "      [OK] Agent is now running in the background!" -ForegroundColor Green
 
 Write-Host "`n====================================================================" -ForegroundColor Cyan

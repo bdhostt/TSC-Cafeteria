@@ -37,22 +37,23 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
     setIsChecking(true);
     setTestPrintSuccess(null);
 
+    let detectedLocal = false;
+
     // 1. Check local agent
     try {
       const res = await fetch('http://127.0.0.1:9123/health', {
         method: 'GET',
-        signal: AbortSignal.timeout(1500)
+        signal: AbortSignal.timeout(3500)
       });
       if (res.ok) {
         const data = await res.json();
+        detectedLocal = true;
         setLocalAgentStatus('online');
-        setActivePrinter(data.activePrinter || 'Thermal Printer');
+        setActivePrinter(data.activePrinter || '80 Printer');
         setInstalledPrinters(data.printers || []);
-      } else {
-        setLocalAgentStatus('offline');
       }
     } catch {
-      setLocalAgentStatus('offline');
+      // check cloud bridge fallback below
     }
 
     // 2. Check cloud server status
@@ -62,13 +63,23 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
       });
       if (cRes.ok) {
         const cData = await cRes.json();
+        const isCloudBridgeOnline = Boolean(cData.isAgentOnline);
         setCloudStatus({
-          isAgentOnline: Boolean(cData.isAgentOnline),
+          isAgentOnline: isCloudBridgeOnline,
           pendingCount: cData.pendingCount || 0
         });
+        if (!detectedLocal && isCloudBridgeOnline) {
+          detectedLocal = true;
+          setLocalAgentStatus('online');
+          setActivePrinter(prev => prev || '80 Printer (192.168.1.87 - Cloud Bridge Active)');
+        }
       }
     } catch {
       // cloud check blip
+    }
+
+    if (!detectedLocal) {
+      setLocalAgentStatus('offline');
     }
 
     setIsChecking(false);
