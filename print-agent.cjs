@@ -9,22 +9,157 @@ const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'ht
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 800;
 
-let cachedPrinters = ['80 Printer'];
+let cachedPrinters = [];
+let cachedDetailedPrinters = [];
+let cachedLanIps = ['192.168.1.87'];
+let isUsbPhysicallyConnected = false;
+let isLanReachable = false;
 let lastPrinterScan = 0;
 let printerScanPromise = null;
+
+const VIRTUAL_PRINTER_REGEX = /microsoft print to pdf|xps document writer|onenote|fax|adobe pdf|foxit|send to|anydesk|snagit|cutepdf/i;
+
+function checkTcpReachable(host, port, timeoutMs = 450) {
+  return new Promise((resolve) => {
+    let done = false;
+    const socket = new net.Socket();
+    const finish = (ok) => {
+      if (!done) {
+        done = true;
+        try { socket.destroy(); } catch (e) {}
+        resolve(ok);
+      }
+    };
+    socket.setTimeout(timeoutMs);
+    socket.on('timeout', () => finish(false));
+    socket.on('error', () => finish(false));
+    socket.connect(port, host, () => finish(true));
+  });
+}
+
+// Automatically configure routing if a thermal printer is plugged directly into PC's LAN port without a router (APIPA 169.254.x.x)
+function configureDirectLanCableRoute() {
+  const ps = `
+    $eth = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' -and ($_.InterfaceDescription -match 'Ethernet|Realtek|Intel|PCIe|LAN|USB' -or $_.Name -match 'Ethernet') };
+    foreach ($adapter in $eth) {
+      $ips = @(Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue);
+      $hasApipa = $ips | Where-Object { $_.IPAddress -match '^169\\.254\\.' };
+      $has192 = $ips | Where-Object { $_.IPAddress -match '^192\\.168\\.1\\.' };
+      if ($hasApipa -and -not $has192) {
+        route add 192.168.1.87 mask 255.255.255.255 0.0.0.0 IF $adapter.ifIndex 2>$null;
+        New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress 192.168.1.250 -PrefixLength 24 -SkipAsSource $true -ErrorAction SilentlyContinue | Out-Null;
+      }
+    }
+  `.replace(/\r?\n/g, ' ');
+  exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${ps.replace(/"/g, '\\"')}"`, { timeout: 8000 }, () => {});
+}
 
 function refreshWindowsPrintersInBackground() {
   if (printerScanPromise) return printerScanPromise;
   printerScanPromise = new Promise((resolve) => {
-    exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', { timeout: 15000 }, (err, stdout) => {
+    const psCmd = [
+      `$usb = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.Service -eq 'usbprint' -and $_.Status -eq 'OK' });`,
+      `$usbQueues = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -match '^USBPRINT\\\\' -and $_.Status -eq 'OK' });`,
+      `$printers = @(Get-Printer -ErrorAction SilentlyContinue | Select-Object Name, PortName, DriverName, WorkOffline);`,
+      `[PSCustomObject]@{ usbCount = $usb.Count; usbNames = @($usbQueues | Select-Object -ExpandProperty FriendlyName); usbHardwareIds = @($usb | Select-Object -ExpandProperty InstanceId); printers = $printers } | ConvertTo-Json -Compress`
+    ].join(' ');
+
+    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCmd.replace(/"/g, '\\"')}"`, { timeout: 12000 }, async (err, stdout) => {
       printerScanPromise = null;
+      const detailed = [];
+      const realNames = [];
+      const discoveredIps = new Set(['192.168.1.87', '192.168.0.87', '192.168.1.200', '192.168.0.200']);
+
       if (!err && stdout) {
-        const list = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-        if (list.length > 0) {
-          cachedPrinters = list;
-          lastPrinterScan = Date.now();
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          isUsbPhysicallyConnected = (Number(parsed.usbCount) || 0) > 0;
+          const rawList = Array.isArray(parsed.printers) ? parsed.printers : (parsed.printers ? [parsed.printers] : []);
+
+          for (const p of rawList) {
+            const name = (p && p.Name ? String(p.Name) : '').trim();
+            const port = (p && p.PortName ? String(p.PortName) : '').trim();
+            if (!name || VIRTUAL_PRINTER_REGEX.test(name)) continue;
+
+            const ipMatch = port.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+            if (ipMatch) discoveredIps.add(ipMatch[1]);
+
+            const isUsbPort = /^USB/i.test(port);
+            const isLanPort = Boolean(ipMatch) || /^(IP_|WSD|TCP)/i.test(port);
+            const connType = isLanPort ? 'LAN' : 'USB';
+            const connectedNow = isUsbPort ? isUsbPhysicallyConnected : (!p.WorkOffline);
+
+            detailed.push({
+              name,
+              portName: port || 'USB001',
+              driverName: (p && p.DriverName ? String(p.DriverName) : ''),
+              connectionType: connType,
+              ipAddress: ipMatch ? ipMatch[1] : (connType === 'LAN' ? '192.168.1.87' : undefined),
+              port: 9100,
+              usbPort: isUsbPort ? port : 'USB001',
+              isConnected: connectedNow
+            });
+
+            if (isUsbPort && !isUsbPhysicallyConnected) continue;
+            realNames.push(name);
+          }
+
+          // Also include Direct USB PnP hardware printer if plugged in (even without Windows driver)
+          if (isUsbPhysicallyConnected) {
+            const usbFriendlyList = Array.isArray(parsed.usbNames) ? parsed.usbNames.filter(Boolean) : [];
+            const hwLabel = usbFriendlyList[0] ? `${usbFriendlyList[0]} (Direct USB)` : 'Direct USB Thermal Printer (USB001)';
+            if (!realNames.length) {
+              realNames.push(hwLabel);
+            }
+            if (!detailed.some(d => d.connectionType === 'USB' && d.isConnected)) {
+              detailed.unshift({
+                name: hwLabel,
+                portName: 'USB001',
+                driverName: 'Direct USB (Driverless)',
+                connectionType: 'USB',
+                usbPort: 'USB001',
+                isConnected: true
+              });
+            }
+          }
+        } catch (parseErr) {
+          // ignore parse error
         }
       }
+
+      cachedLanIps = Array.from(discoveredIps);
+
+      // Check if any LAN thermal printer is reachable on TCP 9100
+      let foundLan = false;
+      let activeLanIp = '192.168.1.87';
+      for (const ip of cachedLanIps) {
+        if (await checkTcpReachable(ip, 9100, 350)) {
+          foundLan = true;
+          activeLanIp = ip;
+          cachedLanIps = [ip, ...cachedLanIps.filter(x => x !== ip)];
+          break;
+        }
+      }
+      isLanReachable = foundLan;
+
+      if (isLanReachable && !detailed.some(d => d.connectionType === 'LAN' && d.ipAddress === activeLanIp)) {
+        detailed.unshift({
+          name: `80 Printer (LAN ${activeLanIp})`,
+          portName: `${activeLanIp}:9100`,
+          driverName: 'Direct TCP/IP ESC/POS',
+          connectionType: 'LAN',
+          ipAddress: activeLanIp,
+          port: 9100,
+          isConnected: true
+        });
+        if (!realNames.includes('80 Printer')) {
+          realNames.unshift('80 Printer');
+        }
+      }
+
+      cachedPrinters = realNames;
+      cachedDetailedPrinters = detailed;
+      lastPrinterScan = Date.now();
       resolve(cachedPrinters);
     });
   });
@@ -33,13 +168,18 @@ function refreshWindowsPrintersInBackground() {
 
 async function getWindowsPrinters(force = false) {
   const now = Date.now();
-  if (force || lastPrinterScan === 0 || (now - lastPrinterScan >= 60000)) {
-    refreshWindowsPrintersInBackground();
+  if (force || lastPrinterScan === 0 || (now - lastPrinterScan >= 4000)) {
+    await refreshWindowsPrintersInBackground();
   }
   return cachedPrinters;
 }
 
-function printTcpRaw(host, port, rawBuffer, timeoutMs = 1000) {
+async function hasConnectedHardwarePrinter() {
+  await getWindowsPrinters();
+  return isUsbPhysicallyConnected || isLanReachable || cachedPrinters.length > 0;
+}
+
+function printTcpRaw(host, port, rawBuffer, timeoutMs = 1200) {
   return new Promise((resolve) => {
     let resolved = false;
     const socket = new net.Socket();
@@ -63,16 +203,14 @@ function printTcpRaw(host, port, rawBuffer, timeoutMs = 1000) {
 }
 
 function resolveThermalPrinter(installedPrinters, requestedName) {
-  const printers = installedPrinters || [];
+  const printers = (installedPrinters || []).filter(p => !VIRTUAL_PRINTER_REGEX.test(p));
   const lanPrinter = printers.find(p => /80\s*printer/i.test(p));
 
-  // If 80 Printer (LAN 192.168.1.87) is installed, route ALL POS orders, KOTs, and bills to it
   if (lanPrinter) {
     return lanPrinter;
   }
 
-  // 1. If a specific printer name was requested:
-  if (requestedName) {
+  if (requestedName && !VIRTUAL_PRINTER_REGEX.test(requestedName)) {
     const trimmedReq = requestedName.trim();
     const exact = printers.find(p => p.toLowerCase() === trimmedReq.toLowerCase());
     if (exact) return exact;
@@ -83,12 +221,10 @@ function resolveThermalPrinter(installedPrinters, requestedName) {
     }
   }
 
-  // 2. Fallback to Kot Printer (USB001)
   const kot = printers.find(p => /kot\s*printer/i.test(p)) || printers.find(p => /kot/i.test(p));
   if (kot) return kot;
 
-  // 3. Fallback to any other thermal/receipt printer
-  const thermal = printers.find(p => /pos|receipt|thermal/i.test(p));
+  const thermal = printers.find(p => /pos|receipt|thermal|80|58|xp|xprinter|gp|rongta|epson|bixolon|generic/i.test(p));
   if (thermal) return thermal;
 
   return printers[0] || '80 Printer';
@@ -100,14 +236,16 @@ async function printSlipWindows(printerName, rawBuffer) {
     fs.writeFileSync(tempFile, rawBuffer);
 
     const scriptPath = path.join(__dirname, 'scripts', 'print-raw.ps1');
-    const psCmd = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + scriptPath + '" -PrinterName "' + printerName.replace(/"/g, '`"') + '" -FilePath "' + tempFile.replace(/"/g, '`"') + '"';
+    const safePrinter = (printerName || '80 Printer').replace(/"/g, '`"');
+    const psCmd = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + scriptPath + '" -PrinterName "' + safePrinter + '" -FilePath "' + tempFile.replace(/"/g, '`"') + '"';
 
-    exec(psCmd, (error) => {
+    exec(psCmd, (error, stdout) => {
       try { fs.unlinkSync(tempFile); } catch (e) {}
       if (error) {
-        console.error('❌ [Print Error] Failed to print to ' + printerName + ':', error.message);
+        console.error('❌ [Print Error] Hardware print unavailable on "' + printerName + '":', (error.message || '').split('\n')[0]);
         resolve(false);
       } else {
+        console.log('🖨️ [Hardware Print] ' + (stdout || 'SUCCESS').trim());
         resolve(true);
       }
     });
@@ -115,14 +253,17 @@ async function printSlipWindows(printerName, rawBuffer) {
 }
 
 async function printSlipFast(printerName, rawBuffer) {
-  // If printing to LAN 80 Printer, try direct high-speed TCP socket first (10ms instant print)
-  if (/80\s*printer/i.test(printerName)) {
-    const tcpOk = await printTcpRaw('192.168.1.87', 9100, rawBuffer, 1000);
+  // 1. Always try direct TCP Socket (Port 9100) for any reachable LAN Thermal Printer (works on ANY PC without driver!)
+  for (const ip of cachedLanIps) {
+    const tcpOk = await printTcpRaw(ip, 9100, rawBuffer, 700);
     if (tcpOk) {
-      console.log('⚡ [Ultra-Fast TCP Print] Sent directly to 192.168.1.87:9100');
+      isLanReachable = true;
+      console.log('⚡ [Ultra-Fast LAN Print] Sent directly to ' + ip + ':9100');
       return true;
     }
   }
+
+  // 2. Try Direct USB Hardware / Windows Spooler via print-raw.ps1 (works on ANY PC with or without driver!)
   return await printSlipWindows(printerName, rawBuffer);
 }
 
@@ -708,13 +849,8 @@ function buildDayEndEscPosBuffer(data) {
 
 const recentJobsCache = new Map();
 
-function isDuplicateJob(job) {
-  if (!job) return false;
-  const now = Date.now();
-  for (const [key, timestamp] of recentJobsCache.entries()) {
-    if (now - timestamp > 30000) recentJobsCache.delete(key);
-  }
-
+function getJobDedupKey(job) {
+  if (!job) return '';
   let key = job.id;
   if (job.payload) {
     const p = job.payload;
@@ -723,7 +859,17 @@ function isDuplicateJob(job) {
     const tot = p.netTotal || (p.slips ? p.slips.length : '');
     key = (job.type || '') + '_' + inv + '_' + tbl + '_' + tot;
   }
+  return key;
+}
 
+function isDuplicateJob(job) {
+  if (!job) return false;
+  const now = Date.now();
+  for (const [key, timestamp] of recentJobsCache.entries()) {
+    if (now - timestamp > 30000) recentJobsCache.delete(key);
+  }
+
+  const key = getJobDedupKey(job);
   if (recentJobsCache.has(key)) {
     const diff = now - recentJobsCache.get(key);
     if (diff < 15000) {
@@ -731,9 +877,12 @@ function isDuplicateJob(job) {
       return true;
     }
   }
-
-  recentJobsCache.set(key, now);
   return false;
+}
+
+function markJobPrinted(job) {
+  const key = getJobDedupKey(job);
+  if (key) recentJobsCache.set(key, Date.now());
 }
 
 async function processPrintJob(job) {
@@ -743,68 +892,90 @@ async function processPrintJob(job) {
   const installedPrinters = await getWindowsPrinters();
   const defaultKotPrinter = resolveThermalPrinter(installedPrinters);
 
-  console.log('\n🖨️ [Job Dispatch] Received job ' + job.id + ' (' + job.type + ')');
+  console.log('\n🖨️ [Job Dispatch] Processing job ' + job.id + ' (' + job.type + ')');
 
   if (job.type === 'KOT') {
     const payload = job.payload || {};
     const slips = payload.slips || [];
     if (!Array.isArray(slips) || slips.length === 0) return false;
 
+    let allOk = true;
     for (let i = 0; i < slips.length; i++) {
       const slip = slips[i];
       const targetPrinter = resolveThermalPrinter(installedPrinters, slip.targetPrinterName);
       console.log(' ➔ Printing KOT Slip ' + (i + 1) + '/' + slips.length + ' on "' + targetPrinter + '"...');
       const buffer = buildKotEscPosBuffer(payload, slip, i + 1, slips.length);
-      await printSlipFast(targetPrinter, buffer);
+      const ok = await printSlipFast(targetPrinter, buffer);
+      if (!ok) allOk = false;
       if (i < slips.length - 1) await new Promise(r => setTimeout(r, 200));
     }
-    console.log('✅ [Job ' + job.id + '] All KOT slips printed successfully on ' + defaultKotPrinter + '!');
-    return true;
+    if (allOk) {
+      markJobPrinted(job);
+      console.log('✅ [Job ' + job.id + '] All KOT slips printed successfully on ' + defaultKotPrinter + '!');
+      return true;
+    }
+    console.warn('⚠️ [Job ' + job.id + '] KOT print failed on this device (printer not connected here).');
+    return false;
   }
 
   if (job.type === 'BILL') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Bill for Table ' + (job.payload.tableName || 'N/A') + ' on "' + targetPrinter + '"...');
     const buffer = buildBillEscPosBuffer(job.payload);
-    await printSlipFast(targetPrinter, buffer);
-    console.log('✅ [Job ' + job.id + '] Bill printed successfully on ' + targetPrinter + '!');
-    return true;
+    const ok = await printSlipFast(targetPrinter, buffer);
+    if (ok) {
+      markJobPrinted(job);
+      console.log('✅ [Job ' + job.id + '] Bill printed successfully on ' + targetPrinter + '!');
+    }
+    return ok;
   }
 
   if (job.type === 'ZREPORT') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Shift Z-Report on "' + targetPrinter + '"...');
     const buffer = buildZReportEscPosBuffer(job.payload);
-    await printSlipFast(targetPrinter, buffer);
-    console.log('✅ [Job ' + job.id + '] Shift Z-Report printed successfully on ' + targetPrinter + '!');
-    return true;
+    const ok = await printSlipFast(targetPrinter, buffer);
+    if (ok) {
+      markJobPrinted(job);
+      console.log('✅ [Job ' + job.id + '] Shift Z-Report printed successfully on ' + targetPrinter + '!');
+    }
+    return ok;
   }
 
   if (job.type === 'WAITER_SLIP') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Waiter Slip for ' + (job.payload.waiterName || 'Staff') + ' on "' + targetPrinter + '"...');
     const buffer = buildWaiterSlipEscPosBuffer(job.payload);
-    await printSlipFast(targetPrinter, buffer);
-    console.log('✅ [Job ' + job.id + '] Waiter slip printed successfully on ' + targetPrinter + '!');
-    return true;
+    const ok = await printSlipFast(targetPrinter, buffer);
+    if (ok) {
+      markJobPrinted(job);
+      console.log('✅ [Job ' + job.id + '] Waiter slip printed successfully on ' + targetPrinter + '!');
+    }
+    return ok;
   }
 
   if (job.type === 'CHEF_SLIP') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Kitchen Chef Slip on "' + targetPrinter + '"...');
     const buffer = buildChefSlipEscPosBuffer(job.payload);
-    await printSlipFast(targetPrinter, buffer);
-    console.log('✅ [Job ' + job.id + '] Chef slip printed successfully on ' + targetPrinter + '!');
-    return true;
+    const ok = await printSlipFast(targetPrinter, buffer);
+    if (ok) {
+      markJobPrinted(job);
+      console.log('✅ [Job ' + job.id + '] Chef slip printed successfully on ' + targetPrinter + '!');
+    }
+    return ok;
   }
 
   if (job.type === 'DAYEND') {
     const targetPrinter = resolveThermalPrinter(installedPrinters);
     console.log(' ➔ Printing Daily Master Day-End Z-Report on "' + targetPrinter + '"...');
     const buffer = buildDayEndEscPosBuffer(job.payload);
-    await printSlipFast(targetPrinter, buffer);
-    console.log('✅ [Job ' + job.id + '] Day-End Master Z-Report printed successfully on ' + targetPrinter + '!');
-    return true;
+    const ok = await printSlipFast(targetPrinter, buffer);
+    if (ok) {
+      markJobPrinted(job);
+      console.log('✅ [Job ' + job.id + '] Day-End Master Z-Report printed successfully on ' + targetPrinter + '!');
+    }
+    return ok;
   }
 
   return false;
@@ -823,14 +994,21 @@ function startLocalHttpServer() {
       return;
     }
 
-    if (req.url === '/health' && req.method === 'GET') {
-      const printers = await getWindowsPrinters();
+    if ((req.url === '/health' || req.url.startsWith('/health?') || req.url === '/api/hardware/printers' || req.url.startsWith('/api/hardware/printers?')) && req.method === 'GET') {
+      const force = req.url.includes('force=1');
+      const printers = await getWindowsPrinters(force);
+      const hasHardware = await hasConnectedHardwarePrinter();
       const activePrinter = resolveThermalPrinter(printers);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        status: 'ok', 
+        success: true,
+        status: hasHardware ? 'ok' : 'standby',
+        hasHardware,
+        isUsbConnected: isUsbPhysicallyConnected,
+        isLanReachable,
         activePrinter,
-        printers: printers, 
+        printers: printers,
+        detailedPrinters: cachedDetailedPrinters,
         timestamp: Date.now() 
       }));
       return;
@@ -888,8 +1066,8 @@ function startLocalHttpServer() {
     console.error('⚠️ [Local Bridge Server Error]:', err.message);
   });
 
-  server.listen(LOCAL_PORT, '127.0.0.1', () => {
-    console.log('⚡ [Local Bridge] Direct HTTP Service ready on http://127.0.0.1:' + LOCAL_PORT);
+  server.listen(LOCAL_PORT, '0.0.0.0', () => {
+    console.log('⚡ [Local Bridge] Direct HTTP Service ready on http://127.0.0.1:' + LOCAL_PORT + ' (and LAN 0.0.0.0:' + LOCAL_PORT + ')');
   });
 }
 
@@ -903,22 +1081,39 @@ process.on('unhandledRejection', (reason) => {
 
 async function pollCloudPrintQueue() {
   try {
-    const url = CLOUD_SERVER_URL + '/api/print-bridge/poll';
-    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
-        const completedIds = [];
-        for (const job of data.jobs) {
-          const ok = await processPrintJob(job);
-          if (ok) completedIds.push(job.id);
-        }
-        if (completedIds.length > 0) {
-          await fetch(CLOUD_SERVER_URL + '/api/print-bridge/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jobIds: completedIds })
-          });
+    // CRITICAL: Only pull and complete jobs from the cloud queue if THIS PC physically has the USB or LAN printer connected!
+    // Otherwise an unplugged PC will steal jobs meant for another PC where the printer is currently connected.
+    const canPrintHere = await hasConnectedHardwarePrinter();
+    if (canPrintHere) {
+      const url = CLOUD_SERVER_URL + '/api/print-bridge/poll';
+      const activePrinter = resolveThermalPrinter(cachedPrinters);
+      const agentMeta = Buffer.from(JSON.stringify({
+        activePrinter,
+        isUsbConnected: isUsbPhysicallyConnected,
+        isLanReachable,
+        printers: cachedPrinters,
+        detailedPrinters: cachedDetailedPrinters
+      }), 'utf8').toString('base64');
+
+      const response = await fetch(url, {
+        headers: { 'X-Agent-Printers': agentMeta },
+        signal: AbortSignal.timeout(4000)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
+          const completedIds = [];
+          for (const job of data.jobs) {
+            const ok = await processPrintJob(job);
+            if (ok) completedIds.push(job.id);
+          }
+          if (completedIds.length > 0) {
+            await fetch(CLOUD_SERVER_URL + '/api/print-bridge/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jobIds: completedIds })
+            });
+          }
         }
       }
     }
@@ -935,8 +1130,12 @@ async function init() {
   console.log('================================================================');
   console.log('  [+] Cloud Target   : ' + CLOUD_SERVER_URL);
   console.log('  [+] Local Bridge   : http://127.0.0.1:' + LOCAL_PORT + ' (Instant 0ms Print)');
-  console.log('  [+] Queue Polling  : Active (Every ' + (POLL_INTERVAL_MS / 1000) + 's)');
+  console.log('  [+] Queue Polling  : Active (Smart Hardware-Aware Mode)');
   console.log('================================================================\n');
+
+  // Configure direct LAN cable route if printer is plugged straight into PC Ethernet port
+  configureDirectLanCableRoute();
+  setInterval(configureDirectLanCableRoute, 20000);
 
   // Start HTTP health/print server and cloud polling immediately (0ms delay)
   startLocalHttpServer();
@@ -945,16 +1144,20 @@ async function init() {
   const printers = await refreshWindowsPrintersInBackground();
   const primaryThermal = resolveThermalPrinter(printers);
 
-  console.log('📋 Detected Installed Windows Printers:');
-  printers.forEach(p => {
-    if (p === primaryThermal) {
-      console.log('   🎯 ' + p + ' [PRIMARY ACTIVE HARDWARE PRINTER]');
-    } else {
-      console.log('   • ' + p);
-    }
-  });
+  console.log('📋 Detected Connected Thermal Printers:');
+  if (printers.length === 0 && !isLanReachable) {
+    console.log('   ⏸️  No physical USB/LAN printer plugged into this PC right now (Standby Mode).');
+  } else {
+    printers.forEach(p => {
+      if (p === primaryThermal) {
+        console.log('   🎯 ' + p + ' [PRIMARY ACTIVE HARDWARE PRINTER]');
+      } else {
+        console.log('   • ' + p);
+      }
+    });
+  }
 
-  console.log('\n🖨️ Active Output Device : "' + primaryThermal + '"');
+  console.log('\n🖨️ Active Output Device : "' + primaryThermal + '" (USB: ' + (isUsbPhysicallyConnected ? 'YES' : 'NO') + ', LAN: ' + (isLanReachable ? 'YES' : 'NO') + ')');
   console.log('🟢 Status: Listening for print orders from ' + CLOUD_SERVER_URL + '...\n');
 }
 

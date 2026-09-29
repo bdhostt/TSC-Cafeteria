@@ -26,6 +26,18 @@ import {
   Cpu
 } from 'lucide-react';
 import { PrinterBridgeModal } from '../common/PrinterBridgeModal';
+import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
+
+interface DetectedSystemPrinter {
+  name: string;
+  portName: string;
+  driverName?: string;
+  connectionType: 'USB' | 'LAN';
+  ipAddress?: string;
+  port?: number;
+  usbPort?: string;
+  isConnected: boolean;
+}
 
 export const PrintersConfigView: React.FC = () => {
   const { 
@@ -64,40 +76,133 @@ export const PrintersConfigView: React.FC = () => {
 
   // Test Print Simulation State
   const [testingPrinterId, setTestingPrinterId] = useState<string | null>(null);
-  const [testPrintOutput, setTestPrintOutput] = useState<{ printer: PrinterConfig; timestamp: string } | null>(null);
+  const [testPrintOutput, setTestPrintOutput] = useState<{ printer: PrinterConfig; timestamp: string; hardwareSuccess?: boolean } | null>(null);
 
-  // Desktop Print Bridge State
+  // Desktop Print Bridge & System Printer Discovery State
   const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
   const [isLocalBridgeOnline, setIsLocalBridgeOnline] = useState<boolean | null>(null);
+  const [detectedSystemPrinters, setDetectedSystemPrinters] = useState<DetectedSystemPrinter[]>([]);
+  const [activeHardwarePrinter, setActiveHardwarePrinter] = useState<string>('');
+  const [isScanningPrinters, setIsScanningPrinters] = useState(false);
+
+  const scanSystemPrinters = React.useCallback(async (force = false) => {
+    setIsScanningPrinters(true);
+    let foundOnline = false;
+    const mergedMap = new Map<string, DetectedSystemPrinter>();
+
+    // 1. Try direct local agent on 127.0.0.1:9123
+    try {
+      const localRes = await fetch(`http://127.0.0.1:9123/health${force ? '?force=1' : ''}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(1800)
+      });
+      if (localRes.ok) {
+        const d = await localRes.json();
+        foundOnline = true;
+        if (d.activePrinter) setActiveHardwarePrinter(d.activePrinter);
+        if (Array.isArray(d.detailedPrinters)) {
+          for (const item of d.detailedPrinters) {
+            if (item && item.name) mergedMap.set(item.name, item);
+          }
+        } else if (Array.isArray(d.printers)) {
+          for (const pName of d.printers) {
+            mergedMap.set(pName, {
+              name: pName,
+              portName: d.isLanReachable ? '192.168.1.87:9100' : 'USB001',
+              connectionType: d.isLanReachable && !d.isUsbConnected ? 'LAN' : 'USB',
+              ipAddress: '192.168.1.87',
+              port: 9100,
+              usbPort: 'USB001',
+              isConnected: Boolean(d.isUsbConnected || d.isLanReachable)
+            });
+          }
+        }
+      }
+    } catch {
+      // Local HTTP may be blocked by HTTPS mixed-content in Chrome; fallback to server bridge below
+    }
+
+    // 2. Also query server /api/hardware/printers & /api/print-bridge/status (works on https://tsc-cafeteria.onrender.com!)
+    try {
+      const [hwRes, bridgeRes] = await Promise.all([
+        fetch('/api/hardware/printers', { signal: AbortSignal.timeout(3000) }).catch(() => null),
+        fetch('/api/print-bridge/status', { signal: AbortSignal.timeout(3000) }).catch(() => null)
+      ]);
+
+      if (bridgeRes && bridgeRes.ok) {
+        const bData = await bridgeRes.json();
+        if (bData.isAgentOnline) foundOnline = true;
+        if (bData.activePrinter) setActiveHardwarePrinter(bData.activePrinter);
+        if (Array.isArray(bData.detailedPrinters)) {
+          for (const item of bData.detailedPrinters) {
+            if (item && item.name && !mergedMap.has(item.name)) {
+              mergedMap.set(item.name, item);
+            }
+          }
+        }
+      }
+
+      if (hwRes && hwRes.ok) {
+        const hwData = await hwRes.json();
+        if (hwData.isAgentOnline) foundOnline = true;
+        if (hwData.activePrinter && !activeHardwarePrinter) setActiveHardwarePrinter(hwData.activePrinter);
+        if (Array.isArray(hwData.detailedPrinters)) {
+          for (const item of hwData.detailedPrinters) {
+            if (item && item.name && !mergedMap.has(item.name)) {
+              mergedMap.set(item.name, item);
+            }
+          }
+        } else if (Array.isArray(hwData.printers)) {
+          for (const pName of hwData.printers) {
+            if (!mergedMap.has(pName)) {
+              mergedMap.set(pName, {
+                name: pName,
+                portName: 'USB001',
+                connectionType: /lan|192\./i.test(pName) ? 'LAN' : 'USB',
+                ipAddress: '192.168.1.87',
+                port: 9100,
+                usbPort: 'USB001',
+                isConnected: true
+              });
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore network error
+    }
+
+    setIsLocalBridgeOnline(foundOnline);
+    setDetectedSystemPrinters(Array.from(mergedMap.values()));
+    setIsScanningPrinters(false);
+  }, [activeHardwarePrinter]);
 
   React.useEffect(() => {
-    let isMounted = true;
-    const checkBridge = async () => {
-      try {
-        const res = await fetch('http://127.0.0.1:9123/health', {
-          method: 'GET',
-          signal: AbortSignal.timeout(1500)
-        });
-        if (isMounted) setIsLocalBridgeOnline(res.ok);
-      } catch {
-        if (isMounted) setIsLocalBridgeOnline(false);
-      }
-    };
-    checkBridge();
-    const interval = setInterval(checkBridge, 12000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+    scanSystemPrinters(false);
+    const interval = setInterval(() => scanSystemPrinters(false), 10000);
+    return () => clearInterval(interval);
+  }, [scanSystemPrinters]);
+
+  // Apply a detected system printer's hardware settings into the modal form
+  const handleSelectDetectedPrinter = (sysPrinter: DetectedSystemPrinter) => {
+    setName(sysPrinter.name);
+    setConnectionType(sysPrinter.connectionType);
+    if (sysPrinter.connectionType === 'LAN') {
+      setIpAddress(sysPrinter.ipAddress || '192.168.1.87');
+      setPort(sysPrinter.port || 9100);
+    } else {
+      setUsbPort(sysPrinter.usbPort || sysPrinter.portName || 'USB001');
+    }
+    setNotes(`Connected via ${sysPrinter.connectionType} (${sysPrinter.portName})`);
+  };
 
   // Open Modal for Add
   const handleOpenAdd = () => {
     setEditingPrinterId(null);
     setName('');
     setType('KOT');
-    setConnectionType('LAN');
-    setIpAddress('192.168.1.200');
+    setConnectionType('USB');
+    setIpAddress('192.168.1.87');
     setPort(9100);
     setUsbPort('USB001');
     setBaudRate(9600);
@@ -108,6 +213,7 @@ export const PrintersConfigView: React.FC = () => {
     setIsActive(true);
     setNotes('');
     setIsModalOpen(true);
+    scanSystemPrinters(true);
   };
 
   // Open Modal for Edit
@@ -116,7 +222,7 @@ export const PrintersConfigView: React.FC = () => {
     setName(p.name);
     setType(p.type);
     setConnectionType(p.connectionType);
-    setIpAddress(p.ipAddress || '192.168.1.200');
+    setIpAddress(p.ipAddress || '192.168.1.87');
     setPort(p.port || 9100);
     setUsbPort(p.usbPort || 'USB001');
     setBaudRate(p.baudRate || 9600);
@@ -127,6 +233,7 @@ export const PrintersConfigView: React.FC = () => {
     setIsActive(p.isActive !== false);
     setNotes(p.notes || '');
     setIsModalOpen(true);
+    scanSystemPrinters(true);
   };
 
   // Save Printer
@@ -181,16 +288,40 @@ export const PrintersConfigView: React.FC = () => {
     );
   };
 
-  // Test Print
-  const handleTestPrint = (printer: PrinterConfig) => {
+  // Real Hardware + UI Test Print
+  const handleTestPrint = async (printer: PrinterConfig) => {
     setTestingPrinterId(printer.id);
-    setTimeout(() => {
-      setTestingPrinterId(null);
-      setTestPrintOutput({
-        printer,
-        timestamp: new Date().toLocaleTimeString()
+    const nowStr = new Date().toLocaleTimeString();
+    let hwOk = false;
+    try {
+      hwOk = await dispatchHardwarePrint('/api/hardware/print-kot', {
+        tableName: 'PRINTER TEST',
+        tableZone: printer.connectionType === 'LAN' ? `${printer.ipAddress || '192.168.1.87'}:${printer.port || 9100}` : (printer.usbPort || 'USB001'),
+        waiter: 'System Admin',
+        customer: 'Hardware Diagnostics',
+        invoiceNo: 'TEST-' + Math.floor(1000 + Math.random() * 9000),
+        dateTime: new Date().toLocaleString('en-US'),
+        slips: [
+          {
+            station: printer.name,
+            targetPrinterName: printer.name,
+            category: `${printer.type} (${printer.paperWidth})`,
+            items: [
+              { name: 'Thermal Print Head Check', qty: 1, notes: `Interface: ${printer.connectionType}` },
+              { name: 'Auto-Cutter Blade Check', qty: 1, notes: 'Status: ONLINE & READY' }
+            ]
+          }
+        ]
       });
-    }, 600);
+    } catch {
+      hwOk = false;
+    }
+    setTestingPrinterId(null);
+    setTestPrintOutput({
+      printer,
+      timestamp: nowStr,
+      hardwareSuccess: hwOk
+    });
   };
 
   // Filtered List
@@ -614,6 +745,96 @@ export const PrintersConfigView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4 my-4">
+              {/* System Connected Printers Scanner & Selector */}
+              <div className="p-3.5 rounded-2xl bg-linear-to-r from-emerald-50/80 via-teal-50/40 to-slate-50 border border-emerald-200/90 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-emerald-600 text-white">
+                      <Cpu className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <span>System Printers (Check & Select)</span>
+                        {detectedSystemPrinters.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300">
+                            {detectedSystemPrinters.length} Found
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Click any connected USB or LAN printer below to auto-fill its settings
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => scanSystemPrinters(true)}
+                    disabled={isScanningPrinters}
+                    className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-[11px] flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isScanningPrinters ? 'animate-spin text-emerald-600' : 'text-emerald-700'}`} />
+                    <span>{isScanningPrinters ? 'Scanning...' : 'Check Printers'}</span>
+                  </button>
+                </div>
+
+                {detectedSystemPrinters.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {detectedSystemPrinters.map((sysP, idx) => {
+                      const isSelected =
+                        name.trim().toLowerCase() === sysP.name.trim().toLowerCase() ||
+                        (connectionType === sysP.connectionType &&
+                          ((sysP.connectionType === 'USB' && usbPort === sysP.usbPort) ||
+                            (sysP.connectionType === 'LAN' && ipAddress === sysP.ipAddress)));
+                      return (
+                        <button
+                          key={`${sysP.name}-${idx}`}
+                          type="button"
+                          onClick={() => handleSelectDetectedPrinter(sysP)}
+                          className={`p-2.5 rounded-xl border text-left transition flex items-center justify-between gap-2 cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                              : 'bg-white hover:bg-emerald-50/70 text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              {sysP.connectionType === 'LAN' ? (
+                                <Wifi className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-blue-600'}`} />
+                              ) : (
+                                <Usb className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-amber-600'}`} />
+                              )}
+                              <span className="font-extrabold text-xs truncate">{sysP.name}</span>
+                            </div>
+                            <div className={`text-[10px] font-mono mt-0.5 ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
+                              {sysP.connectionType === 'LAN'
+                                ? `LAN IP: ${sysP.ipAddress || '192.168.1.87'}:${sysP.port || 9100}`
+                                : `Port: ${sysP.usbPort || sysP.portName || 'USB001'}`}
+                            </div>
+                          </div>
+
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
+                              isSelected
+                                ? 'bg-white text-emerald-800'
+                                : sysP.isConnected
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {isSelected ? '✓ Selected' : sysP.isConnected ? 'Select' : 'Available'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-white/80 border border-dashed border-slate-300 text-[11px] text-slate-600 flex items-center justify-between">
+                    <span>No active hardware printer detected yet. Connect USB/LAN cable & run Printer Agent.</span>
+                  </div>
+                )}
+              </div>
+
               {/* Printer Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -624,7 +845,7 @@ export const PrintersConfigView: React.FC = () => {
                   required
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Main Kitchen Thermal Printer (80mm), Bar Counter KOT..."
+                  placeholder="e.g. 80 Printer, Kot Printer (Kitchen & Master KOT)..."
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
               </div>

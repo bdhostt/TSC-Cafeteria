@@ -113,12 +113,14 @@ async function startServer() {
     });
   }
 
+  const VIRTUAL_PRINTER_REGEX = /microsoft print to pdf|xps document writer|onenote|fax|adobe pdf|foxit|send to|anydesk|snagit|cutepdf/i;
+
   // Resolve active thermal printer: Prioritizes 80 Printer (LAN 192.168.1.87) or Kot Printer (USB001)
   function resolveThermalPrinter(installedPrinters: string[], requestedName?: string): string {
-    const printers = installedPrinters || [];
+    const printers = (installedPrinters || []).filter(p => !VIRTUAL_PRINTER_REGEX.test(p));
 
     // 1. If a specific printer name was requested:
-    if (requestedName) {
+    if (requestedName && !VIRTUAL_PRINTER_REGEX.test(requestedName)) {
       const trimmedReq = requestedName.trim();
       const exact = printers.find(p => p.toLowerCase() === trimmedReq.toLowerCase());
       if (exact) return exact;
@@ -143,7 +145,7 @@ async function startServer() {
     if (kot) return kot;
 
     // 4. Fallback to any other thermal/receipt printer
-    const thermal = printers.find(p => /pos|receipt|thermal/i.test(p));
+    const thermal = printers.find(p => /pos|receipt|thermal|80|58|xp|xprinter|gp|rongta|epson|bixolon|generic/i.test(p));
     if (thermal) return thermal;
 
     return printers[0] || '80 Printer';
@@ -1002,6 +1004,13 @@ async function startServer() {
 
   const cloudPrintJobs: CloudPrintJob[] = [];
   let lastAgentHeartbeat = 0;
+  let lastAgentTelemetry: {
+    activePrinter?: string;
+    isUsbConnected?: boolean;
+    isLanReachable?: boolean;
+    printers?: string[];
+    detailedPrinters?: any[];
+  } = {};
 
   function enqueueCloudPrintJob(type: CloudPrintJob['type'], payload: any) {
     const job: CloudPrintJob = {
@@ -1019,21 +1028,54 @@ async function startServer() {
     return job;
   }
 
-  // REST endpoint: Discover connected Windows physical printers
+  // REST endpoint: Discover connected Windows physical printers (either from local Windows server or active floor agent)
   app.get("/api/hardware/printers", async (req, res) => {
     try {
-      const printers = await getWindowsPrinters();
-      const safePrinters = printers.filter(p => !/^80\s*printer$/i.test(p.trim()));
-      const activePrinter = resolveThermalPrinter(printers);
-      res.json({ success: true, printers: safePrinters, activePrinter });
+      const isAgentOnline = (Date.now() - lastAgentHeartbeat) < 30000;
+      const localPrinters = process.platform === 'win32' ? await getWindowsPrinters() : [];
+      const filteredLocal = localPrinters.filter(p => !VIRTUAL_PRINTER_REGEX.test(p));
+
+      const agentPrinters = (isAgentOnline && Array.isArray(lastAgentTelemetry.printers)) ? lastAgentTelemetry.printers : [];
+      const mergedPrinters = Array.from(new Set([...agentPrinters, ...filteredLocal]));
+      const activePrinter = (isAgentOnline && lastAgentTelemetry.activePrinter) || resolveThermalPrinter(mergedPrinters);
+      const detailedPrinters = (isAgentOnline && Array.isArray(lastAgentTelemetry.detailedPrinters) && lastAgentTelemetry.detailedPrinters.length > 0)
+        ? lastAgentTelemetry.detailedPrinters
+        : mergedPrinters.map(name => ({
+            name,
+            portName: /80\s*printer/i.test(name) ? 'USB001 / 192.168.1.87' : 'USB001',
+            connectionType: /lan|192\./i.test(name) ? 'LAN' : 'USB',
+            ipAddress: '192.168.1.87',
+            port: 9100,
+            usbPort: 'USB001',
+            isConnected: true
+          }));
+
+      res.json({
+        success: true,
+        isAgentOnline,
+        isUsbConnected: isAgentOnline ? Boolean(lastAgentTelemetry.isUsbConnected) : (filteredLocal.length > 0),
+        isLanReachable: isAgentOnline ? Boolean(lastAgentTelemetry.isLanReachable) : false,
+        printers: mergedPrinters,
+        detailedPrinters,
+        activePrinter
+      });
     } catch (err: any) {
-      res.json({ success: false, printers: [], error: err?.message });
+      res.json({ success: false, printers: [], detailedPrinters: [], error: err?.message });
     }
   });
 
   // REST endpoints for Local Print Bridge Agent
   app.get("/api/print-bridge/poll", (req, res) => {
     lastAgentHeartbeat = Date.now();
+    const metaHeader = req.headers['x-agent-printers'];
+    if (typeof metaHeader === 'string' && metaHeader.trim()) {
+      try {
+        const decoded = JSON.parse(Buffer.from(metaHeader, 'base64').toString('utf8'));
+        if (decoded && typeof decoded === 'object') {
+          lastAgentTelemetry = decoded;
+        }
+      } catch {}
+    }
     const pending = cloudPrintJobs.filter(j => j.status === 'pending');
     res.json({
       success: true,
@@ -1060,6 +1102,11 @@ async function startServer() {
     res.json({
       success: true,
       isAgentOnline: isOnline,
+      activePrinter: isOnline ? lastAgentTelemetry.activePrinter : undefined,
+      isUsbConnected: isOnline ? Boolean(lastAgentTelemetry.isUsbConnected) : false,
+      isLanReachable: isOnline ? Boolean(lastAgentTelemetry.isLanReachable) : false,
+      printers: isOnline ? (lastAgentTelemetry.printers || []) : [],
+      detailedPrinters: isOnline ? (lastAgentTelemetry.detailedPrinters || []) : [],
       lastHeartbeatAgoSeconds: Math.floor((Date.now() - lastAgentHeartbeat) / 1000),
       pendingCount: cloudPrintJobs.filter(j => j.status === 'pending').length
     });
@@ -1109,17 +1156,19 @@ async function startServer() {
         const installedPrinters = await getWindowsPrinters();
         const targetPrinter = resolveThermalPrinter(installedPrinters);
 
-        console.log(`🖨️ [Hardware Bill Print] Printing bill for ${billData.tableName} on "${targetPrinter}" (Kot Printer USB001)`);
+        console.log(`🖨️ [Hardware Bill Print] Printing bill for ${billData.tableName} on "${targetPrinter}"`);
         const rawBuffer = buildBillEscPosBuffer(billData);
         const ok = await printSlipWindows(targetPrinter, rawBuffer);
-        return res.json({
-          success: ok,
-          printerUsed: targetPrinter,
-          isLocalServer: true
-        });
+        if (ok) {
+          return res.json({
+            success: true,
+            printerUsed: targetPrinter,
+            isLocalServer: true
+          });
+        }
       }
 
-      // Enqueue for cloud print agent on Linux/Cloud deployments
+      // Enqueue for remote/other PC print agent if local print unavailable or on Linux/Cloud
       enqueueCloudPrintJob('BILL', billData);
 
       console.log(`☁️ [Cloud Bill Queue] Enqueued bill for ${billData.tableName}. Agent online: ${isAgentOnline}`);
@@ -1152,14 +1201,16 @@ async function startServer() {
         const installedPrinters = await getWindowsPrinters();
         const targetPrinter = resolveThermalPrinter(installedPrinters);
 
-        console.log(`🖨️ [Hardware Z-Report Print] Printing shift Z-Report for session ${reportData.session.id} on "${targetPrinter}" (Kot Printer USB001)`);
+        console.log(`🖨️ [Hardware Z-Report Print] Printing shift Z-Report for session ${reportData.session.id} on "${targetPrinter}"`);
         const rawBuffer = buildZReportEscPosBuffer(reportData);
         const ok = await printSlipWindows(targetPrinter, rawBuffer);
-        return res.json({
-          success: ok,
-          printerUsed: targetPrinter,
-          isLocalServer: true
-        });
+        if (ok) {
+          return res.json({
+            success: true,
+            printerUsed: targetPrinter,
+            isLocalServer: true
+          });
+        }
       }
 
       enqueueCloudPrintJob('ZREPORT', reportData);
@@ -1190,14 +1241,16 @@ async function startServer() {
         const installedPrinters = await getWindowsPrinters();
         const targetPrinter = resolveThermalPrinter(installedPrinters);
 
-        console.log(`🖨️ [Hardware Waiter Slip Print] Printing slip for waiter ${slipData.waiterName} on "${targetPrinter}" (Kot Printer USB001)`);
+        console.log(`🖨️ [Hardware Waiter Slip Print] Printing slip for waiter ${slipData.waiterName} on "${targetPrinter}"`);
         const rawBuffer = buildWaiterSlipEscPosBuffer(slipData);
         const ok = await printSlipWindows(targetPrinter, rawBuffer);
-        return res.json({
-          success: ok,
-          printerUsed: targetPrinter,
-          isLocalServer: true
-        });
+        if (ok) {
+          return res.json({
+            success: true,
+            printerUsed: targetPrinter,
+            isLocalServer: true
+          });
+        }
       }
 
       enqueueCloudPrintJob('WAITER_SLIP', slipData);
@@ -1228,14 +1281,16 @@ async function startServer() {
         const installedPrinters = await getWindowsPrinters();
         const targetPrinter = resolveThermalPrinter(installedPrinters);
 
-        console.log(`🖨️ [Hardware Day-End Print] Printing master day-end for date ${dayData.dayRecord.date} on "${targetPrinter}" (Kot Printer USB001)`);
+        console.log(`🖨️ [Hardware Day-End Print] Printing master day-end for date ${dayData.dayRecord.date} on "${targetPrinter}"`);
         const rawBuffer = buildDayEndEscPosBuffer(dayData);
         const ok = await printSlipWindows(targetPrinter, rawBuffer);
-        return res.json({
-          success: ok,
-          printerUsed: targetPrinter,
-          isLocalServer: true
-        });
+        if (ok) {
+          return res.json({
+            success: true,
+            printerUsed: targetPrinter,
+            isLocalServer: true
+          });
+        }
       }
 
       enqueueCloudPrintJob('DAYEND', dayData);
@@ -1266,14 +1321,16 @@ async function startServer() {
         const installedPrinters = await getWindowsPrinters();
         const targetPrinter = resolveThermalPrinter(installedPrinters);
 
-        console.log(`🖨️ [Hardware Chef Slip Print] Printing production slip for chef ${shiftData.shift.chefName} on "${targetPrinter}" (Kot Printer USB001)`);
+        console.log(`🖨️ [Hardware Chef Slip Print] Printing production slip for chef ${shiftData.shift.chefName} on "${targetPrinter}"`);
         const rawBuffer = buildChefSlipEscPosBuffer(shiftData);
         const ok = await printSlipWindows(targetPrinter, rawBuffer);
-        return res.json({
-          success: ok,
-          printerUsed: targetPrinter,
-          isLocalServer: true
-        });
+        if (ok) {
+          return res.json({
+            success: true,
+            printerUsed: targetPrinter,
+            isLocalServer: true
+          });
+        }
       }
 
       enqueueCloudPrintJob('CHEF_SLIP', shiftData);
@@ -1304,13 +1361,13 @@ async function startServer() {
         const installedPrinters = await getWindowsPrinters();
         const masterPrinter = resolveThermalPrinter(installedPrinters);
 
-        console.log(`🖨️ [Hardware Print] Processing ${slips.length} KOT slips. Master fallback printer: "${masterPrinter}" (Kot Printer USB001)`);
+        console.log(`🖨️ [Hardware Print] Processing ${slips.length} KOT slips. Master fallback printer: "${masterPrinter}"`);
 
         let printedCount = 0;
         for (let i = 0; i < slips.length; i++) {
           const slip = slips[i];
           const targetPrinter = resolveThermalPrinter(installedPrinters, slip.targetPrinterName);
-          console.log(` ➔ Printing KOT Slip ${i + 1}/${slips.length} on "${targetPrinter}" (Kot Printer USB001)...`);
+          console.log(` ➔ Printing KOT Slip ${i + 1}/${slips.length} on "${targetPrinter}"...`);
 
           const rawBuffer = buildKotEscPosBuffer(
             { tableName, tableZone, waiter, customer, invoiceNo, dateTime },
@@ -1330,13 +1387,15 @@ async function startServer() {
           }
         }
 
-        return res.json({
-          success: printedCount > 0,
-          printedCount,
-          totalSlips: slips.length,
-          printerUsed: masterPrinter,
-          isLocalServer: true
-        });
+        if (printedCount > 0) {
+          return res.json({
+            success: true,
+            printedCount,
+            totalSlips: slips.length,
+            printerUsed: masterPrinter,
+            isLocalServer: true
+          });
+        }
       }
 
       // Enqueue for cloud print agent on Linux/Cloud deployments
