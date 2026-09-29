@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import os from "os";
 import { exec } from "child_process";
-import { connectToDatabase, isDbConnected, RestaurantStateModel } from "./src/db/mongodb";
+import { connectToDatabase, isDbConnected, getLastDbError, RestaurantStateModel } from "./src/db/mongodb";
 
 dotenv.config();
 
@@ -14,14 +14,16 @@ const STATE_FILE = path.join(process.cwd(), "restaurant_data.json");
 const STATE_KEY = "default_cafe_banani";
 let cachedState: any = null;
 let lastServerUpdate = 0;
+let isLoadedFromMongo = false;
 
-// Try to load state from JSON backup on startup
+// Try to load fallback state from JSON backup on startup (used only until MongoDB connects)
 try {
   if (fs.existsSync(STATE_FILE)) {
     const raw = fs.readFileSync(STATE_FILE, "utf-8");
     if (raw) {
       const parsed = JSON.parse(raw);
       cachedState = parsed.data || null;
+      // Do not trust static file's future 2026 timestamp over live MongoDB documents
       lastServerUpdate = parsed.timestamp || Date.now();
     }
   }
@@ -34,18 +36,20 @@ async function initDatabase() {
   const connected = await connectToDatabase();
   if (connected) {
     try {
-      const doc = await RestaurantStateModel.findOne({ stateKey: STATE_KEY });
+      const doc = await RestaurantStateModel.findOne({ stateKey: STATE_KEY }).lean() as any;
       if (doc && doc.data) {
         cachedState = doc.data;
         lastServerUpdate = doc.timestamp || Date.now();
+        isLoadedFromMongo = true;
         console.log("📦 Loaded restaurant state from MongoDB successfully.");
       } else if (cachedState) {
-        // Seed MongoDB from existing JSON backup
+        // Seed MongoDB from existing JSON backup only if collection is completely empty
         await RestaurantStateModel.findOneAndUpdate(
           { stateKey: STATE_KEY },
-          { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
+          { stateKey: STATE_KEY, data: cachedState, timestamp: Date.now() },
           { upsert: true, new: true }
         );
+        isLoadedFromMongo = true;
         console.log("🌱 Seeded initial restaurant state into MongoDB from local backup.");
       }
     } catch (err) {
@@ -71,19 +75,28 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" })); // Support large restaurant dataset syncing
 
   // Health check endpoint
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", async (req, res) => {
+    if (!isDbConnected()) {
+      await connectToDatabase();
+    }
     res.json({
       status: "ok",
       mongodbConnected: isDbConnected(),
+      lastDbError: getLastDbError(),
       timestamp: new Date().toISOString()
     });
   });
 
   // DB status endpoint
-  app.get("/api/db/status", (req, res) => {
+  app.get("/api/db/status", async (req, res) => {
+    if (!isDbConnected()) {
+      await initDatabase();
+    }
     res.json({
       success: true,
       mongodbConnected: isDbConnected(),
+      isLoadedFromMongo,
+      lastDbError: getLastDbError(),
       hasCachedState: !!cachedState,
       lastServerUpdate
     });
@@ -1345,11 +1358,15 @@ async function startServer() {
   // REST API endpoints for POS real-time cloud synchronization
   app.get("/api/restaurant/state", async (req, res) => {
     try {
+      if (!isDbConnected()) {
+        await connectToDatabase();
+      }
       if (isDbConnected()) {
         const doc = await RestaurantStateModel.findOne({ stateKey: STATE_KEY }).lean() as any;
-        if (doc && doc.data && (!cachedState || !lastServerUpdate || (doc.timestamp && doc.timestamp > lastServerUpdate))) {
+        if (doc && doc.data) {
           cachedState = doc.data;
-          lastServerUpdate = doc.timestamp || lastServerUpdate;
+          lastServerUpdate = doc.timestamp || Date.now();
+          isLoadedFromMongo = true;
         }
       }
       res.json({
@@ -1370,14 +1387,17 @@ async function startServer() {
 
   app.post("/api/restaurant/state", async (req, res) => {
     try {
-      const { data: clientData, clientTimestamp } = req.body;
-      
-      const now = Date.now();
-      const effectiveClientTs = clientTimestamp || now;
+      const { data: clientData } = req.body;
+
+      if (!isDbConnected()) {
+        await connectToDatabase();
+      }
+
       if (clientData) {
         cachedState = clientData;
-        lastServerUpdate = Math.max(now, effectiveClientTs);
-        
+        // Always use monotonic server timestamp so client clock differences (e.g. 2025 vs 2026) never block updates
+        lastServerUpdate = Math.max(Date.now(), (lastServerUpdate || 0) + 1);
+
         // Save to MongoDB if connected
         if (isDbConnected()) {
           try {
@@ -1386,6 +1406,7 @@ async function startServer() {
               { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
               { upsert: true, new: true }
             );
+            isLoadedFromMongo = true;
           } catch (err: any) {
             console.error("MongoDB async update error:", err);
           }
@@ -1396,7 +1417,7 @@ async function startServer() {
           if (err) console.error("Error writing restaurant state file:", err);
         });
       }
-      
+
       res.json({
         success: true,
         timestamp: lastServerUpdate,

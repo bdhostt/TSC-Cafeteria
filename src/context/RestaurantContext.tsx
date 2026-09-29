@@ -1682,9 +1682,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
 
         const serverTimestamp = result.timestamp || 0;
-        if (!isInitial && serverTimestamp && serverTimestamp < lastSyncedTimestampRef.current) {
-          return;
-        }
 
         if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
           result.data.tableDimensions = { width: 147, height: 98 };
