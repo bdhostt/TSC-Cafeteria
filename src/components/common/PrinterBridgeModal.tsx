@@ -14,6 +14,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
+import { useRestaurant } from '../../context/RestaurantContext';
 
 interface PrinterBridgeModalProps {
   isOpen: boolean;
@@ -21,6 +22,9 @@ interface PrinterBridgeModalProps {
 }
 
 export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, onClose }) => {
+  const { data: appData } = useRestaurant();
+  const brandName = appData.restaurantProfile?.name || 'POS';
+  const safeFileSlug = brandName.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'POS';
   const [isChecking, setIsChecking] = useState(false);
   const [localAgentStatus, setLocalAgentStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [activePrinter, setActivePrinter] = useState<string>('');
@@ -90,7 +94,7 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
           station: 'MAIN PRINTER TEST',
           items: [
             { name: 'Thermal Hardware Communication', qty: 1 },
-            { name: 'Cafe Banani Print Bridge OK', qty: 1 }
+            { name: `${brandName} Print Bridge OK`, qty: 1 }
           ]
         }]
       };
@@ -117,7 +121,7 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
             </div>
             <div>
               <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
-                <span>Cafe Banani Printer Bridge</span>
+                <span>{brandName} Printer Bridge</span>
                 {localAgentStatus === 'online' ? (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
                     Active
@@ -177,7 +181,7 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs space-y-2">
               <div className="flex items-center gap-2 text-rose-800 font-bold">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>Cafe Banani Printer Agent is not running on this PC!</span>
+                <span>{brandName} Printer Agent is not running on this PC!</span>
               </div>
               <p className="text-[11px] text-rose-700 pl-6">
                 Please download and install the printer agent on this computer to send KOTs and Bills directly to floor thermal printers.
@@ -236,16 +240,16 @@ export const PrinterBridgeModal: React.FC<PrinterBridgeModalProps> = ({ isOpen, 
           <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
             <a
               href="/api/download/printer-agent-zip"
-              download="CafeBananiPrinter-Setup.zip"
+              download={`${safeFileSlug}-Printer-Setup.zip`}
               className="w-full sm:w-auto flex-1 py-2.5 px-4 bg-[#004b9b] hover:bg-[#005bb8] text-white text-xs font-black rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer text-center"
             >
               <Download className="w-4 h-4" />
-              <span>Download Cafe Banani Printer Setup (.ZIP)</span>
+              <span>Download {brandName} Printer Setup (.ZIP)</span>
             </a>
 
             <a
               href="/api/download/printer-installer-bat"
-              download="INSTALL-CAFE-BANANI-PRINTER.bat"
+              download={`INSTALL-${safeFileSlug.toUpperCase()}-PRINTER.bat`}
               className="w-full sm:w-auto py-2.5 px-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
               title="Download standalone BAT installer"
             >

@@ -577,7 +577,7 @@ export const DEFAULT_PRINT_TEMPLATES: PrintTemplate[] = [
 ];
 
 export const DEFAULT_RESTAURANT_PROFILE: RestaurantProfile = {
-  name: "Barcode Cafe Banani",
+  name: "BD HOSTT POS",
   tagline: "Restaurant POS & Recipe BOM ERP",
   logoUrl: "",
   logoType: "preset",

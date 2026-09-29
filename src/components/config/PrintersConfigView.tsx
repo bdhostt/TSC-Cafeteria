@@ -250,7 +250,7 @@ export const PrintersConfigView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h4 className="font-extrabold text-sm text-slate-900">
-                Cafe Banani Printer Agent (Floor Bridge)
+                {data.restaurantProfile?.name || 'POS'} Printer Agent (Floor Bridge)
               </h4>
               {isLocalBridgeOnline ? (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
@@ -273,7 +273,7 @@ export const PrintersConfigView: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <a
             href="/api/download/printer-agent-zip"
-            download="CafeBananiPrinter-Setup.zip"
+            download={`${(data.restaurantProfile?.name || 'POS').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')}-Printer-Setup.zip`}
             className="px-3.5 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
