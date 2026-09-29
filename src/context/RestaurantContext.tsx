@@ -72,6 +72,7 @@ export const isSaleActive = (s: SaleRecord | undefined | null): boolean => {
 };
 
 const STORAGE_KEY = 'barcode_cafe_banani_app_data_v2';
+const TIMESTAMP_STORAGE_KEY = 'barcode_cafe_banani_last_update_v2';
 const USER_STORAGE_KEY = 'barcode_cafe_current_user_v2';
 const LANG_STORAGE_KEY = 'barcode_cafe_language_pref';
 const ACTIVE_TAB_KEY = 'barcode_cafe_active_tab_v2';
@@ -1681,7 +1682,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return;
         }
 
-        const serverTimestamp = result.timestamp || 0;
+        const serverTimestamp = Number(result.timestamp) || 0;
+        const localSavedTimestamp = Number(localStorage.getItem(TIMESTAMP_STORAGE_KEY)) || 0;
+        const isServerFromMongo = Boolean(result.isLoadedFromMongo);
+
+        // Check whether local state has active user data (sales, pos sessions, purchases, custom items)
+        const localSalesCount = dataRef.current.sales?.length || 0;
+        const localPurchasesCount = dataRef.current.purchases?.length || 0;
+        const localSessionActive = Boolean(dataRef.current.session?.isActive || (dataRef.current.posSessions && dataRef.current.posSessions.length > 0));
+
+        // If this is the initial load and local browser data is newer or has active data while server returned default/unloaded data:
+        const isLocalNewer = localSavedTimestamp > serverTimestamp;
+        const isServerUninitialized = !isServerFromMongo && serverTimestamp <= 0;
+
+        if (isInitial && (isLocalNewer || (isServerUninitialized && (localSalesCount > 0 || localPurchasesCount > 0 || localSessionActive)))) {
+          console.log("🛡️ Preserving local restaurant state and syncing up to server (preventing overwrite by default server fallback)");
+          isInitialSyncDoneRef.current = true;
+          // Immediately send the user's latest client data to seed the woken server
+          syncToServer(dataRef.current);
+          return;
+        }
 
         if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
           result.data.tableDimensions = { width: 147, height: 98 };
@@ -1738,7 +1758,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           isUpdatingFromSync.current = true;
           setData(result.data);
           lastSyncedStringRef.current = serverStateStr;
-          if (serverTimestamp) lastSyncedTimestampRef.current = serverTimestamp;
+          if (serverTimestamp) {
+            lastSyncedTimestampRef.current = serverTimestamp;
+            try {
+              localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(serverTimestamp));
+            } catch {}
+          }
           try {
             localStorage.setItem(STORAGE_KEY, serverStateStr);
           } catch {}
@@ -1779,6 +1804,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           lastSyncedStringRef.current = serialized;
           if (result.timestamp) {
             lastSyncedTimestampRef.current = result.timestamp;
+            try {
+              localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(result.timestamp));
+            } catch {}
           }
         }
       }
@@ -1801,9 +1829,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Save changes to localStorage and push to Server when modified
   useEffect(() => {
     try {
+      const now = Date.now();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       if (isInitialSyncDoneRef.current && !isUpdatingFromSync.current) {
-        lastLocalEditTimeRef.current = Date.now();
+        localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(now));
+        lastLocalEditTimeRef.current = now;
         syncToServer(data);
       }
     } catch (e) {

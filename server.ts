@@ -23,8 +23,8 @@ try {
     if (raw) {
       const parsed = JSON.parse(raw);
       cachedState = parsed.data || null;
-      // Do not trust static file's future 2026 timestamp over live MongoDB documents
-      lastServerUpdate = parsed.timestamp || Date.now();
+      // Default fallback file from repository has timestamp = 0 so client state with real updates always takes priority
+      lastServerUpdate = 0;
     }
   }
 } catch (e) {
@@ -1590,6 +1590,7 @@ async function startServer() {
         success: true,
         data: cachedState,
         timestamp: lastServerUpdate,
+        isLoadedFromMongo,
         storage: isDbConnected() ? "mongodb" : "json_file"
       });
     } catch (err: any) {
@@ -1597,6 +1598,7 @@ async function startServer() {
         success: true,
         data: cachedState,
         timestamp: lastServerUpdate,
+        isLoadedFromMongo: false,
         storage: "fallback_cache"
       });
     }
@@ -1639,6 +1641,7 @@ async function startServer() {
         success: true,
         timestamp: lastServerUpdate,
         data: cachedState,
+        isLoadedFromMongo,
         storage: isDbConnected() ? "mongodb" : "json_file"
       });
     } catch (err: any) {

@@ -1,14 +1,11 @@
 import mongoose, { Schema, Document } from "mongoose";
 import dns from "dns";
 
-// Only apply custom public DNS on local Windows machines where ISP DNS may block SRV records.
-// On cloud Linux containers (like Render), native container DNS must be used first.
-if (process.platform === "win32") {
-  try {
-    dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
-  } catch (e) {
-    // Ignore in environments where setServers is restricted
-  }
+// Apply reliable public DNS to prevent SRV lookup failures on Node.js / cloud containers
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+} catch (e) {
+  // Ignore in environments where setServers is restricted
 }
 
 export interface IRestaurantState extends Document {
