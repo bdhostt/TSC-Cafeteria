@@ -381,14 +381,6 @@ export const PosBillingView: React.FC = () => {
     : ['Floor 1', 'Floor 2', 'VIP Lounge', 'Rooftop Garden'];
 
 
-  // Find last settled sale for the currently active table
-  const lastActiveTableSale = useMemo(() => {
-    if (!activeTable) return null;
-    return [...data.sales].reverse().find(s => 
-      isSaleActive(s) && (s.status === 'SETTLED' || !s.status) &&
-      ((s.tableId && s.tableId === activeTable.id) || (s.table && s.table.toLowerCase().trim() === activeTable.name.toLowerCase().trim()) || (s.details && s.details.toLowerCase().includes(activeTable.name.toLowerCase().trim())))
-    );
-  }, [data.sales, activeTable]);
 
   // Filtered menu items
   const filteredMenuItems = data.menuItems.filter(item => {
@@ -1217,28 +1209,7 @@ export const PosBillingView: React.FC = () => {
               <div className="p-8 text-center text-xs text-slate-400 font-medium flex flex-col items-center justify-center gap-3">
                 <p>Cart is empty. Click items from the menu to add dishes.</p>
 
-                {lastActiveTableSale && canCancelOrEditOrder && (
-                  <button
-                    type="button"
-                    id="btn-undo-table-sale"
-                    onClick={() => {
-                      const confirmed = window.confirm(`Undo settlement for ${activeTable.name} (${lastActiveTableSale.invoiceNo}) and restore all items to cart?`);
-                      if (confirmed) {
-                        voidSale(lastActiveTableSale.id, {
-                          reason: 'Accidental settlement - Restored to cart for edit/cancellation',
-                          refundPayment: true,
-                          refundMethod: 'CASH',
-                          restoreToTable: true
-                        });
-                      }
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition cursor-pointer"
-                    title={`Undo settlement for ${lastActiveTableSale.invoiceNo} (৳${lastActiveTableSale.total}) and re-open cart`}
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Undo Settlement & Restore Order ({lastActiveTableSale.invoiceNo})</span>
-                  </button>
-                )}
+
 
                 <button
                   type="button"
