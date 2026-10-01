@@ -406,12 +406,13 @@ export const ThermalBillModal: React.FC = () => {
 
         let kotTotal = 0;
         for (const item of displayedItems) {
-          const itemTotal = item.price * item.qty;
+          const itemPrice = Number(item.price || 0);
+          const itemTotal = itemPrice * item.qty;
           kotTotal += itemTotal;
           const name = item.name.length > 21 ? item.name.slice(0, 21) : item.name;
           const nameCol = name.padEnd(22, ' ');
           const qtyCol = `${item.qty}x`.padStart(5, ' ');
-          const priceCol = `৳${itemTotal.toLocaleString()}`.padStart(13, ' ');
+          const priceCol = `৳${itemPrice.toLocaleString()}`.padStart(13, ' ');
           kotLines.push(`${nameCol} ${qtyCol} ${priceCol}`);
           if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);
           if (item.selectedAddons && item.selectedAddons.length > 0) {
@@ -811,7 +812,7 @@ export const ThermalBillModal: React.FC = () => {
                         </td>
                         {isKotPricesEnabled && (
                           <td className="py-1.5 text-right font-bold text-xs text-slate-900 align-top">
-                            ৳{Number(item.price * item.qty).toLocaleString()}
+                            ৳{Number(item.price || 0).toLocaleString()}
                           </td>
                         )}
                       </tr>

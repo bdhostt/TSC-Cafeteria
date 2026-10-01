@@ -350,7 +350,7 @@ async function startServer() {
 
         const nameCol = firstLineName.padEnd(22, ' ');
         const qtyCol = `${item.qty}x`.padStart(5, ' ');
-        const priceCol = `Tk ${itemTotal}`.padStart(13, ' ');
+        const priceCol = `Tk ${itemPrice}`.padStart(13, ' ');
 
         pushBytes([0x1B, 0x45, 0x01]); // Bold ON
         pushStr(`${nameCol} ${qtyCol} ${priceCol}\n`);
@@ -358,9 +358,6 @@ async function startServer() {
 
         if (remainder) {
           pushStr(`  ${remainder}\n`);
-        }
-        if (item.qty > 1 && itemPrice > 0) {
-          pushStr(`   (${item.qty} @ Tk ${itemPrice})\n`);
         }
         if (item.variation) {
           pushStr(`   - Cut: ${item.variation}\n`);

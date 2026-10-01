@@ -436,16 +436,13 @@ function buildKotEscPosBuffer(req, slip, index, total) {
 
       const nameCol = firstLineName.padEnd(22, ' ');
       const qtyCol = (item.qty + 'x').padStart(5, ' ');
-      const priceCol = `Tk ${itemTotal}`.padStart(13, ' ');
+      const priceCol = `Tk ${itemPrice}`.padStart(13, ' ');
 
       pushBytes([0x1B, 0x45, 0x01]); // Bold ON
       pushStr(nameCol + ' ' + qtyCol + ' ' + priceCol + '\n');
       pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
       if (remainder) pushStr('  ' + remainder + '\n');
-      if (item.qty > 1 && itemPrice > 0) {
-        pushStr('   (' + item.qty + ' @ Tk ' + itemPrice + ')\n');
-      }
       if (item.variation) pushStr('   - Cut: ' + item.variation + '\n');
       if (item.addons && item.addons.length > 0) pushStr('   - Extras: ' + item.addons.join(', ') + '\n');
       if (item.notes) pushStr('   - Note: ' + item.notes + '\n');
