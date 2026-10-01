@@ -10,6 +10,8 @@ import {
   CommissionAgent,
   RawMasterItem, 
   PurchaseVoucher, 
+  PurchaseItem,
+  PurchasePaymentType,
   PurchaseOrder,
   PurchaseReturn,
   SaleRecord, 
@@ -1255,10 +1257,12 @@ interface RestaurantContextType {
   // Menu & Recipe
   saveMenuItem: (item: Partial<MenuItem> & { id?: number }) => void;
   deleteMenuItem: (id: number) => void;
+  importMenuItems: (items: MenuItem[], overwrite?: boolean, extraData?: { newDepartments?: string[]; newCategories?: string[] }) => { added: number; updated: number };
   
   // Master Raw Items
   saveMasterItem: (item: Partial<RawMasterItem> & { id?: number }) => void;
   deleteMasterItem: (id: number) => void;
+  importMasterItems: (items: RawMasterItem[], overwrite?: boolean, extraData?: { newCategories?: string[]; newVendors?: string[] }) => { added: number; updated: number };
   
   // Purchases, POs & Returns
   savePurchaseVoucher: (voucher: PurchaseVoucher) => void;
@@ -3354,6 +3358,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
       return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
     };
+    const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
+    const defaultPrimaryKotTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+      || allTemplates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+      || allTemplates[0];
 
     const cancelKotPayload = {
       tableName: table.name,
@@ -3399,6 +3407,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
         return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
       };
+      const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
+      const defaultPrimaryKotTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+        || allTemplates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+        || allTemplates[0];
 
       const releaseKotPayload = {
         tableName: table.name,
@@ -3521,6 +3533,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const p = printers.find(pr => pr.departments?.includes(dept) && pr.isActive);
       return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
     };
+    const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
+    const defaultPrimaryKotTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+      || allTemplates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+      || allTemplates[0];
 
     const cancelKotPayload = {
       tableName: table.name,
@@ -4828,6 +4844,63 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setData(prev => ({ ...prev, menuItems: prev.menuItems.filter(i => i.id !== id) }));
   };
 
+  const importMenuItems = (
+    importedItems: MenuItem[],
+    overwrite = true,
+    extraData?: { newDepartments?: string[]; newCategories?: string[] }
+  ): { added: number; updated: number } => {
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    setData(prev => {
+      const currentItems = [...prev.menuItems];
+      const departmentsSet = new Set(prev.departments);
+      const categoriesSet = new Set(prev.menuCategories);
+
+      if (extraData?.newDepartments) {
+        extraData.newDepartments.forEach(d => { if (d && d.trim()) departmentsSet.add(d.trim()); });
+      }
+      if (extraData?.newCategories) {
+        extraData.newCategories.forEach(c => { if (c && c.trim()) categoriesSet.add(c.trim()); });
+      }
+
+      importedItems.forEach(item => {
+        if (item.department) departmentsSet.add(item.department);
+        if (item.category) categoriesSet.add(item.category);
+
+        const existingIndex = currentItems.findIndex(
+          i => i.id === item.id || (i.name && item.name && i.name.toLowerCase().trim() === item.name.toLowerCase().trim())
+        );
+
+        if (existingIndex >= 0 && overwrite) {
+          currentItems[existingIndex] = {
+            ...currentItems[existingIndex],
+            ...item,
+            id: currentItems[existingIndex].id // keep existing id
+          };
+          updatedCount++;
+        } else if (existingIndex >= 0 && !overwrite) {
+          const newItem: MenuItem = { ...item, id: Date.now() + Math.floor(Math.random() * 10000) };
+          currentItems.push(newItem);
+          addedCount++;
+        } else {
+          const newItem: MenuItem = { ...item, id: item.id || (Date.now() + Math.floor(Math.random() * 10000)) };
+          currentItems.push(newItem);
+          addedCount++;
+        }
+      });
+
+      return {
+        ...prev,
+        menuItems: currentItems,
+        departments: Array.from(departmentsSet),
+        menuCategories: Array.from(categoriesSet)
+      };
+    });
+
+    return { added: addedCount, updated: updatedCount };
+  };
+
   const saveMasterItem = (item: Partial<RawMasterItem> & { id?: number }) => {
     setData(prev => {
       const exists = prev.masterItems.some(i => i.id === item.id);
@@ -4851,6 +4924,63 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const deleteMasterItem = (id: number) => {
     setData(prev => ({ ...prev, masterItems: prev.masterItems.filter(i => i.id !== id) }));
+  };
+
+  const importMasterItems = (
+    importedItems: RawMasterItem[],
+    overwrite = true,
+    extraData?: { newCategories?: string[]; newVendors?: string[] }
+  ): { added: number; updated: number } => {
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    setData(prev => {
+      const currentItems = [...prev.masterItems];
+      const categoriesSet = new Set(prev.purchaseCategories);
+      const vendorsSet = new Set(prev.vendors);
+
+      if (extraData?.newCategories) {
+        extraData.newCategories.forEach(c => { if (c && c.trim()) categoriesSet.add(c.trim()); });
+      }
+      if (extraData?.newVendors) {
+        extraData.newVendors.forEach(v => { if (v && v.trim()) vendorsSet.add(v.trim()); });
+      }
+
+      importedItems.forEach(item => {
+        if (item.category) categoriesSet.add(item.category);
+        if (item.vendor) vendorsSet.add(item.vendor);
+
+        const existingIndex = currentItems.findIndex(
+          i => i.id === item.id || (i.name && item.name && i.name.toLowerCase().trim() === item.name.toLowerCase().trim())
+        );
+
+        if (existingIndex >= 0 && overwrite) {
+          currentItems[existingIndex] = {
+            ...currentItems[existingIndex],
+            ...item,
+            id: currentItems[existingIndex].id
+          };
+          updatedCount++;
+        } else if (existingIndex >= 0 && !overwrite) {
+          const newItem: RawMasterItem = { ...item, id: Date.now() + Math.floor(Math.random() * 10000) };
+          currentItems.push(newItem);
+          addedCount++;
+        } else {
+          const newItem: RawMasterItem = { ...item, id: item.id || (Date.now() + Math.floor(Math.random() * 10000)) };
+          currentItems.push(newItem);
+          addedCount++;
+        }
+      });
+
+      return {
+        ...prev,
+        masterItems: currentItems,
+        purchaseCategories: Array.from(categoriesSet),
+        vendors: Array.from(vendorsSet)
+      };
+    });
+
+    return { added: addedCount, updated: updatedCount };
   };
 
   const savePurchaseVoucher = (voucher: PurchaseVoucher) => {
@@ -5998,8 +6128,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       updateSaleWaiter,
       saveMenuItem,
       deleteMenuItem,
+      importMenuItems,
       saveMasterItem,
       deleteMasterItem,
+      importMasterItems,
       savePurchaseVoucher,
       deletePurchaseVoucher,
       savePurchaseOrder,

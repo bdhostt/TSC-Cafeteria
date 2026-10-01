@@ -24,17 +24,27 @@ import {
   Building2,
   ChefHat,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { AIChefAssistantModal } from '../ai/AIChefAssistantModal';
+import { ExcelImportModal } from '../common/ExcelImportModal';
+import { 
+  exportMenuItemsToExcel, 
+  generateMenuItemTemplateExcel, 
+  parseMenuItemsFromRows 
+} from '../../utils/excelUtils';
 
 export const MenuItemsView: React.FC = () => {
-  const { data, saveMenuItem, deleteMenuItem, language, t, setActiveTab, setPosView, canAccessTab } = useRestaurant();
+  const { data, saveMenuItem, deleteMenuItem, importMenuItems, language, t, setActiveTab, setPosView, canAccessTab } = useRestaurant();
   const [search, setSearch] = useState('');
   const [selectedDept, setSelectedDept] = useState('ALL');
   const [selectedCat, setSelectedCat] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   // Modal active sub-tab
@@ -275,7 +285,7 @@ export const MenuItemsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {canAccessTab('pos') && (
             <button
               onClick={() => {
@@ -289,6 +299,28 @@ export const MenuItemsView: React.FC = () => {
               <span>Return to Live POS</span>
             </button>
           )}
+
+          {/* Export Excel */}
+          <button
+            id="btn-export-menu-excel"
+            onClick={() => exportMenuItemsToExcel(data.menuItems)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Export all menu items & pricing to Excel (.xlsx)"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span>Export Excel</span>
+          </button>
+
+          {/* Import Excel */}
+          <button
+            id="btn-import-menu-excel"
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Import menu dishes from Excel (.xlsx / .xls / .csv)"
+          >
+            <Upload className="w-4 h-4 text-indigo-600" />
+            <span>Import Excel</span>
+          </button>
 
           <button
             onClick={() => setIsAiModalOpen(true)}
@@ -1183,6 +1215,44 @@ export const MenuItemsView: React.FC = () => {
 
       {/* AI Assistant Modal */}
       {isAiModalOpen && <AIChefAssistantModal onClose={() => setIsAiModalOpen(false)} />}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal<MenuItem>
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Import Menu Dishes from Excel"
+        subtitle="Upload .xlsx, .xls or .csv spreadsheets to update or bulk populate menu dishes & pricing"
+        templateFileName="Menu_Items_Template_Sample.xlsx"
+        onDownloadTemplate={generateMenuItemTemplateExcel}
+        parser={(rows) => parseMenuItemsFromRows(rows, data.menuItems)}
+        onImport={(items, overwrite, extra) => importMenuItems(items, overwrite, extra)}
+        itemTypeLabel="menu dishes"
+        previewColumns={[
+          { key: 'name', label: 'Dish Name' },
+          { key: 'department', label: 'Kitchen Dept' },
+          { key: 'category', label: 'Category' },
+          { 
+            key: 'price', 
+            label: 'Dine-in Price', 
+            render: (i) => `৳ ${(i.price || 0).toLocaleString()}` 
+          },
+          { 
+            key: 'cost', 
+            label: 'BOM Cost', 
+            render: (i) => `৳ ${(i.cost || 0).toLocaleString()}` 
+          },
+          {
+            key: 'channelPrices',
+            label: 'Channels',
+            render: (i) => {
+              if (!i.channelPrices || Object.keys(i.channelPrices).length === 0) return '—';
+              return Object.entries(i.channelPrices)
+                .map(([k, v]) => `${k.slice(0, 3)}: ৳${v}`)
+                .join(', ');
+            }
+          }
+        ]}
+      />
     </div>
   );
 };

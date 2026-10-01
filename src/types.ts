@@ -102,6 +102,7 @@ export interface PrintTemplate {
   showCustomer: boolean;
   showDateTime: boolean;
   showPricesOnKot: boolean;
+  showPrices?: boolean;
   showNotes: boolean;
   fontSize: 'sm' | 'base' | 'lg';
   footerMessage?: string; // e.g. "Thank you for dining with us!", "⚡ Fast Kitchen Dispatch"

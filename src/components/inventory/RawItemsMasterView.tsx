@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { RawMasterItem } from '../../types';
-import { Layers, Plus, Trash2, Edit, Search, X } from 'lucide-react';
+import { Layers, Plus, Trash2, Edit, Search, X, FileSpreadsheet, Download, Upload } from 'lucide-react';
+import { ExcelImportModal } from '../common/ExcelImportModal';
+import { 
+  exportMasterItemsToExcel, 
+  generateMasterItemTemplateExcel, 
+  parseMasterItemsFromRows 
+} from '../../utils/excelUtils';
 
 export const RawItemsMasterView: React.FC = () => {
-  const { data, saveMasterItem, deleteMasterItem } = useRestaurant();
+  const { data, saveMasterItem, deleteMasterItem, importMasterItems } = useRestaurant();
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<RawMasterItem | null>(null);
 
   // Form State
@@ -72,14 +79,39 @@ export const RawItemsMasterView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          id="btn-add-raw-item"
-          onClick={handleOpenAdd}
-          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Raw Material</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Export Excel */}
+          <button
+            id="btn-export-raw-excel"
+            onClick={() => exportMasterItemsToExcel(data.masterItems)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Export all raw materials to Excel (.xlsx)"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span>Export Excel</span>
+          </button>
+
+          {/* Import Excel */}
+          <button
+            id="btn-import-raw-excel"
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Import raw materials from Excel (.xlsx / .xls / .csv)"
+          >
+            <Upload className="w-4 h-4 text-indigo-600" />
+            <span>Import Excel</span>
+          </button>
+
+          {/* Add Raw Material */}
+          <button
+            id="btn-add-raw-item"
+            onClick={handleOpenAdd}
+            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Raw Material</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary card */}
@@ -276,6 +308,30 @@ export const RawItemsMasterView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal<RawMasterItem>
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Import Raw Materials Master from Excel"
+        subtitle="Upload .xlsx, .xls or .csv spreadsheets to update or populate raw materials catalog"
+        templateFileName="Raw_Materials_Template_Sample.xlsx"
+        onDownloadTemplate={generateMasterItemTemplateExcel}
+        parser={(rows) => parseMasterItemsFromRows(rows, data.masterItems)}
+        onImport={(items, overwrite, extra) => importMasterItems(items, overwrite, extra)}
+        itemTypeLabel="raw materials"
+        previewColumns={[
+          { key: 'name', label: 'Item Name' },
+          { key: 'category', label: 'Category' },
+          { key: 'vendor', label: 'Default Vendor' },
+          { key: 'uom', label: 'UOM' },
+          { 
+            key: 'defaultRate', 
+            label: 'Rate (৳)', 
+            render: (i) => `৳ ${(i.defaultRate || 0).toLocaleString()}/${i.uom || 'Kg'}` 
+          }
+        ]}
+      />
     </div>
   );
 };
