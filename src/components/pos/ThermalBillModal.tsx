@@ -244,7 +244,20 @@ export const ThermalBillModal: React.FC = () => {
           netTotal: printableReceipt.netTotal,
           paymentBreakdown: (printableReceipt as any).paymentBreakdown,
           changeReturn: (printableReceipt as any).changeReturn,
-          isSettled: printableReceipt.isSettled
+          isSettled: printableReceipt.isSettled,
+          paperWidth: activeTemplate?.paperWidth || (printableReceipt as any)?.paperWidth || '80mm',
+          headerTitle: activeTemplate?.headerTitle || printableReceipt.headerTitle,
+          showLogo: activeTemplate?.showLogo !== false,
+          showAddress: activeTemplate?.showAddress !== false,
+          showPhone: activeTemplate?.showPhone !== false,
+          showBinVat: Boolean(activeTemplate?.showBinVat ?? printableReceipt.showBinVat),
+          showTableZone: activeTemplate?.showTableZone !== false,
+          showWaiter: activeTemplate?.showWaiter !== false,
+          showCustomer: activeTemplate?.showCustomer !== false,
+          showPrices: activeTemplate?.showPrices !== false,
+          showPaymentBreakdown: activeTemplate?.showPaymentBreakdown !== false,
+          footerMessage: activeTemplate?.footerMessage,
+          footerNotes: activeTemplate?.footerNotes
         };
 
         await dispatchHardwarePrint('/api/hardware/print-bill', billPayload);
@@ -506,44 +519,49 @@ export const ThermalBillModal: React.FC = () => {
 </html>`;
     }
 
-    // CUSTOMER BILL / CASH MEMO (Exact 100% match to 'localhost:3000 this is ok' thermal slip)
-    const titleText = printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL';
+    // CUSTOMER BILL / CASH MEMO (Standard 48-col 80mm or 32-col 58mm receipt)
+    const paperWidth = activeTemplate?.paperWidth || (printableReceipt as any)?.paperWidth || '80mm';
+    const width = paperWidth === '58mm' ? 32 : 48;
+    const divider = '-'.repeat(width);
+
+    const titleText = activeTemplate?.headerTitle || printableReceipt.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
     const lines: string[] = [];
 
-    lines.push(centerLine(restaurantName || 'BD HOSTT POS'));
-    const rawAddress = restaurantAddress || 'Chattogram, Bangladesh';
-    if (rawAddress) {
-      if (rawAddress.includes(',')) {
-        const parts = rawAddress.split(',').map(p => p.trim());
-        let currentLine = '';
-        for (const part of parts) {
-          if (!currentLine) {
-            currentLine = part;
-          } else if ((currentLine + ', ' + part).length <= 40) {
-            currentLine += ', ' + part;
-          } else {
-            lines.push(centerLine(currentLine));
-            currentLine = part;
+    lines.push(centerLine(restaurantName || 'BD HOSTT POS', width));
+    if (activeTemplate?.showAddress !== false) {
+      const rawAddress = restaurantAddress || 'Chattogram, Bangladesh';
+      if (rawAddress) {
+        if (rawAddress.includes(',')) {
+          const parts = rawAddress.split(',').map(p => p.trim());
+          let currentLine = '';
+          for (const part of parts) {
+            if (!currentLine) {
+              currentLine = part;
+            } else if ((currentLine + ', ' + part).length <= (width - 2)) {
+              currentLine += ', ' + part;
+            } else {
+              lines.push(centerLine(currentLine, width));
+              currentLine = part;
+            }
           }
+          if (currentLine) lines.push(centerLine(currentLine, width));
+        } else {
+          lines.push(centerLine(rawAddress, width));
         }
-        if (currentLine) lines.push(centerLine(currentLine));
-      } else {
-        lines.push(centerLine(rawAddress));
       }
     }
-    if (restaurantHotline) lines.push(centerLine(`Hotline: ${restaurantHotline}`));
-    if (restaurantBin) lines.push(centerLine(`BIN/VAT Reg: ${restaurantBin}`));
+    if (activeTemplate?.showPhone !== false && restaurantHotline) {
+      lines.push(centerLine(`Hotline: ${restaurantHotline}`, width));
+    }
+    if (activeTemplate?.showBinVat && restaurantBin) {
+      lines.push(centerLine(`BIN/VAT Reg: ${restaurantBin}`, width));
+    }
 
-    lines.push('------------------------------------------');
-    lines.push(centerLine(titleText));
-    lines.push('------------------------------------------');
+    lines.push(divider);
+    lines.push(centerLine(titleText, width));
+    lines.push(divider);
 
-    const metaLine = (lbl: string, val?: string) => {
-      if (!val) return '';
-      return `${lbl.padEnd(14, ' ')}: ${val}`;
-    };
-
-    lines.push(metaLine('Invoice No', printableReceipt.invoiceNo));
+    lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo, width));
     let dateStr = receiptDateStr;
     let timeStr = receiptTimeStr;
     const rawDt = printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`;
@@ -558,55 +576,73 @@ export const ThermalBillModal: React.FC = () => {
         timeStr = parts.slice(1).join(' ');
       }
     }
-    lines.push(line2Col(`Date : ${dateStr}`, `Time: ${timeStr}`));
-    lines.push(metaLine('Table & Zone', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`));
+    lines.push(line2Col(`Date : ${dateStr}`, `Time: ${timeStr}`, width));
+    if (activeTemplate?.showTableZone !== false) {
+      lines.push(line2Col('Table & Zone :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`, width));
+    }
     if (printableReceipt.channelOrAgent) {
-      lines.push(metaLine('Channel', printableReceipt.channelOrAgent));
+      lines.push(line2Col('Channel :', printableReceipt.channelOrAgent, width));
     }
     const waiterText = (printableReceipt.waiter && printableReceipt.waiter !== 'N/A' && printableReceipt.waiter !== 'Staff')
       ? printableReceipt.waiter
       : (printableReceipt.waiter || 'Staff');
     if (activeTemplate?.showWaiter !== false) {
-      lines.push(metaLine('Waiter', waiterText));
+      lines.push(line2Col('Waiter :', waiterText, width));
     }
     if (printableReceipt.orderTakenBy && printableReceipt.orderTakenBy !== printableReceipt.waiter) {
-      lines.push(metaLine('Order Taken By', printableReceipt.orderTakenBy));
+      lines.push(line2Col('Order Taken By :', printableReceipt.orderTakenBy, width));
     }
     if (printableReceipt.isSettled) {
-      lines.push(metaLine('Bill Settled By', printableReceipt.settleBillRole || 'Cashier'));
+      lines.push(line2Col('Bill Settled By :', printableReceipt.settleBillRole || 'Cashier', width));
     }
-    if (printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
-      lines.push(metaLine('Customer', printableReceipt.customer));
+    if (activeTemplate?.showCustomer !== false && printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
+      lines.push(line2Col('Customer :', printableReceipt.customer, width));
     }
-    lines.push('------------------------------------------');
+    lines.push(divider);
 
-    // Column Header (Exact 42 columns: 19 + 1 + 4 + 1 + 8 + 1 + 8 = 42)
-    const colItemH = 'ITEM'.padEnd(19, ' ');
-    const colQtyH = ' QTY';
-    const colPriceH = '   PRICE';
-    const colTotalH = '   TOTAL';
-    lines.push(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}`);
-    lines.push('------------------------------------------');
+    // Column Header
+    if (width === 48) {
+      const colItemH = 'ITEM'.padEnd(21, ' ');
+      const colQtyH = ' QTY ';
+      const colPriceH = '    PRICE';
+      const colTotalH = '     TOTAL';
+      lines.push(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}`);
+    } else {
+      const colItemH = 'ITEM'.padEnd(14, ' ');
+      const colQtyH = 'QTY';
+      const colPriceH = ' PRICE';
+      const colTotalH = ' TOTAL';
+      lines.push(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}`);
+    }
+    lines.push(divider);
 
+    const itemLimit = width === 48 ? 21 : 14;
     for (const item of displayedItems) {
       let firstLineName = (item.name || '').trim();
       let remainder = '';
-      if (firstLineName.length > 19) {
-        const lastSpace = firstLineName.lastIndexOf(' ', 19);
+      if (firstLineName.length > itemLimit) {
+        const lastSpace = firstLineName.lastIndexOf(' ', itemLimit);
         if (lastSpace > 8) {
           remainder = firstLineName.slice(lastSpace + 1).trim();
           firstLineName = firstLineName.slice(0, lastSpace);
         } else {
-          remainder = firstLineName.slice(19).trim();
-          firstLineName = firstLineName.slice(0, 19);
+          remainder = firstLineName.slice(itemLimit).trim();
+          firstLineName = firstLineName.slice(0, itemLimit);
         }
       }
-      const colItem = firstLineName.padEnd(19, ' ');
-      const colQty = (' ' + item.qty + ' ').padStart(4, ' ');
-      const colPrice = Number(item.price).toFixed(2).padStart(8, ' ');
-      const colTotal = Number(item.price * item.qty).toFixed(2).padStart(8, ' ');
-
-      lines.push(`${colItem} ${colQty} ${colPrice} ${colTotal}`);
+      if (width === 48) {
+        const colItem = firstLineName.padEnd(21, ' ');
+        const colQty = (' ' + item.qty + ' ').padStart(5, ' ');
+        const colPrice = Number(item.price).toFixed(2).padStart(9, ' ');
+        const colTotal = Number(item.price * item.qty).toFixed(2).padStart(10, ' ');
+        lines.push(`${colItem} ${colQty} ${colPrice} ${colTotal}`);
+      } else {
+        const colItem = firstLineName.padEnd(14, ' ');
+        const colQty = String(item.qty).padStart(3, ' ');
+        const colPrice = Number(item.price).toFixed(0).padStart(6, ' ');
+        const colTotal = Number(item.price * item.qty).toFixed(0).padStart(6, ' ');
+        lines.push(`${colItem} ${colQty} ${colPrice} ${colTotal}`);
+      }
       if (remainder) lines.push(`  ${remainder}`);
       if (item.selectedVariation?.name) lines.push(`  * Cut: ${item.selectedVariation.name}`);
       if (item.selectedAddons && item.selectedAddons.length > 0) {
@@ -615,46 +651,53 @@ export const ThermalBillModal: React.FC = () => {
       if (item.notes) lines.push(`  - Note: ${item.notes}`);
     }
 
-    lines.push('------------------------------------------');
-    lines.push(line2Col('Subtotal:', Number(displayedSubtotal).toFixed(2)));
+    lines.push(divider);
+    lines.push(line2Col('Subtotal:', Number(displayedSubtotal).toFixed(2), width));
     if (printableReceipt.discountDeduction > 0) {
       const discLbl = printableReceipt.discountType === 'percent' && printableReceipt.discountVal
         ? `Discount (${printableReceipt.discountVal}%):`
         : 'Discount:';
-      lines.push(line2Col(discLbl, `-${Number(printableReceipt.discountDeduction).toFixed(2)}`));
+      lines.push(line2Col(discLbl, `-${Number(printableReceipt.discountDeduction).toFixed(2)}`, width));
     }
-    lines.push('------------------------------------------');
-    lines.push(line2Col('TOTAL PAYABLE:', Number(printableReceipt.netTotal).toFixed(2)));
+    lines.push(divider);
+    lines.push(line2Col('TOTAL PAYABLE:', Number(printableReceipt.netTotal).toFixed(2), width));
 
     const pb = printableReceipt.paymentBreakdown;
-    if (pb) {
-      lines.push('------------------------------------------');
-      if (pb.cash > 0) lines.push(line2Col('Cash Paid:', Number(pb.cash).toFixed(2)));
-      if (pb.card > 0) lines.push(line2Col('Card Paid:', Number(pb.card).toFixed(2)));
-      if (pb.bkash > 0) lines.push(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2)));
-      if (pb.nagad > 0) lines.push(line2Col('Nagad Paid:', Number(pb.nagad).toFixed(2)));
-      if (pb.due > 0) lines.push(line2Col('Due / Credit:', Number(pb.due).toFixed(2)));
+    if (pb && activeTemplate?.showPaymentBreakdown !== false) {
+      lines.push(divider);
+      if (pb.cash > 0) lines.push(line2Col('Cash Paid:', Number(pb.cash).toFixed(2), width));
+      if (pb.card > 0) lines.push(line2Col('Card Paid:', Number(pb.card).toFixed(2), width));
+      if (pb.bkash > 0) lines.push(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2), width));
+      if (pb.nagad > 0) lines.push(line2Col('Nagad Paid:', Number(pb.nagad).toFixed(2), width));
+      if (pb.due > 0) lines.push(line2Col('Due / Credit:', Number(pb.due).toFixed(2), width));
       if (printableReceipt.changeReturn && printableReceipt.changeReturn > 0) {
-        lines.push(line2Col('Change Return:', Number(printableReceipt.changeReturn).toFixed(2)));
+        lines.push(line2Col('Change Return:', Number(printableReceipt.changeReturn).toFixed(2), width));
       }
     }
 
-    lines.push('------------------------------------------');
+    lines.push(divider);
     if (printableReceipt.receiptType === 'VOID_MEMO') {
-      lines.push(centerLine('*** ORDER CANCELLED / VOIDED ***'));
-      lines.push(centerLine(`*** REFUND: ${printableReceipt.refundStatus || 'REFUNDED'} ***`));
+      lines.push(centerLine('*** ORDER CANCELLED / VOIDED ***', width));
+      lines.push(centerLine(`*** REFUND: ${printableReceipt.refundStatus || 'REFUNDED'} ***`, width));
       if (printableReceipt.voidReason) {
-        lines.push(line2Col('Void Reason:', printableReceipt.voidReason));
+        lines.push(line2Col('Void Reason:', printableReceipt.voidReason, width));
       }
       if (printableReceipt.voidAuthorizedBy) {
-        lines.push(line2Col('Auth By    :', printableReceipt.voidAuthorizedBy));
+        lines.push(line2Col('Auth By:', printableReceipt.voidAuthorizedBy, width));
       }
     } else if (printableReceipt.isSettled) {
-      lines.push(centerLine('*** PAID & SETTLED ***'));
+      lines.push(centerLine('*** PAID & SETTLED ***', width));
     }
-    lines.push(centerLine('Thank you for dining with us!'));
-    lines.push(centerLine('Please visit again'));
-    lines.push('------------------------------------------');
+    if (activeTemplate?.footerMessage) {
+      lines.push(centerLine(activeTemplate.footerMessage, width));
+    } else {
+      lines.push(centerLine('Thank you for dining with us!', width));
+      lines.push(centerLine('Please visit again', width));
+    }
+    if (activeTemplate?.footerNotes) {
+      lines.push(centerLine(activeTemplate.footerNotes, width));
+    }
+    lines.push(divider);
 
     return `<!DOCTYPE html>
 <html>

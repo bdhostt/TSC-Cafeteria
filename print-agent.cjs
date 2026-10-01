@@ -508,47 +508,51 @@ function buildBillEscPosBuffer(bill) {
   pushStr((bill.restaurantName || 'BD HOSTT POS') + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
-  const rawAddress = bill.restaurantAddress || 'Chattogram, Bangladesh';
-  if (rawAddress) {
-    if (rawAddress.includes(',')) {
-      const parts = rawAddress.split(',').map(p => p.trim());
-      let currentLine = '';
-      for (const part of parts) {
-        if (!currentLine) {
-          currentLine = part;
-        } else if ((currentLine + ', ' + part).length <= 40) {
-          currentLine += ', ' + part;
-        } else {
-          pushStr(currentLine + '\n');
-          currentLine = part;
+  const width = bill.paperWidth === '58mm' ? 32 : 48;
+  const divider = '-'.repeat(width) + '\n';
+
+  if (bill.showAddress !== false) {
+    const rawAddress = bill.restaurantAddress || 'Chattogram, Bangladesh';
+    if (rawAddress) {
+      if (rawAddress.includes(',')) {
+        const parts = rawAddress.split(',').map(p => p.trim());
+        let currentLine = '';
+        for (const part of parts) {
+          if (!currentLine) {
+            currentLine = part;
+          } else if ((currentLine + ', ' + part).length <= (width - 2)) {
+            currentLine += ', ' + part;
+          } else {
+            pushStr(currentLine + '\n');
+            currentLine = part;
+          }
         }
+        if (currentLine) pushStr(currentLine + '\n');
+      } else {
+        pushStr(rawAddress + '\n');
       }
-      if (currentLine) pushStr(currentLine + '\n');
-    } else {
-      pushStr(rawAddress + '\n');
     }
   }
 
-  const rawHotline = bill.restaurantHotline || '+880 1700-000000';
-  if (rawHotline) pushStr('Hotline: ' + rawHotline + '\n');
+  if (bill.showPhone !== false) {
+    const rawHotline = bill.restaurantHotline || '+880 1700-000000';
+    if (rawHotline) pushStr('Hotline: ' + rawHotline + '\n');
+  }
 
-  const rawBin = bill.restaurantBin || '0029381-01';
-  if (rawBin) pushStr('BIN/VAT Reg: ' + rawBin + '\n');
+  if (bill.showBinVat && bill.restaurantBin) {
+    pushStr('BIN/VAT Reg: ' + bill.restaurantBin + '\n');
+  }
 
-  pushStr('------------------------------------------\n');
+  pushStr(divider);
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Bill Type
-  pushStr((bill.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL') + '\n');
+  const bannerText = bill.headerTitle || (bill.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
+  pushStr(bannerText + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-  pushStr('------------------------------------------\n');
+  pushStr(divider);
 
-  // 4. Left Align: Invoice Metadata
+  // 4. Left & Right Justified: Invoice Metadata (Flush to margins)
   pushBytes([0x1B, 0x61, 0x00]);
-  const metaLine = (lbl, val) => {
-    if (!val) return '';
-    return lbl.padEnd(14, ' ') + ': ' + val + '\n';
-  };
-
-  pushStr(metaLine('Invoice No', bill.invoiceNo || 'INV-0000'));
+  pushStr(line2Col('Invoice No :', bill.invoiceNo || 'INV-0000', width));
 
   let dateStr = '';
   let timeStr = '';
@@ -567,97 +571,126 @@ function buildBillEscPosBuffer(bill) {
       timeStr = new Date().toLocaleTimeString('en-US');
     }
   }
-  pushStr(line2Col('Date : ' + dateStr, 'Time: ' + timeStr));
-  pushStr(metaLine('Table & Zone', (bill.tableName || 'Takeaway') + (bill.tableZone ? ' (' + bill.tableZone + ')' : '')));
-  if (bill.channelOrAgent) pushStr(metaLine('Channel', bill.channelOrAgent));
+  pushStr(line2Col('Date : ' + dateStr, 'Time: ' + timeStr, width));
+  if (bill.showTableZone !== false) {
+    pushStr(line2Col('Table & Zone :', (bill.tableName || 'Takeaway') + (bill.tableZone ? ' (' + bill.tableZone + ')' : ''), width));
+  }
+  if (bill.channelOrAgent) {
+    pushStr(line2Col('Channel :', bill.channelOrAgent, width));
+  }
   if (bill.showWaiter !== false) {
-    pushStr(metaLine('Waiter', bill.waiter && bill.waiter !== 'N/A' && bill.waiter !== 'Staff' ? bill.waiter : (bill.waiter || 'Staff')));
+    const waiterTxt = bill.waiter && bill.waiter !== 'N/A' && bill.waiter !== 'Staff' ? bill.waiter : (bill.waiter || 'Staff');
+    pushStr(line2Col('Waiter :', waiterTxt, width));
   }
   const orderTaker = bill.orderTakenBy || bill.orderCreatedBy || bill.waiter || 'Staff';
   if (orderTaker && orderTaker !== (bill.waiter || 'Staff')) {
-    pushStr(metaLine('Order Taken By', orderTaker));
+    pushStr(line2Col('Order Taken By :', orderTaker, width));
   }
   if (bill.isSettled) {
     const settleRole = bill.settleBillRole || bill.cashierRole || 'Cashier';
-    pushStr(metaLine('Bill Settled By', settleRole));
+    pushStr(line2Col('Bill Settled By :', settleRole, width));
   }
-  if (bill.customer && bill.customer !== 'Walk-in Customer') {
-    pushStr(metaLine('Customer', bill.customer));
+  if (bill.showCustomer !== false && bill.customer && bill.customer !== 'Walk-in Customer') {
+    pushStr(line2Col('Customer :', bill.customer, width));
   }
-  pushStr('------------------------------------------\n');
+  pushStr(divider);
 
-  // 5. Column Headers (Exact 42 character columns: 19 + 1 + 4 + 1 + 8 + 1 + 8 = 42)
+  // 5. Column Headers & Items
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for headers
-  const colItemH = 'ITEM'.padEnd(19, ' ');
-  const colQtyH = ' QTY';
-  const colPriceH = '   PRICE';
-  const colTotalH = '   TOTAL';
-  pushStr(colItemH + ' ' + colQtyH + ' ' + colPriceH + ' ' + colTotalH + '\n');
+  if (width === 48) {
+    const colItemH = 'ITEM'.padEnd(21, ' ');
+    const colQtyH = ' QTY ';
+    const colPriceH = '    PRICE';
+    const colTotalH = '     TOTAL';
+    pushStr(colItemH + ' ' + colQtyH + ' ' + colPriceH + ' ' + colTotalH + '\n');
+  } else {
+    const colItemH = 'ITEM'.padEnd(14, ' ');
+    const colQtyH = 'QTY';
+    const colPriceH = ' PRICE';
+    const colTotalH = ' TOTAL';
+    pushStr(colItemH + ' ' + colQtyH + ' ' + colPriceH + ' ' + colTotalH + '\n');
+  }
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-  pushStr('------------------------------------------\n');
+  pushStr(divider);
 
   // 6. Food Items (Crisp & High Legibility)
+  const itemLimit = width === 48 ? 21 : 14;
   for (const item of (bill.items || [])) {
     let firstLineName = (item.name || '').trim();
     let remainder = '';
-    if (firstLineName.length > 19) {
-      const lastSpace = firstLineName.lastIndexOf(' ', 19);
+    if (firstLineName.length > itemLimit) {
+      const lastSpace = firstLineName.lastIndexOf(' ', itemLimit);
       if (lastSpace > 8) {
         remainder = firstLineName.slice(lastSpace + 1).trim();
         firstLineName = firstLineName.slice(0, lastSpace);
       } else {
-        remainder = firstLineName.slice(19).trim();
-        firstLineName = firstLineName.slice(0, 19);
+        remainder = firstLineName.slice(itemLimit).trim();
+        firstLineName = firstLineName.slice(0, itemLimit);
       }
     }
-    const colItem = firstLineName.padEnd(19, ' ');
-    const colQty = (' ' + item.qty + ' ').padStart(4, ' ');
-    const colPrice = Number(item.price).toFixed(2).padStart(8, ' ');
-    const colTotal = Number(item.price * item.qty).toFixed(2).padStart(8, ' ');
+    if (width === 48) {
+      const colItem = firstLineName.padEnd(21, ' ');
+      const colQty = (' ' + item.qty + ' ').padStart(5, ' ');
+      const colPrice = Number(item.price).toFixed(2).padStart(9, ' ');
+      const colTotal = Number(item.price * item.qty).toFixed(2).padStart(10, ' ');
+      pushStr(colItem + ' ' + colQty + ' ' + colPrice + ' ' + colTotal + '\n');
+    } else {
+      const colItem = firstLineName.padEnd(14, ' ');
+      const colQty = String(item.qty).padStart(3, ' ');
+      const colPrice = Number(item.price).toFixed(0).padStart(6, ' ');
+      const colTotal = Number(item.price * item.qty).toFixed(0).padStart(6, ' ');
+      pushStr(colItem + ' ' + colQty + ' ' + colPrice + ' ' + colTotal + '\n');
+    }
 
-    pushStr(colItem + ' ' + colQty + ' ' + colPrice + ' ' + colTotal + '\n');
     if (remainder) pushStr('  ' + remainder + '\n');
     if (item.variation) pushStr('  * Cut: ' + item.variation + '\n');
     if (item.addons && item.addons.length > 0) pushStr('  + Extras: ' + item.addons.join(', ') + '\n');
     if (item.notes) pushStr('  - Note: ' + item.notes + '\n');
   }
 
-  pushStr('------------------------------------------\n');
+  pushStr(divider);
 
-  // 7. Financial Totals (Right-aligned matching the TOTAL column at column 42)
-  pushStr(line2Col('Subtotal:', Number(bill.subtotal || 0).toFixed(2)));
+  // 7. Financial Totals (Right-aligned matching the TOTAL column at column width)
+  pushStr(line2Col('Subtotal:', Number(bill.subtotal || 0).toFixed(2), width));
   if (bill.discountDeduction > 0) {
     const discLbl = bill.discountType === 'percent' && bill.discountVal 
       ? 'Discount (' + bill.discountVal + '%):' 
       : 'Discount:';
-    pushStr(line2Col(discLbl, '-' + Number(bill.discountDeduction).toFixed(2)));
+    pushStr(line2Col(discLbl, '-' + Number(bill.discountDeduction).toFixed(2), width));
   }
-  pushStr('------------------------------------------\n');
+  pushStr(divider);
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Total Payable
-  pushStr(line2Col('TOTAL PAYABLE:', Number(bill.netTotal || 0).toFixed(2)));
+  pushStr(line2Col('TOTAL PAYABLE:', Number(bill.netTotal || 0).toFixed(2), width));
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
   const pb = bill.paymentBreakdown;
-  if (pb) {
-    pushStr('------------------------------------------\n');
-    if (pb.cash > 0) pushStr(line2Col('Cash Paid:', Number(pb.cash).toFixed(2)));
-    if (pb.card > 0) pushStr(line2Col('Card Paid:', Number(pb.card).toFixed(2)));
-    if (pb.bkash > 0) pushStr(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2)));
-    if (pb.nagad > 0) pushStr(line2Col('Nagad Paid:', Number(pb.nagad).toFixed(2)));
-    if (pb.due > 0) pushStr(line2Col('Due / Credit:', Number(pb.due).toFixed(2)));
-    if (bill.changeReturn > 0) pushStr(line2Col('Change Return:', Number(bill.changeReturn).toFixed(2)));
+  if (pb && bill.showPaymentBreakdown !== false) {
+    pushStr(divider);
+    if (pb.cash > 0) pushStr(line2Col('Cash Paid:', Number(pb.cash).toFixed(2), width));
+    if (pb.card > 0) pushStr(line2Col('Card Paid:', Number(pb.card).toFixed(2), width));
+    if (pb.bkash > 0) pushStr(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2), width));
+    if (pb.nagad > 0) pushStr(line2Col('Nagad Paid:', Number(pb.nagad).toFixed(2), width));
+    if (pb.due > 0) pushStr(line2Col('Due / Credit:', Number(pb.due).toFixed(2), width));
+    if (bill.changeReturn > 0) pushStr(line2Col('Change Return:', Number(bill.changeReturn).toFixed(2), width));
   }
 
-  pushStr('------------------------------------------\n');
+  pushStr(divider);
   pushBytes([0x1B, 0x61, 0x01]);
   if (bill.isSettled) {
     pushBytes([0x1B, 0x45, 0x01]);
     pushStr('*** PAID & SETTLED ***\n');
     pushBytes([0x1B, 0x45, 0x00]);
   }
-  pushStr('Thank you for dining with us!\n');
-  pushStr('Please visit again\n');
-  pushStr('------------------------------------------\n');
+  if (bill.footerMessage) {
+    pushStr(bill.footerMessage + '\n');
+  } else {
+    pushStr('Thank you for dining with us!\n');
+    pushStr('Please visit again\n');
+  }
+  if (bill.footerNotes) {
+    pushStr(bill.footerNotes + '\n');
+  }
+  pushStr(divider);
   pushStr('\n\n\n');
   pushBytes([0x1D, 0x56, 0x00]);
 

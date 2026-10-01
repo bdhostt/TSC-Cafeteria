@@ -736,4 +736,17 @@ export interface PrintableReceipt {
   isPaid?: boolean;
   isDirectPrint?: boolean;
   showPrices?: boolean;
+  paperWidth?: ThermalPaperWidth;
+  headerTitle?: string;
+  showLogo?: boolean;
+  showTagline?: boolean;
+  showAddress?: boolean;
+  showPhone?: boolean;
+  showBinVat?: boolean;
+  showTableZone?: boolean;
+  showWaiter?: boolean;
+  showCustomer?: boolean;
+  showPaymentBreakdown?: boolean;
+  footerMessage?: string;
+  footerNotes?: string;
 }

@@ -475,47 +475,56 @@ async function startServer() {
     pushStr(`${bill.restaurantName || cachedState?.restaurantProfile?.name || "BD HOSTT POS"}\n`);
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
-    const rawAddress = bill.restaurantAddress || cachedState?.restaurantProfile?.address || "Chattogram, Bangladesh";
-    if (rawAddress) {
-      if (rawAddress.includes(",")) {
-        const parts = rawAddress.split(",").map(p => p.trim());
-        let currentLine = "";
-        for (const part of parts) {
-          if (!currentLine) {
-            currentLine = part;
-          } else if ((currentLine + ", " + part).length <= 40) {
-            currentLine += ", " + part;
-          } else {
-            pushStr(`${currentLine}\n`);
-            currentLine = part;
+    const width = (bill as any).paperWidth === '58mm' ? 32 : 48;
+    const divider = '-'.repeat(width) + '\n';
+
+    if ((bill as any).showAddress !== false) {
+      const rawAddress = bill.restaurantAddress || cachedState?.restaurantProfile?.address || "Chattogram, Bangladesh";
+      if (rawAddress) {
+        if (rawAddress.includes(",")) {
+          const parts = rawAddress.split(",").map(p => p.trim());
+          let currentLine = "";
+          for (const part of parts) {
+            if (!currentLine) {
+              currentLine = part;
+            } else if ((currentLine + ", " + part).length <= (width - 2)) {
+              currentLine += ", " + part;
+            } else {
+              pushStr(`${currentLine}\n`);
+              currentLine = part;
+            }
           }
+          if (currentLine) {
+            pushStr(`${currentLine}\n`);
+          }
+        } else {
+          pushStr(`${rawAddress}\n`);
         }
-        if (currentLine) {
-          pushStr(`${currentLine}\n`);
-        }
-      } else {
-        pushStr(`${rawAddress}\n`);
       }
     }
 
-    const rawHotline = bill.restaurantHotline || cachedState?.restaurantProfile?.phone || "+880 1756-007600";
-    if (rawHotline) {
-      pushStr(`Hotline: ${rawHotline}\n`);
+    if ((bill as any).showPhone !== false) {
+      const rawHotline = bill.restaurantHotline || cachedState?.restaurantProfile?.phone || "+880 1756-007600";
+      if (rawHotline) {
+        pushStr(`Hotline: ${rawHotline}\n`);
+      }
     }
 
-    const rawBin = bill.restaurantBin || "0029381-01";
-    if (rawBin) {
+    if ((bill as any).showBinVat && bill.restaurantBin) {
+      const rawBin = bill.restaurantBin || "0029381-01";
       pushStr(`BIN/VAT Reg: ${rawBin}\n`);
     }
-    pushStr("------------------------------------------\n");
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(`${bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL"}\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-    pushStr("------------------------------------------\n");
 
-    // 4. Left Align: Invoice metadata
+    pushStr(divider);
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+    const bannerText = (bill as any).headerTitle || (bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL");
+    pushStr(`${bannerText}\n`);
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+    pushStr(divider);
+
+    // 4. Left & Right Justified: Invoice metadata (Flush to margins)
     pushBytes([0x1B, 0x61, 0x00]); // Left
-    pushStr(line2Col("Invoice No :", bill.invoiceNo || "INV-0000"));
+    pushStr(line2Col("Invoice No :", bill.invoiceNo || "INV-0000", width));
     let dateStr = "";
     let timeStr = "";
     const rawDt = bill.dateTime || new Date().toLocaleString("en-US");
@@ -533,63 +542,77 @@ async function startServer() {
         timeStr = new Date().toLocaleTimeString("en-US");
       }
     }
-    const metaLine = (lbl: string, val?: string) => {
-      if (!val) return "";
-      return lbl.padEnd(14, ' ') + ': ' + val + '\n';
-    };
-
-    pushStr(metaLine("Invoice No", bill.invoiceNo || "INV-0000"));
-    pushStr(line2Col(`Date : ${dateStr}`, `Time: ${timeStr}`));
-    pushStr(metaLine("Table & Zone", `${bill.tableName || "Takeaway"}${bill.tableZone ? ` (${bill.tableZone})` : ""}`));
+    pushStr(line2Col(`Date : ${dateStr}`, `Time: ${timeStr}`, width));
+    if ((bill as any).showTableZone !== false) {
+      pushStr(line2Col("Table & Zone :", `${bill.tableName || "Takeaway"}${bill.tableZone ? ` (${bill.tableZone})` : ""}`, width));
+    }
     if (bill.channelOrAgent) {
-      pushStr(metaLine("Channel", bill.channelOrAgent));
+      pushStr(line2Col("Channel :", bill.channelOrAgent, width));
     }
     if ((bill as any).showWaiter !== false) {
-      pushStr(metaLine("Waiter", bill.waiter && bill.waiter !== "N/A" && bill.waiter !== "Staff" ? bill.waiter : (bill.waiter || "Staff")));
+      const waiterTxt = bill.waiter && bill.waiter !== "N/A" && bill.waiter !== "Staff" ? bill.waiter : (bill.waiter || "Staff");
+      pushStr(line2Col("Waiter :", waiterTxt, width));
     }
     const orderTaker = bill.orderTakenBy || bill.orderCreatedBy || bill.waiter || "Staff";
     if (orderTaker && orderTaker !== (bill.waiter || "Staff")) {
-      pushStr(metaLine("Order Taken By", orderTaker));
+      pushStr(line2Col("Order Taken By :", orderTaker, width));
     }
     if (bill.isSettled) {
       const settleRole = bill.settleBillRole || bill.cashierRole || "Cashier";
-      pushStr(metaLine("Bill Settled By", settleRole));
+      pushStr(line2Col("Bill Settled By :", settleRole, width));
     }
-    if (bill.customer && bill.customer !== "Walk-in Customer") {
-      pushStr(metaLine("Customer", bill.customer));
+    if ((bill as any).showCustomer !== false && bill.customer && bill.customer !== "Walk-in Customer") {
+      pushStr(line2Col("Customer :", bill.customer, width));
     }
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
 
-    // 5. Items Header (Exact 42 character columns: 19 + 1 + 4 + 1 + 8 + 1 + 8 = 42)
+    // 5. Items Header
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    const colItemH = "ITEM".padEnd(19, ' ');
-    const colQtyH = " QTY";
-    const colPriceH = "   PRICE";
-    const colTotalH = "   TOTAL";
-    pushStr(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}\n`);
+    if (width === 48) {
+      const colItemH = "ITEM".padEnd(21, ' ');
+      const colQtyH = " QTY ";
+      const colPriceH = "    PRICE";
+      const colTotalH = "     TOTAL";
+      pushStr(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}\n`);
+    } else {
+      const colItemH = "ITEM".padEnd(14, ' ');
+      const colQtyH = "QTY";
+      const colPriceH = " PRICE";
+      const colTotalH = " TOTAL";
+      pushStr(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}\n`);
+    }
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
 
     // 6. Food Items (Crisp & High Legibility)
+    const itemLimit = width === 48 ? 21 : 14;
     for (const item of bill.items) {
       let firstLineName = (item.name || "").trim();
       let remainder = "";
-      if (firstLineName.length > 19) {
-        const lastSpace = firstLineName.lastIndexOf(" ", 19);
+      if (firstLineName.length > itemLimit) {
+        const lastSpace = firstLineName.lastIndexOf(" ", itemLimit);
         if (lastSpace > 8) {
           remainder = firstLineName.slice(lastSpace + 1).trim();
           firstLineName = firstLineName.slice(0, lastSpace);
         } else {
-          remainder = firstLineName.slice(19).trim();
-          firstLineName = firstLineName.slice(0, 19);
+          remainder = firstLineName.slice(itemLimit).trim();
+          firstLineName = firstLineName.slice(0, itemLimit);
         }
       }
-      const colItem = firstLineName.padEnd(19, ' ');
-      const colQty = (" " + item.qty + " ").padStart(4, ' ');
-      const colPrice = Number(item.price).toFixed(2).padStart(8, ' ');
-      const colTotal = Number(item.price * item.qty).toFixed(2).padStart(8, ' ');
+      if (width === 48) {
+        const colItem = firstLineName.padEnd(21, ' ');
+        const colQty = (" " + item.qty + " ").padStart(5, ' ');
+        const colPrice = Number(item.price).toFixed(2).padStart(9, ' ');
+        const colTotal = Number(item.price * item.qty).toFixed(2).padStart(10, ' ');
+        pushStr(`${colItem} ${colQty} ${colPrice} ${colTotal}\n`);
+      } else {
+        const colItem = firstLineName.padEnd(14, ' ');
+        const colQty = String(item.qty).padStart(3, ' ');
+        const colPrice = Number(item.price).toFixed(0).padStart(6, ' ');
+        const colTotal = Number(item.price * item.qty).toFixed(0).padStart(6, ' ');
+        pushStr(`${colItem} ${colQty} ${colPrice} ${colTotal}\n`);
+      }
 
-      pushStr(`${colItem} ${colQty} ${colPrice} ${colTotal}\n`);
       if (remainder) {
         pushStr(`  ${remainder}\n`);
       }
@@ -604,36 +627,36 @@ async function startServer() {
       }
     }
 
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
 
-    // 7. Financial Summary (Right-aligned matching the TOTAL column at column 42)
+    // 7. Financial Summary (Right-aligned matching the TOTAL column at column width)
     pushBytes([0x1B, 0x61, 0x00]); // Left align
-    pushStr(line2Col("Subtotal:", Number(bill.subtotal || 0).toFixed(2)));
+    pushStr(line2Col("Subtotal:", Number(bill.subtotal || 0).toFixed(2), width));
     if (bill.discountDeduction && bill.discountDeduction > 0) {
       const discLbl = bill.discountType === 'percent' && bill.discountVal 
         ? `Discount (${bill.discountVal}%):` 
         : "Discount:";
-      pushStr(line2Col(discLbl, `-${Number(bill.discountDeduction).toFixed(2)}`));
+      pushStr(line2Col(discLbl, `-${Number(bill.discountDeduction).toFixed(2)}`, width));
     }
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(line2Col("TOTAL PAYABLE:", Number(bill.netTotal || 0).toFixed(2)));
+    pushStr(line2Col("TOTAL PAYABLE:", Number(bill.netTotal || 0).toFixed(2), width));
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     // Payment breakdown if settled
     const pb = (bill as any).paymentBreakdown;
-    if (pb) {
-      pushStr("------------------------------------------\n");
-      if (pb.cash > 0) pushStr(line2Col("Cash Paid:", Number(pb.cash).toFixed(2)));
-      if (pb.card > 0) pushStr(line2Col("Card Paid:", Number(pb.card).toFixed(2)));
-      if (pb.bkash > 0) pushStr(line2Col("bKash Paid:", Number(pb.bkash).toFixed(2)));
-      if (pb.nagad > 0) pushStr(line2Col("Nagad Paid:", Number(pb.nagad).toFixed(2)));
-      if (pb.due > 0) pushStr(line2Col("Due / Credit:", Number(pb.due).toFixed(2)));
+    if (pb && (bill as any).showPaymentBreakdown !== false) {
+      pushStr(divider);
+      if (pb.cash > 0) pushStr(line2Col("Cash Paid:", Number(pb.cash).toFixed(2), width));
+      if (pb.card > 0) pushStr(line2Col("Card Paid:", Number(pb.card).toFixed(2), width));
+      if (pb.bkash > 0) pushStr(line2Col("bKash Paid:", Number(pb.bkash).toFixed(2), width));
+      if (pb.nagad > 0) pushStr(line2Col("Nagad Paid:", Number(pb.nagad).toFixed(2), width));
+      if (pb.due > 0) pushStr(line2Col("Due / Credit:", Number(pb.due).toFixed(2), width));
       if ((bill as any).changeReturn && (bill as any).changeReturn > 0) {
-        pushStr(line2Col("Change Return:", Number((bill as any).changeReturn).toFixed(2)));
+        pushStr(line2Col("Change Return:", Number((bill as any).changeReturn).toFixed(2), width));
       }
     }
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
 
     // 8. Center Align: Footer Note
     pushBytes([0x1B, 0x61, 0x01]); // Center
@@ -642,9 +665,16 @@ async function startServer() {
       pushStr("*** PAID & SETTLED ***\n");
       pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     }
-    pushStr("Thank you for dining with us!\n");
-    pushStr("Please visit again\n");
-    pushStr("------------------------------------------\n");
+    if ((bill as any).footerMessage) {
+      pushStr(`${(bill as any).footerMessage}\n`);
+    } else {
+      pushStr("Thank you for dining with us!\n");
+      pushStr("Please visit again\n");
+    }
+    if ((bill as any).footerNotes) {
+      pushStr(`${(bill as any).footerNotes}\n`);
+    }
+    pushStr(divider);
 
     // 9. Feed & Cut
     pushStr("\n\n\n");

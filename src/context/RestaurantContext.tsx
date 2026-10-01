@@ -3571,6 +3571,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const billInvoiceNo = 'BILL-' + Date.now().toString().slice(-6);
     const billDateTime = new Date().toLocaleString('en-US');
 
+    const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
+    const defaultPrimaryBillTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
+      || allTemplates.find(t => t.isActive && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
+      || allTemplates[0];
+
     const billPayload: PrintableReceipt = {
       restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT POS',
       restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'Chattogram, Bangladesh',
@@ -3596,7 +3601,21 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       netTotal,
       isSettled: false,
       receiptType: 'BILL',
-      isDirectPrint: false
+      isDirectPrint: false,
+      targetTemplateId: defaultPrimaryBillTemplate?.id,
+      paperWidth: defaultPrimaryBillTemplate?.paperWidth || '80mm',
+      headerTitle: defaultPrimaryBillTemplate?.headerTitle,
+      showLogo: defaultPrimaryBillTemplate?.showLogo !== false,
+      showAddress: defaultPrimaryBillTemplate?.showAddress !== false,
+      showPhone: defaultPrimaryBillTemplate?.showPhone !== false,
+      showBinVat: Boolean(defaultPrimaryBillTemplate?.showBinVat),
+      showTableZone: defaultPrimaryBillTemplate?.showTableZone !== false,
+      showWaiter: defaultPrimaryBillTemplate?.showWaiter !== false,
+      showCustomer: defaultPrimaryBillTemplate?.showCustomer !== false,
+      showPrices: defaultPrimaryBillTemplate?.showPrices !== false,
+      showPaymentBreakdown: defaultPrimaryBillTemplate?.showPaymentBreakdown !== false,
+      footerMessage: defaultPrimaryBillTemplate?.footerMessage,
+      footerNotes: defaultPrimaryBillTemplate?.footerNotes
     };
 
     if (showModal) {
@@ -3762,6 +3781,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (e) {}
 
     // Paid Cash Memo receipt payload for hardware printing
+    const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
+    const defaultPrimaryBillTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
+      || allTemplates.find(t => t.isActive && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
+      || allTemplates[0];
+
     const memoReceipt: PrintableReceipt = {
       restaurantName: data.restaurantProfile?.name || DEFAULT_RESTAURANT_PROFILE.name || 'BD HOSTT POS',
       restaurantAddress: data.restaurantProfile?.address || DEFAULT_RESTAURANT_PROFILE.address || 'Chattogram, Bangladesh',
@@ -3792,7 +3816,21 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       changeReturn,
       isSettled: true,
       receiptType: 'PAID_MEMO',
-      isDirectPrint: false
+      isDirectPrint: false,
+      targetTemplateId: defaultPrimaryBillTemplate?.id,
+      paperWidth: defaultPrimaryBillTemplate?.paperWidth || '80mm',
+      headerTitle: defaultPrimaryBillTemplate?.headerTitle,
+      showLogo: defaultPrimaryBillTemplate?.showLogo !== false,
+      showAddress: defaultPrimaryBillTemplate?.showAddress !== false,
+      showPhone: defaultPrimaryBillTemplate?.showPhone !== false,
+      showBinVat: Boolean(defaultPrimaryBillTemplate?.showBinVat),
+      showTableZone: defaultPrimaryBillTemplate?.showTableZone !== false,
+      showWaiter: defaultPrimaryBillTemplate?.showWaiter !== false,
+      showCustomer: defaultPrimaryBillTemplate?.showCustomer !== false,
+      showPrices: defaultPrimaryBillTemplate?.showPrices !== false,
+      showPaymentBreakdown: defaultPrimaryBillTemplate?.showPaymentBreakdown !== false,
+      footerMessage: defaultPrimaryBillTemplate?.footerMessage,
+      footerNotes: defaultPrimaryBillTemplate?.footerNotes
     };
 
     const memoPayload = {
