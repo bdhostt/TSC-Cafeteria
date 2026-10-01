@@ -1111,7 +1111,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
                   </div>
 
                   {/* Financials for Bill */}
-                  {(targetSlipType === 'BILL' || targetSlipType === 'BOTH') && (
+                  {(templateType === 'BILL' || templateType === 'BOTH') && (
                     <div className="py-1.5 space-y-0.5 border-b border-dashed border-slate-400">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
