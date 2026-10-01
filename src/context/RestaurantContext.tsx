@@ -3076,7 +3076,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       || allTemplates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
       || allTemplates[0];
 
-    const isGlobalKotPricesEnabled = Boolean(defaultPrimaryKotTemplate?.showPricesOnKot);
+    const hasAnyKotPriceEnabled = allTemplates.some(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH') && t.showPricesOnKot);
+    const isGlobalKotPricesEnabled = Boolean(defaultPrimaryKotTemplate?.showPricesOnKot || hasAnyKotPriceEnabled);
 
     if (showModal) {
       setPrintableReceipt({
@@ -3143,7 +3144,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               items: deptItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
-                price: i.price,
+                price: Number(i.price || 0),
                 variation: i.selectedVariation?.name,
                 addons: i.selectedAddons?.map(a => a.name),
                 notes: i.notes
@@ -3157,7 +3158,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             items: enriched.map(i => ({
               name: i.name,
               qty: i.qty,
-              price: i.price,
+              price: Number(i.price || 0),
               variation: i.selectedVariation?.name,
               addons: i.selectedAddons?.map(a => a.name),
               notes: i.notes

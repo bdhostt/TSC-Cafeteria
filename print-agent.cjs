@@ -402,7 +402,7 @@ function buildKotEscPosBuffer(req, slip, index, total) {
   }
   pushStr('------------------------------------------\n');
 
-  const shouldShowPrices = Boolean(slip.showPrices ?? req.showPrices);
+  const shouldShowPrices = Boolean(slip.showPrices || req.showPrices);
 
   if (shouldShowPrices) {
     // 5. Items Header with Price (Exact 42 character columns: 22 item + 1 space + 5 qty + 1 space + 13 price = 42)
@@ -417,7 +417,8 @@ function buildKotEscPosBuffer(req, slip, index, total) {
     // 6. Food Items with Prices
     let totalAmount = 0;
     for (const item of (slip.items || [])) {
-      const itemTotal = Number(item.price || 0) * item.qty;
+      const itemPrice = Number(item.price || 0);
+      const itemTotal = itemPrice * item.qty;
       totalAmount += itemTotal;
 
       let firstLineName = (item.name || '').trim();
@@ -435,13 +436,16 @@ function buildKotEscPosBuffer(req, slip, index, total) {
 
       const nameCol = firstLineName.padEnd(22, ' ');
       const qtyCol = (item.qty + 'x').padStart(5, ' ');
-      const priceCol = (item.price != null ? 'Tk ' + itemTotal : '').padStart(13, ' ');
+      const priceCol = `Tk ${itemTotal}`.padStart(13, ' ');
 
       pushBytes([0x1B, 0x45, 0x01]); // Bold ON
       pushStr(nameCol + ' ' + qtyCol + ' ' + priceCol + '\n');
       pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
       if (remainder) pushStr('  ' + remainder + '\n');
+      if (item.qty > 1 && itemPrice > 0) {
+        pushStr('   (' + item.qty + ' @ Tk ' + itemPrice + ')\n');
+      }
       if (item.variation) pushStr('   - Cut: ' + item.variation + '\n');
       if (item.addons && item.addons.length > 0) pushStr('   - Extras: ' + item.addons.join(', ') + '\n');
       if (item.notes) pushStr('   - Note: ' + item.notes + '\n');

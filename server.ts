@@ -316,7 +316,7 @@ async function startServer() {
     }
     pushStr("------------------------------------------\n");
 
-    const shouldShowPrices = Boolean(slip.showPrices ?? req.showPrices);
+    const shouldShowPrices = Boolean(slip.showPrices || req.showPrices);
 
     if (shouldShowPrices) {
       // 5. Items Header with Price (Exact 42 character columns: 22 item + 1 space + 5 qty + 1 space + 13 price = 42)
@@ -331,7 +331,8 @@ async function startServer() {
       // 6. Food Items (with prices)
       let totalAmount = 0;
       for (const item of slip.items) {
-        const itemTotal = Number(item.price || 0) * item.qty;
+        const itemPrice = Number(item.price || 0);
+        const itemTotal = itemPrice * item.qty;
         totalAmount += itemTotal;
 
         let firstLineName = item.name.trim();
@@ -349,7 +350,7 @@ async function startServer() {
 
         const nameCol = firstLineName.padEnd(22, ' ');
         const qtyCol = `${item.qty}x`.padStart(5, ' ');
-        const priceCol = (item.price != null ? `Tk ${itemTotal}` : "").padStart(13, ' ');
+        const priceCol = `Tk ${itemTotal}`.padStart(13, ' ');
 
         pushBytes([0x1B, 0x45, 0x01]); // Bold ON
         pushStr(`${nameCol} ${qtyCol} ${priceCol}\n`);
@@ -357,6 +358,9 @@ async function startServer() {
 
         if (remainder) {
           pushStr(`  ${remainder}\n`);
+        }
+        if (item.qty > 1 && itemPrice > 0) {
+          pushStr(`   (${item.qty} @ Tk ${itemPrice})\n`);
         }
         if (item.variation) {
           pushStr(`   - Cut: ${item.variation}\n`);

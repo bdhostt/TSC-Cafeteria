@@ -262,7 +262,7 @@ export const ThermalBillModal: React.FC = () => {
 
     // 2. KOT Ticket: Hardware kitchen station print
     try {
-      const showPrices = Boolean(activeTemplate?.showPricesOnKot);
+      const showPrices = Boolean(activeTemplate?.showPricesOnKot || printableReceipt?.showPrices);
       const slipsToPrint = (selectedDeptFilter === 'ALL')
         ? [{
             station: 'Master KOT (All Stations)',
@@ -271,7 +271,7 @@ export const ThermalBillModal: React.FC = () => {
             items: displayedItems.map(i => ({
               name: i.name,
               qty: i.qty,
-              price: i.price,
+              price: Number(i.price || 0),
               variation: i.selectedVariation?.name,
               addons: i.selectedAddons?.map(a => a.name),
               notes: i.notes
@@ -286,11 +286,11 @@ export const ThermalBillModal: React.FC = () => {
                   return {
                     station: dept,
                     targetPrinterName: deptPrinter?.name || 'Kot Printer',
-                    showPrices: Boolean(deptTemplate?.showPricesOnKot),
+                    showPrices: Boolean(deptTemplate?.showPricesOnKot || showPrices || printableReceipt?.showPrices),
                     items: deptItems.map(i => ({
                       name: i.name,
                       qty: i.qty,
-                      price: i.price,
+                      price: Number(i.price || 0),
                       variation: i.selectedVariation?.name,
                       addons: i.selectedAddons?.map(a => a.name),
                       notes: i.notes
@@ -304,7 +304,7 @@ export const ThermalBillModal: React.FC = () => {
                   items: displayedItems.map(i => ({
                     name: i.name,
                     qty: i.qty,
-                    price: i.price,
+                    price: Number(i.price || 0),
                     variation: i.selectedVariation?.name,
                     addons: i.selectedAddons?.map(a => a.name),
                     notes: i.notes
@@ -317,7 +317,7 @@ export const ThermalBillModal: React.FC = () => {
               items: displayedItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
-                price: i.price,
+                price: Number(i.price || 0),
                 variation: i.selectedVariation?.name,
                 addons: i.selectedAddons?.map(a => a.name),
                 notes: i.notes
