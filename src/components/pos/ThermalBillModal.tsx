@@ -404,44 +404,64 @@ export const ThermalBillModal: React.FC = () => {
 
       const kotLines: string[] = [];
       kotLines.push(divider);
-      kotLines.push(centerLine(`STATION: ${stationName}`, width));
-      kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${printableReceipt.invoiceNo}`, width));
-      if (isCancelKot) {
-        kotLines.push(centerLine('*** VOID / CANCELLED ORDER ***', width));
-      }
+      kotLines.push(centerLine(isCancelKot ? '*** VOID / CANCELLED KOT ***' : '*** KITCHEN ORDER TICKET ***', width));
       kotLines.push(divider);
-      kotLines.push(line2Col('TABLE :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`, width));
-      if (activeTemplate?.showWaiter !== false) {
-        kotLines.push(line2Col('WAITER :', printableReceipt.waiter || 'Staff', width));
+
+      const invoiceVal = (printableReceipt.invoiceNo || 'KOT-0000') + (isCancelKot ? ' (VOID)' : '');
+      kotLines.push(line2Col(isCancelKot ? 'Void KOT No :' : 'KOT No :', invoiceVal, width));
+      if (stationName) {
+        kotLines.push(line2Col('Station :', stationName, width));
       }
-      kotLines.push(line2Col('TIME :', printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`, width));
+
+      let dateStr = '';
+      let timeStr = '';
+      const rawDt = printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`;
+      if (rawDt.includes(',')) {
+        const parts = rawDt.split(',');
+        dateStr = parts[0].trim();
+        timeStr = parts.slice(1).join(',').trim();
+      } else {
+        const parts = rawDt.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          dateStr = parts[0];
+          timeStr = parts.slice(1).join(' ');
+        } else {
+          dateStr = rawDt;
+          timeStr = new Date().toLocaleTimeString('en-US');
+        }
+      }
+      kotLines.push(line2Col('Date : ' + dateStr, 'Time: ' + timeStr, width));
+      kotLines.push(line2Col('Table & Zone :', `${printableReceipt.tableName || 'Table'}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`, width));
+      if (activeTemplate?.showWaiter !== false) {
+        kotLines.push(line2Col('Waiter :', printableReceipt.waiter || 'Staff', width));
+      }
       if (printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
-        kotLines.push(line2Col('CUSTOMER :', printableReceipt.customer, width));
+        kotLines.push(line2Col('Customer :', printableReceipt.customer, width));
       }
       if (isCancelKot && printableReceipt.voidAuthorizedBy) {
-        kotLines.push(line2Col('AUTH BY :', printableReceipt.voidAuthorizedBy, width));
+        kotLines.push(line2Col('Auth By :', printableReceipt.voidAuthorizedBy, width));
       }
       if (isCancelKot && printableReceipt.voidReason) {
-        kotLines.push(line2Col('REASON :', printableReceipt.voidReason, width));
+        kotLines.push(line2Col('Reason :', printableReceipt.voidReason, width));
       }
       kotLines.push(divider);
 
       const showPrices = Boolean(activeTemplate?.showPricesOnKot || printableReceipt?.showPrices);
       if (showPrices) {
         if (width === 48) {
-          const kotItemH = 'ITEM NAME'.padEnd(26, ' ');
+          const kotItemH = 'ITEM'.padEnd(28, ' ');
           const kotQtyH = ' QTY  ';
-          const kotPriceH = '         PRICE';
+          const kotPriceH = '       PRICE';
           kotLines.push(`${kotItemH} ${kotQtyH} ${kotPriceH}`);
         } else {
-          const kotItemH = 'ITEM'.padEnd(16, ' ');
-          const kotQtyH = 'QTY ';
+          const kotItemH = 'ITEM'.padEnd(14, ' ');
+          const kotQtyH = ' QTY ';
           const kotPriceH = '     PRICE';
           kotLines.push(`${kotItemH} ${kotQtyH} ${kotPriceH}`);
         }
         kotLines.push(divider);
 
-        const nameLimit = width === 48 ? 26 : 16;
+        const nameLimit = width === 48 ? 28 : 14;
         for (const item of displayedItems) {
           const itemPrice = Number(item.price || 0);
 
@@ -459,14 +479,14 @@ export const ThermalBillModal: React.FC = () => {
           }
 
           if (width === 48) {
-            const nameCol = firstLineName.padEnd(26, ' ');
-            const qtyCol = (' ' + item.qty + 'x ').padStart(6, ' ');
-            const priceCol = `Tk ${itemPrice}`.padStart(14, ' ');
+            const nameCol = firstLineName.padEnd(28, ' ');
+            const qtyCol = (item.qty + 'x').padStart(4, ' ').padEnd(6, ' ');
+            const priceCol = itemPrice.toFixed(2).padStart(12, ' ');
             kotLines.push(`${nameCol} ${qtyCol} ${priceCol}`);
           } else {
-            const nameCol = firstLineName.padEnd(16, ' ');
-            const qtyCol = `${item.qty}x `.padStart(4, ' ');
-            const priceCol = `Tk ${itemPrice}`.padStart(10, ' ');
+            const nameCol = firstLineName.padEnd(14, ' ');
+            const qtyCol = (item.qty + 'x').padStart(4, ' ').padEnd(5, ' ');
+            const priceCol = itemPrice.toFixed(2).padStart(11, ' ');
             kotLines.push(`${nameCol} ${qtyCol} ${priceCol}`);
           }
           if (remainder) kotLines.push(`  ${remainder}`);
@@ -479,17 +499,17 @@ export const ThermalBillModal: React.FC = () => {
         kotLines.push(divider);
       } else {
         if (width === 48) {
-          const kotItemH = 'ITEM NAME'.padEnd(38, ' ');
+          const kotItemH = 'ITEM'.padEnd(38, ' ');
           const kotQtyH = '      QTY';
           kotLines.push(`${kotItemH} ${kotQtyH}`);
         } else {
-          const kotItemH = 'ITEM'.padEnd(24, ' ');
-          const kotQtyH = '    QTY';
+          const kotItemH = 'ITEM'.padEnd(22, ' ');
+          const kotQtyH = '      QTY';
           kotLines.push(`${kotItemH} ${kotQtyH}`);
         }
         kotLines.push(divider);
 
-        const nameLimit = width === 48 ? 38 : 24;
+        const nameLimit = width === 48 ? 38 : 22;
         for (const item of displayedItems) {
           const name = item.name.length > nameLimit ? item.name.slice(0, nameLimit) : item.name;
           if (width === 48) {
@@ -497,8 +517,8 @@ export const ThermalBillModal: React.FC = () => {
             const qtyCol = (item.qty + 'x').padStart(9, ' ');
             kotLines.push(`${nameCol} ${qtyCol}`);
           } else {
-            const nameCol = name.padEnd(24, ' ');
-            const qtyCol = (item.qty + 'x').padStart(7, ' ');
+            const nameCol = name.padEnd(22, ' ');
+            const qtyCol = (item.qty + 'x').padStart(9, ' ');
             kotLines.push(`${nameCol} ${qtyCol}`);
           }
           if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);

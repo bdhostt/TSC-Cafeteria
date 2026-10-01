@@ -353,7 +353,7 @@ async function printSlipFast(printerName, rawBuffer) {
 }
 
 function line2Col(left, right, width) {
-  width = width || 42;
+  width = width || 48;
   const l = (left || '').trim();
   const r = (right || '').trim();
   const maxL = Math.max(0, width - 1 - r.length);
@@ -362,7 +362,15 @@ function line2Col(left, right, width) {
   return safeL + ' '.repeat(spaces) + r + '\n';
 }
 
-function buildKotEscPosBuffer(req, slip, index, total) {
+function centerLine(text, width) {
+  width = width || 48;
+  const t = (text || '').trim();
+  if (t.length >= width) return t;
+  const leftPad = Math.floor((width - t.length) / 2);
+  return ' '.repeat(leftPad) + t;
+}
+
+function buildKotEscPosBuffer(req, slip, index, total, targetPrinter) {
   const chunks = [];
   const pushStr = (str) => chunks.push(Buffer.from(str, 'latin1'));
   const pushBytes = (arr) => chunks.push(Buffer.from(arr));
@@ -373,66 +381,97 @@ function buildKotEscPosBuffer(req, slip, index, total) {
   // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
   pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF (prevents muddy/bleeding characters)
   pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
-  pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform standard font A (12x24, 42 columns)
+  pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform standard font A (12x24)
 
-  const width = (slip.paperWidth || req.paperWidth) === '58mm' ? 32 : 48;
+  const is58mmReq = (slip.paperWidth || req.paperWidth) === '58mm';
+  const is58mmPrinter = /58/i.test(targetPrinter || '') && !/80/i.test(targetPrinter || '');
+  const width = (is58mmReq && is58mmPrinter) ? 32 : 48;
   const divider = '-'.repeat(width) + '\n';
 
-  // 3. Center Align: Station & KOT number
+  // 3. Center Align: KOT Header Banner
   pushBytes([0x1B, 0x61, 0x01]);
   pushStr(divider);
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-  const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
-  pushStr('STATION: ' + cleanStation.toUpperCase() + '\n');
-  pushStr('KOT NO: ' + req.invoiceNo + (total > 1 ? '-' + index : '') + '\n');
-  if (slip.category) {
-    pushStr('Category: ' + slip.category + '\n');
-  }
+  pushStr(centerLine('*** KITCHEN ORDER TICKET ***', width) + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
   pushStr(divider);
 
-  // 4. Left & Right Justified: Table, Time, Waiter Info (Flush to margins)
+  // 4. Left & Right Justified: Metadata (Strict 48 Columns Flush Left/Right)
   pushBytes([0x1B, 0x61, 0x00]);
-  pushStr(line2Col('TABLE :', req.tableName + (req.tableZone ? ' (' + req.tableZone + ')' : ''), width));
+  const invoiceVal = (req.invoiceNo || 'KOT-0000') + (total > 1 ? '-' + index : '');
+  pushStr(line2Col('KOT No :', invoiceVal, width));
 
-  const timeStr = req.dateTime || new Date().toLocaleString('en-US');
+  const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
+  if (cleanStation) {
+    pushStr(line2Col('Station :', cleanStation.toUpperCase(), width));
+  }
+
+  // Dual Date & Time (Same as Bill: Date on left, Time on right flush to column 48)
   const shouldShowDateTime = slip.showDateTime !== undefined ? Boolean(slip.showDateTime) : (req.showDateTime !== false);
   if (shouldShowDateTime) {
-    pushStr(line2Col('TIME :', timeStr, width));
+    let dateStr = '';
+    let timeStr = '';
+    const rawDt = req.dateTime || new Date().toLocaleString('en-US');
+    if (rawDt.includes(',')) {
+      const parts = rawDt.split(',');
+      dateStr = parts[0].trim();
+      timeStr = parts.slice(1).join(',').trim();
+    } else {
+      const parts = rawDt.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        dateStr = parts[0];
+        timeStr = parts.slice(1).join(' ');
+      } else {
+        dateStr = rawDt;
+        timeStr = new Date().toLocaleTimeString('en-US');
+      }
+    }
+    pushStr(line2Col('Date : ' + dateStr, 'Time: ' + timeStr, width));
   }
 
+  // Table & Zone (Matches Bill format)
+  pushStr(line2Col('Table & Zone :', (req.tableName || 'Table') + (req.tableZone ? ' (' + req.tableZone + ')' : ''), width));
+
+  // Waiter
   const shouldShowWaiter = slip.showWaiter !== undefined ? Boolean(slip.showWaiter) : (req.showWaiter !== undefined ? Boolean(req.showWaiter) : true);
   if (shouldShowWaiter) {
-    pushStr(line2Col('WAITER :', (req.waiter || 'Staff'), width));
+    pushStr(line2Col('Waiter :', req.waiter || 'Staff', width));
   }
 
+  // Customer
   const shouldShowCustomer = slip.showCustomer !== undefined ? Boolean(slip.showCustomer) : Boolean(req.showCustomer);
   if (shouldShowCustomer && req.customer && req.customer !== 'Walk-in Customer') {
-    pushStr(line2Col('CUSTOMER :', req.customer, width));
+    pushStr(line2Col('Customer :', req.customer, width));
   }
+
+  if (slip.category) {
+    pushStr(line2Col('Category :', slip.category, width));
+  }
+
   pushStr(divider);
 
+  // 5. Items Grid
   const shouldShowPrices = Boolean(slip.showPrices || req.showPrices);
 
   if (shouldShowPrices) {
-    // 5. Items Header with Price
+    // 3 Columns: ITEM (starts col 1), QTY (center), PRICE (ends col 48)
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     if (width === 48) {
-      const colItemH = 'ITEM NAME'.padEnd(26, ' ');
+      const colItemH = 'ITEM'.padEnd(28, ' ');
       const colQtyH = ' QTY  ';
-      const colPriceH = '         PRICE';
+      const colPriceH = '       PRICE';
       pushStr(colItemH + ' ' + colQtyH + ' ' + colPriceH + '\n');
     } else {
-      const colItemH = 'ITEM'.padEnd(16, ' ');
-      const colQtyH = 'QTY ';
+      const colItemH = 'ITEM'.padEnd(14, ' ');
+      const colQtyH = ' QTY ';
       const colPriceH = '     PRICE';
       pushStr(colItemH + ' ' + colQtyH + ' ' + colPriceH + '\n');
     }
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr(divider);
 
-    // 6. Food Items with Prices
-    const nameLimit = width === 48 ? 26 : 16;
+    // Food Items with Prices
+    const nameLimit = width === 48 ? 28 : 14;
     for (const item of (slip.items || [])) {
       const itemPrice = Number(item.price || 0);
 
@@ -450,16 +489,16 @@ function buildKotEscPosBuffer(req, slip, index, total) {
       }
 
       if (width === 48) {
-        const nameCol = firstLineName.padEnd(26, ' ');
-        const qtyCol = (' ' + item.qty + 'x ').padStart(6, ' ');
-        const priceCol = `Tk ${itemPrice}`.padStart(14, ' ');
+        const nameCol = firstLineName.padEnd(28, ' ');
+        const qtyCol = (item.qty + 'x').padStart(4, ' ').padEnd(6, ' ');
+        const priceCol = itemPrice.toFixed(2).padStart(12, ' ');
         pushBytes([0x1B, 0x45, 0x01]); // Bold ON
         pushStr(nameCol + ' ' + qtyCol + ' ' + priceCol + '\n');
         pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
       } else {
-        const nameCol = firstLineName.padEnd(16, ' ');
-        const qtyCol = `${item.qty}x `.padStart(4, ' ');
-        const priceCol = `Tk ${itemPrice}`.padStart(10, ' ');
+        const nameCol = firstLineName.padEnd(14, ' ');
+        const qtyCol = (item.qty + 'x').padStart(4, ' ').padEnd(5, ' ');
+        const priceCol = itemPrice.toFixed(2).padStart(11, ' ');
         pushBytes([0x1B, 0x45, 0x01]); // Bold ON
         pushStr(nameCol + ' ' + qtyCol + ' ' + priceCol + '\n');
         pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
@@ -473,34 +512,33 @@ function buildKotEscPosBuffer(req, slip, index, total) {
 
     pushStr(divider);
   } else {
-    // 5. Items Header without price
+    // 2 Columns: ITEM (starts col 1), QTY (ends col 48)
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     if (width === 48) {
-      const colItemH = 'ITEM NAME'.padEnd(38, ' ');
+      const colItemH = 'ITEM'.padEnd(38, ' ');
       const colQtyH = '      QTY';
       pushStr(colItemH + ' ' + colQtyH + '\n');
     } else {
-      const colItemH = 'ITEM'.padEnd(24, ' ');
-      const colQtyH = '    QTY';
+      const colItemH = 'ITEM'.padEnd(22, ' ');
+      const colQtyH = '      QTY';
       pushStr(colItemH + ' ' + colQtyH + '\n');
     }
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr(divider);
 
-    // 6. Food Items (Crisp, High Legibility)
-    const nameLimit = width === 48 ? 38 : 24;
+    const nameLimit = width === 48 ? 38 : 22;
     for (const item of (slip.items || [])) {
       const name = item.name.length > nameLimit ? item.name.slice(0, nameLimit) : item.name;
       if (width === 48) {
         const nameCol = name.padEnd(38, ' ');
         const qtyCol = (item.qty + 'x').padStart(9, ' ');
-        pushBytes([0x1B, 0x45, 0x01]); // Bold ON for item name and qty
+        pushBytes([0x1B, 0x45, 0x01]); // Bold ON
         pushStr(nameCol + ' ' + qtyCol + '\n');
         pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
       } else {
-        const nameCol = name.padEnd(24, ' ');
-        const qtyCol = (item.qty + 'x').padStart(7, ' ');
-        pushBytes([0x1B, 0x45, 0x01]); // Bold ON for item name and qty
+        const nameCol = name.padEnd(22, ' ');
+        const qtyCol = (item.qty + 'x').padStart(9, ' ');
+        pushBytes([0x1B, 0x45, 0x01]); // Bold ON
         pushStr(nameCol + ' ' + qtyCol + '\n');
         pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
       }
@@ -513,6 +551,7 @@ function buildKotEscPosBuffer(req, slip, index, total) {
     pushStr(divider);
   }
 
+  // 6. Feed & Cut
   pushStr('\n\n\n');
   pushBytes([0x1D, 0x56, 0x00]);
 
@@ -1118,7 +1157,7 @@ async function processPrintJob(job) {
       const slip = slips[i];
       const targetPrinter = resolveThermalPrinter(installedPrinters, slip.targetPrinterName);
       console.log(' ➔ Printing KOT Slip ' + (i + 1) + '/' + slips.length + ' on "' + targetPrinter + '"...');
-      const buffer = buildKotEscPosBuffer(payload, slip, i + 1, slips.length);
+      const buffer = buildKotEscPosBuffer(payload, slip, i + 1, slips.length, targetPrinter);
       const ok = await printSlipFast(targetPrinter, buffer);
       if (!ok) allOk = false;
       if (i < slips.length - 1) await new Promise(r => setTimeout(r, 200));
