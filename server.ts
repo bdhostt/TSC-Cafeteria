@@ -311,25 +311,27 @@ async function startServer() {
     const width = (is58mmReq && is58mmPrinter) ? 32 : 48;
     const divider = '-'.repeat(width) + '\n';
 
-    // 3. Center Align: KOT Header Banner
+    // 3. Center Align: Station & KOT Number (Exactly as in picture)
     pushBytes([0x1B, 0x61, 0x01]);
     pushStr(divider);
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(centerLine('*** KITCHEN ORDER TICKET ***', width) + '\n');
+    const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
+    pushStr(`STATION: ${cleanStation.toUpperCase()}\n`);
+    const invoiceVal = (req.invoiceNo || 'KOT-0000') + (total > 1 ? `-${index}` : '');
+    pushStr(`KOT NO: ${invoiceVal}\n`);
+    if (slip.category) {
+      pushStr(`Category: ${slip.category}\n`);
+    }
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr(divider);
 
     // 4. Left & Right Justified: Metadata (Strict 48 Columns Flush Left/Right)
     pushBytes([0x1B, 0x61, 0x00]);
-    const invoiceVal = (req.invoiceNo || 'KOT-0000') + (total > 1 ? '-' + index : '');
-    pushStr(line2Col('KOT No :', invoiceVal, width));
 
-    const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
-    if (cleanStation) {
-      pushStr(line2Col('Station :', cleanStation.toUpperCase(), width));
-    }
+    // Table & Zone (Matches Bill format)
+    pushStr(line2Col('Table & Zone :', `${req.tableName || 'Table'}${req.tableZone ? ` (${req.tableZone})` : ''}`, width));
 
-    // Dual Date & Time (Same as Bill: Date on left, Time on right flush to column 48)
+    // Dual Date & Time (Date on left, Time on right flush to column 48)
     const shouldShowDateTime = slip.showDateTime !== undefined ? Boolean(slip.showDateTime) : (req.showDateTime !== false);
     if (shouldShowDateTime) {
       let dateStr = '';
@@ -352,9 +354,6 @@ async function startServer() {
       pushStr(line2Col('Date : ' + dateStr, 'Time: ' + timeStr, width));
     }
 
-    // Table & Zone (Matches Bill format)
-    pushStr(line2Col('Table & Zone :', (req.tableName || 'Table') + (req.tableZone ? ' (' + req.tableZone + ')' : ''), width));
-
     // Waiter
     const shouldShowWaiter = slip.showWaiter !== undefined ? Boolean(slip.showWaiter) : (req.showWaiter !== undefined ? Boolean(req.showWaiter) : true);
     if (shouldShowWaiter) {
@@ -365,10 +364,6 @@ async function startServer() {
     const shouldShowCustomer = slip.showCustomer !== undefined ? Boolean(slip.showCustomer) : Boolean(req.showCustomer);
     if (shouldShowCustomer && req.customer && req.customer !== 'Walk-in Customer') {
       pushStr(line2Col('Customer :', req.customer, width));
-    }
-
-    if (slip.category) {
-      pushStr(line2Col('Category :', slip.category, width));
     }
 
     pushStr(divider);

@@ -404,14 +404,13 @@ export const ThermalBillModal: React.FC = () => {
 
       const kotLines: string[] = [];
       kotLines.push(divider);
-      kotLines.push(centerLine(isCancelKot ? '*** VOID / CANCELLED KOT ***' : '*** KITCHEN ORDER TICKET ***', width));
+      kotLines.push(centerLine(`STATION: ${stationName}`, width));
+      const invoiceVal = (printableReceipt.invoiceNo || 'KOT-0000') + (isCancelKot ? ' (VOID)' : '');
+      kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${invoiceVal}`, width));
       kotLines.push(divider);
 
-      const invoiceVal = (printableReceipt.invoiceNo || 'KOT-0000') + (isCancelKot ? ' (VOID)' : '');
-      kotLines.push(line2Col(isCancelKot ? 'Void KOT No :' : 'KOT No :', invoiceVal, width));
-      if (stationName) {
-        kotLines.push(line2Col('Station :', stationName, width));
-      }
+      // Metadata (Left and Right flush)
+      kotLines.push(line2Col('Table & Zone :', `${printableReceipt.tableName || 'Table'}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`, width));
 
       let dateStr = '';
       let timeStr = '';
@@ -431,7 +430,6 @@ export const ThermalBillModal: React.FC = () => {
         }
       }
       kotLines.push(line2Col('Date : ' + dateStr, 'Time: ' + timeStr, width));
-      kotLines.push(line2Col('Table & Zone :', `${printableReceipt.tableName || 'Table'}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`, width));
       if (activeTemplate?.showWaiter !== false) {
         kotLines.push(line2Col('Waiter :', printableReceipt.waiter || 'Staff', width));
       }
