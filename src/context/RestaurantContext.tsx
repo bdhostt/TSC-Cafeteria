@@ -3145,6 +3145,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               showWaiter,
               showCustomer: Boolean(deptTemplate?.showCustomer ?? defaultPrimaryKotTemplate?.showCustomer),
               showDateTime: deptTemplate?.showDateTime !== false,
+              paperWidth: deptTemplate?.paperWidth || defaultPrimaryKotTemplate?.paperWidth || '80mm',
               items: deptItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
@@ -3164,6 +3165,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               : (defaultPrimaryKotTemplate?.showWaiter !== false),
             showCustomer: Boolean(getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showCustomer ?? defaultPrimaryKotTemplate?.showCustomer),
             showDateTime: getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showDateTime !== false,
+            paperWidth: getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.paperWidth || defaultPrimaryKotTemplate?.paperWidth || '80mm',
             items: enriched.map(i => ({
               name: i.name,
               qty: i.qty,
@@ -3185,6 +3187,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         showWaiter: defaultPrimaryKotTemplate?.showWaiter !== false,
         showCustomer: Boolean(defaultPrimaryKotTemplate?.showCustomer),
         showDateTime: defaultPrimaryKotTemplate?.showDateTime !== false,
+        paperWidth: defaultPrimaryKotTemplate?.paperWidth || '80mm',
         slips: slipsToPrint
       };
 
@@ -3352,6 +3355,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       customer: table.customer || 'Walk-in Customer',
       invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
       dateTime: new Date().toLocaleString('en-US'),
+      paperWidth: defaultPrimaryKotTemplate?.paperWidth || '80mm',
       slips: [{
         station: cancelledItemInfo.department || 'Main Kitchen',
         targetPrinterName: getPrinterForDept(cancelledItemInfo.department || 'Main Kitchen')?.name,
@@ -3396,6 +3400,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         customer: table.customer || 'Walk-in Customer',
         invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
         dateTime: new Date().toLocaleString('en-US'),
+        paperWidth: defaultPrimaryKotTemplate?.paperWidth || '80mm',
         slips: [{
           station: 'All Stations',
           targetPrinterName: getPrinterForDept('Main Kitchen')?.name,
@@ -3517,6 +3522,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       customer: table.customer || 'Walk-in Customer',
       invoiceNo: 'VOID-KOT-' + Date.now().toString().slice(-5),
       dateTime: new Date().toLocaleString('en-US'),
+      paperWidth: defaultPrimaryKotTemplate?.paperWidth || '80mm',
       slips: [{
         station: cancelledItems[0]?.department || 'Main Kitchen',
         targetPrinterName: getPrinterForDept(cancelledItems[0]?.department || 'Main Kitchen')?.name,

@@ -282,6 +282,7 @@ export const ThermalBillModal: React.FC = () => {
             targetPrinterName: activePrinter?.name || 'Kot Printer',
             showPrices,
             showWaiter: activeTemplate?.showWaiter !== false,
+            paperWidth: activeTemplate?.paperWidth || '80mm',
             items: displayedItems.map(i => ({
               name: i.name,
               qty: i.qty,
@@ -302,6 +303,7 @@ export const ThermalBillModal: React.FC = () => {
                     targetPrinterName: deptPrinter?.name || 'Kot Printer',
                     showPrices: Boolean(deptTemplate?.showPricesOnKot || showPrices || printableReceipt?.showPrices),
                     showWaiter: Boolean(deptTemplate?.showWaiter ?? activeTemplate?.showWaiter ?? true),
+                    paperWidth: deptTemplate?.paperWidth || activeTemplate?.paperWidth || '80mm',
                     items: deptItems.map(i => ({
                       name: i.name,
                       qty: i.qty,
@@ -317,6 +319,7 @@ export const ThermalBillModal: React.FC = () => {
                   targetPrinterName: activePrinter?.name || 'Kot Printer',
                   showPrices,
                   showWaiter: activeTemplate?.showWaiter !== false,
+                  paperWidth: activeTemplate?.paperWidth || '80mm',
                   items: displayedItems.map(i => ({
                     name: i.name,
                     qty: i.qty,
@@ -331,6 +334,7 @@ export const ThermalBillModal: React.FC = () => {
               targetPrinterName: activePrinter?.name || 'Kot Printer',
               showPrices,
               showWaiter: activeTemplate?.showWaiter !== false,
+              paperWidth: activeTemplate?.paperWidth || '80mm',
               items: displayedItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
@@ -353,6 +357,7 @@ export const ThermalBillModal: React.FC = () => {
         showWaiter: activeTemplate?.showWaiter !== false,
         showCustomer: Boolean(activeTemplate?.showCustomer),
         showDateTime: activeTemplate?.showDateTime !== false,
+        paperWidth: activeTemplate?.paperWidth || '80mm',
         slips: slipsToPrint
       };
 
@@ -371,20 +376,24 @@ export const ThermalBillModal: React.FC = () => {
   const generateReceiptHtml = () => {
     if (!printableReceipt) return '';
 
-    // Monospace alignment helpers (Strict 42 columns for 80mm thermal receipt)
-    const line2Col = (left: string, right: string, width = 42) => {
+    const paperWidth = activeTemplate?.paperWidth || (printableReceipt as any)?.paperWidth || '80mm';
+    const width = paperWidth === '58mm' ? 32 : 48;
+    const divider = '-'.repeat(width);
+
+    // Monospace alignment helpers (Strict 48 columns for 80mm or 32 columns for 58mm)
+    const line2Col = (left: string, right: string, w = width) => {
       const l = left.trim();
       const r = right.trim();
-      const maxL = Math.max(0, width - 1 - r.length);
+      const maxL = Math.max(0, w - 1 - r.length);
       const safeL = l.length > maxL ? l.slice(0, maxL) : l;
-      const spaces = Math.max(1, width - safeL.length - r.length);
+      const spaces = Math.max(1, w - safeL.length - r.length);
       return safeL + ' '.repeat(spaces) + r;
     };
 
-    const centerLine = (text: string, width = 42) => {
+    const centerLine = (text: string, w = width) => {
       const t = text.trim();
-      if (t.length >= width) return t;
-      const leftPad = Math.floor((width - t.length) / 2);
+      if (t.length >= w) return t;
+      const leftPad = Math.floor((w - t.length) / 2);
       return ' '.repeat(leftPad) + t;
     };
 
@@ -394,76 +403,112 @@ export const ThermalBillModal: React.FC = () => {
         : selectedDeptFilter.toUpperCase();
 
       const kotLines: string[] = [];
-      kotLines.push('------------------------------------------');
-      kotLines.push(centerLine(`STATION: ${stationName}`));
-      kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${printableReceipt.invoiceNo}`));
+      kotLines.push(divider);
+      kotLines.push(centerLine(`STATION: ${stationName}`, width));
+      kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${printableReceipt.invoiceNo}`, width));
       if (isCancelKot) {
-        kotLines.push(centerLine('*** VOID / CANCELLED ORDER ***'));
+        kotLines.push(centerLine('*** VOID / CANCELLED ORDER ***', width));
       }
-      kotLines.push('------------------------------------------');
-      kotLines.push(line2Col('Table & Z  :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`));
+      kotLines.push(divider);
+      kotLines.push(line2Col('TABLE :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`, width));
       if (activeTemplate?.showWaiter !== false) {
-        kotLines.push(line2Col('Waiter     :', printableReceipt.waiter || 'Staff'));
+        kotLines.push(line2Col('WAITER :', printableReceipt.waiter || 'Staff', width));
       }
-      kotLines.push(line2Col('Date & Time:', printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`));
+      kotLines.push(line2Col('TIME :', printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`, width));
       if (printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
-        kotLines.push(line2Col('Customer   :', printableReceipt.customer));
+        kotLines.push(line2Col('CUSTOMER :', printableReceipt.customer, width));
       }
       if (isCancelKot && printableReceipt.voidAuthorizedBy) {
-        kotLines.push(line2Col('Auth By    :', printableReceipt.voidAuthorizedBy));
+        kotLines.push(line2Col('AUTH BY :', printableReceipt.voidAuthorizedBy, width));
       }
       if (isCancelKot && printableReceipt.voidReason) {
-        kotLines.push(line2Col('Reason     :', printableReceipt.voidReason));
+        kotLines.push(line2Col('REASON :', printableReceipt.voidReason, width));
       }
-      kotLines.push('------------------------------------------');
+      kotLines.push(divider);
 
       const showPrices = Boolean(activeTemplate?.showPricesOnKot || printableReceipt?.showPrices);
       if (showPrices) {
-        // 22 chars item + 1 space + 5 chars qty + 1 space + 13 chars price = 42 chars
-        const kotItemH = 'ITEM'.padEnd(22, ' ');
-        const kotQtyH = 'QTY'.padStart(5, ' ');
-        const kotPriceH = 'PRICE'.padStart(13, ' ');
-        kotLines.push(`${kotItemH} ${kotQtyH} ${kotPriceH}`);
-        kotLines.push('------------------------------------------');
+        if (width === 48) {
+          const kotItemH = 'ITEM NAME'.padEnd(26, ' ');
+          const kotQtyH = ' QTY  ';
+          const kotPriceH = '         PRICE';
+          kotLines.push(`${kotItemH} ${kotQtyH} ${kotPriceH}`);
+        } else {
+          const kotItemH = 'ITEM'.padEnd(16, ' ');
+          const kotQtyH = 'QTY ';
+          const kotPriceH = '     PRICE';
+          kotLines.push(`${kotItemH} ${kotQtyH} ${kotPriceH}`);
+        }
+        kotLines.push(divider);
 
-        let kotTotal = 0;
+        const nameLimit = width === 48 ? 26 : 16;
         for (const item of displayedItems) {
           const itemPrice = Number(item.price || 0);
-          const itemTotal = itemPrice * item.qty;
-          kotTotal += itemTotal;
-          const name = item.name.length > 21 ? item.name.slice(0, 21) : item.name;
-          const nameCol = name.padEnd(22, ' ');
-          const qtyCol = `${item.qty}x`.padStart(5, ' ');
-          const priceCol = `৳${itemPrice.toLocaleString()}`.padStart(13, ' ');
-          kotLines.push(`${nameCol} ${qtyCol} ${priceCol}`);
+
+          let firstLineName = (item.name || '').trim();
+          let remainder = '';
+          if (firstLineName.length > nameLimit) {
+            const lastSpace = firstLineName.lastIndexOf(' ', nameLimit);
+            if (lastSpace > 8) {
+              remainder = firstLineName.slice(lastSpace + 1).trim();
+              firstLineName = firstLineName.slice(0, lastSpace);
+            } else {
+              remainder = firstLineName.slice(nameLimit).trim();
+              firstLineName = firstLineName.slice(0, nameLimit);
+            }
+          }
+
+          if (width === 48) {
+            const nameCol = firstLineName.padEnd(26, ' ');
+            const qtyCol = (' ' + item.qty + 'x ').padStart(6, ' ');
+            const priceCol = `Tk ${itemPrice}`.padStart(14, ' ');
+            kotLines.push(`${nameCol} ${qtyCol} ${priceCol}`);
+          } else {
+            const nameCol = firstLineName.padEnd(16, ' ');
+            const qtyCol = `${item.qty}x `.padStart(4, ' ');
+            const priceCol = `Tk ${itemPrice}`.padStart(10, ' ');
+            kotLines.push(`${nameCol} ${qtyCol} ${priceCol}`);
+          }
+          if (remainder) kotLines.push(`  ${remainder}`);
           if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);
           if (item.selectedAddons && item.selectedAddons.length > 0) {
             kotLines.push(`   - Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}`);
           }
           if (item.notes) kotLines.push(`   - Note: ${item.notes}`);
         }
-        kotLines.push('------------------------------------------');
+        kotLines.push(divider);
       } else {
-        // 34 chars item + 1 space + 7 chars qty = 42 chars
-        const kotItemH = 'ITEM'.padEnd(34, ' ');
-        const kotQtyH = 'QTY'.padStart(7, ' ');
-        kotLines.push(`${kotItemH} ${kotQtyH}`);
-        kotLines.push('------------------------------------------');
+        if (width === 48) {
+          const kotItemH = 'ITEM NAME'.padEnd(38, ' ');
+          const kotQtyH = '      QTY';
+          kotLines.push(`${kotItemH} ${kotQtyH}`);
+        } else {
+          const kotItemH = 'ITEM'.padEnd(24, ' ');
+          const kotQtyH = '    QTY';
+          kotLines.push(`${kotItemH} ${kotQtyH}`);
+        }
+        kotLines.push(divider);
 
+        const nameLimit = width === 48 ? 38 : 24;
         for (const item of displayedItems) {
-          const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
-          const nameCol = name.padEnd(34, ' ');
-          const qtyCol = `${item.qty}x`.padStart(7, ' ');
-          kotLines.push(`${nameCol} ${qtyCol}`);
+          const name = item.name.length > nameLimit ? item.name.slice(0, nameLimit) : item.name;
+          if (width === 48) {
+            const nameCol = name.padEnd(38, ' ');
+            const qtyCol = (item.qty + 'x').padStart(9, ' ');
+            kotLines.push(`${nameCol} ${qtyCol}`);
+          } else {
+            const nameCol = name.padEnd(24, ' ');
+            const qtyCol = (item.qty + 'x').padStart(7, ' ');
+            kotLines.push(`${nameCol} ${qtyCol}`);
+          }
           if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);
           if (item.selectedAddons && item.selectedAddons.length > 0) {
             kotLines.push(`   - Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}`);
           }
           if (item.notes) kotLines.push(`   - Note: ${item.notes}`);
         }
+        kotLines.push(divider);
       }
-
-      kotLines.push('------------------------------------------');
 
       return `<!DOCTYPE html>
 <html>
@@ -472,15 +517,15 @@ export const ThermalBillModal: React.FC = () => {
   <title>${isCancelKot ? 'VOID_KOT' : 'KOT'}_${printableReceipt.invoiceNo}</title>
   <style>
     @page {
-      size: 80mm auto;
+      size: ${paperWidth === '58mm' ? '58mm' : '80mm'} auto;
       margin: 0mm !important;
     }
     @media print {
       html, body {
         margin: 0 !important;
         padding: 0 !important;
-        width: 72mm !important;
-        max-width: 72mm !important;
+        width: ${paperWidth === '58mm' ? '48mm' : '72mm'} !important;
+        max-width: ${paperWidth === '58mm' ? '48mm' : '72mm'} !important;
       }
       .no-print { display: none !important; }
     }
@@ -491,8 +536,8 @@ export const ThermalBillModal: React.FC = () => {
     body {
       margin: 0 auto;
       padding: 2mm 1mm;
-      width: 72mm;
-      max-width: 72mm;
+      width: ${paperWidth === '58mm' ? '48mm' : '72mm'};
+      max-width: ${paperWidth === '58mm' ? '48mm' : '72mm'};
       background: #ffffff;
       color: #000000 !important;
       font-family: 'Courier New', Courier, monospace !important;
@@ -503,7 +548,7 @@ export const ThermalBillModal: React.FC = () => {
       margin: 0;
       padding: 0;
       font-family: 'Courier New', Courier, monospace !important;
-      font-size: 12.5px !important;
+      font-size: ${paperWidth === '58mm' ? '10px' : '12.5px'} !important;
       line-height: 1.25 !important;
       letter-spacing: 0px !important;
       white-space: pre !important;
@@ -520,10 +565,6 @@ export const ThermalBillModal: React.FC = () => {
     }
 
     // CUSTOMER BILL / CASH MEMO (Standard 48-col 80mm or 32-col 58mm receipt)
-    const paperWidth = activeTemplate?.paperWidth || (printableReceipt as any)?.paperWidth || '80mm';
-    const width = paperWidth === '58mm' ? 32 : 48;
-    const divider = '-'.repeat(width);
-
     const titleText = activeTemplate?.headerTitle || printableReceipt.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
     const lines: string[] = [];
 

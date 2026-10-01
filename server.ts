@@ -270,10 +270,19 @@ async function startServer() {
     return printers[0] || '80 Printer';
   }
 
+  function line2Col(left: string, right: string, width = 48): string {
+    const l = (left || '').trim();
+    const r = (right || '').trim();
+    const maxL = Math.max(0, width - 1 - r.length);
+    const safeL = l.length > maxL ? l.slice(0, maxL) : l;
+    const spaces = Math.max(1, width - safeL.length - r.length);
+    return safeL + ' '.repeat(spaces) + r + '\n';
+  }
+
   // Build ESC/POS binary buffer for a compact single-page KOT slip
   function buildKotEscPosBuffer(
-    req: { tableName: string; tableZone?: string; waiter?: string; customer?: string; invoiceNo: string; dateTime?: string; showPrices?: boolean },
-    slip: { station: string; category?: string; showPrices?: boolean; items: { name: string; qty: number; price?: number; variation?: string; addons?: string[]; notes?: string }[] },
+    req: { tableName: string; tableZone?: string; waiter?: string; customer?: string; invoiceNo: string; dateTime?: string; showPrices?: boolean; showWaiter?: boolean; showCustomer?: boolean; showDateTime?: boolean; paperWidth?: string },
+    slip: { station: string; category?: string; showPrices?: boolean; showWaiter?: boolean; showCustomer?: boolean; showDateTime?: boolean; paperWidth?: string; items: { name: string; qty: number; price?: number; variation?: string; addons?: string[]; notes?: string }[] },
     index: number,
     total: number
   ): Buffer {
@@ -287,11 +296,14 @@ async function startServer() {
     // 2. Hardware Thermal Calibration (Clean, Crisp, Normal Density)
     pushBytes([0x1B, 0x47, 0x00]); // ESC G 0: Double-strike OFF (prevents muddy/bleeding characters)
     pushBytes([0x1B, 0x45, 0x00]); // ESC E 0: Bold OFF by default
-    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform standard font A (12x24, 42 columns)
+    pushBytes([0x1B, 0x21, 0x00]); // ESC ! 0: Uniform standard font A (12x24)
+
+    const width = (slip.paperWidth || req.paperWidth) === '58mm' ? 32 : 48;
+    const divider = '-'.repeat(width) + '\n';
 
     // 3. Center Align: Station & KOT number
     pushBytes([0x1B, 0x61, 0x01]); // Center
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
     const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
     pushStr(`STATION: ${cleanStation.toUpperCase()}\n`);
@@ -300,70 +312,81 @@ async function startServer() {
       pushStr(`Category: ${slip.category}\n`);
     }
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
 
-    // 4. Left Align: Table, Time, Waiter Info
+    // 4. Left & Right Justified: Table, Time, Waiter Info (Flush to margins)
     pushBytes([0x1B, 0x61, 0x00]); // Left align
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Table
-    pushStr(`TABLE   : ${req.tableName}${req.tableZone ? ` (${req.tableZone})` : ""}\n`);
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+    pushStr(line2Col('TABLE :', `${req.tableName}${req.tableZone ? ` (${req.tableZone})` : ''}`, width));
 
     const timeStr = req.dateTime || new Date().toLocaleString("en-US");
     const shouldShowDateTime = slip.showDateTime !== undefined ? Boolean(slip.showDateTime) : (req.showDateTime !== false);
     if (shouldShowDateTime) {
-      pushStr(`TIME    : ${timeStr}\n`);
+      pushStr(line2Col('TIME :', timeStr, width));
     }
 
     const shouldShowWaiter = slip.showWaiter !== undefined ? Boolean(slip.showWaiter) : (req.showWaiter !== undefined ? Boolean(req.showWaiter) : true);
     if (shouldShowWaiter) {
-      pushStr(`WAITER  : ${req.waiter || "Staff"}\n`);
+      pushStr(line2Col('WAITER :', (req.waiter || "Staff"), width));
     }
 
     const shouldShowCustomer = slip.showCustomer !== undefined ? Boolean(slip.showCustomer) : Boolean(req.showCustomer);
     if (shouldShowCustomer && req.customer && req.customer !== "Walk-in Customer") {
-      pushStr(`CUSTOMER: ${req.customer}\n`);
+      pushStr(line2Col('CUSTOMER :', req.customer, width));
     }
-    pushStr("------------------------------------------\n");
+    pushStr(divider);
 
     const shouldShowPrices = Boolean(slip.showPrices || req.showPrices);
 
     if (shouldShowPrices) {
-      // 5. Items Header with Price (Exact 42 character columns: 22 item + 1 space + 5 qty + 1 space + 13 price = 42)
+      // 5. Items Header with Price
       pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-      const colItemH = "ITEM NAME".padEnd(22, ' ');
-      const colQtyH = "QTY".padStart(5, ' ');
-      const colPriceH = "PRICE".padStart(13, ' ');
-      pushStr(`${colItemH} ${colQtyH} ${colPriceH}\n`);
+      if (width === 48) {
+        const colItemH = "ITEM NAME".padEnd(26, ' ');
+        const colQtyH = " QTY  ";
+        const colPriceH = "         PRICE";
+        pushStr(`${colItemH} ${colQtyH} ${colPriceH}\n`);
+      } else {
+        const colItemH = "ITEM".padEnd(16, ' ');
+        const colQtyH = "QTY ";
+        const colPriceH = "     PRICE";
+        pushStr(`${colItemH} ${colQtyH} ${colPriceH}\n`);
+      }
       pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-      pushStr("------------------------------------------\n");
+      pushStr(divider);
 
       // 6. Food Items (with prices)
-      let totalAmount = 0;
-      for (const item of slip.items) {
+      const nameLimit = width === 48 ? 26 : 16;
+      for (const item of (slip.items || [])) {
         const itemPrice = Number(item.price || 0);
-        const itemTotal = itemPrice * item.qty;
-        totalAmount += itemTotal;
 
-        let firstLineName = item.name.trim();
+        let firstLineName = (item.name || '').trim();
         let remainder = "";
-        if (firstLineName.length > 22) {
-          const lastSpace = firstLineName.lastIndexOf(" ", 22);
-          if (lastSpace > 10) {
+        if (firstLineName.length > nameLimit) {
+          const lastSpace = firstLineName.lastIndexOf(" ", nameLimit);
+          if (lastSpace > 8) {
             remainder = firstLineName.slice(lastSpace + 1).trim();
             firstLineName = firstLineName.slice(0, lastSpace);
           } else {
-            remainder = firstLineName.slice(22).trim();
-            firstLineName = firstLineName.slice(0, 22);
+            remainder = firstLineName.slice(nameLimit).trim();
+            firstLineName = firstLineName.slice(0, nameLimit);
           }
         }
 
-        const nameCol = firstLineName.padEnd(22, ' ');
-        const qtyCol = `${item.qty}x`.padStart(5, ' ');
-        const priceCol = `Tk ${itemPrice}`.padStart(13, ' ');
-
-        pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-        pushStr(`${nameCol} ${qtyCol} ${priceCol}\n`);
-        pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+        if (width === 48) {
+          const nameCol = firstLineName.padEnd(26, ' ');
+          const qtyCol = (` ${item.qty}x `).padStart(6, ' ');
+          const priceCol = `Tk ${itemPrice}`.padStart(14, ' ');
+          pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+          pushStr(`${nameCol} ${qtyCol} ${priceCol}\n`);
+          pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+        } else {
+          const nameCol = firstLineName.padEnd(16, ' ');
+          const qtyCol = `${item.qty}x `.padStart(4, ' ');
+          const priceCol = `Tk ${itemPrice}`.padStart(10, ' ');
+          pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+          pushStr(`${nameCol} ${qtyCol} ${priceCol}\n`);
+          pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+        }
 
         if (remainder) {
           pushStr(`  ${remainder}\n`);
@@ -379,23 +402,39 @@ async function startServer() {
         }
       }
 
-      pushStr("------------------------------------------\n");
+      pushStr(divider);
     } else {
       // 5. Items Header
       pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-      pushStr("ITEM NAME                              QTY\n");
+      if (width === 48) {
+        const colItemH = "ITEM NAME".padEnd(38, ' ');
+        const colQtyH = "      QTY";
+        pushStr(`${colItemH} ${colQtyH}\n`);
+      } else {
+        const colItemH = "ITEM".padEnd(24, ' ');
+        const colQtyH = "    QTY";
+        pushStr(`${colItemH} ${colQtyH}\n`);
+      }
       pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-      pushStr("------------------------------------------\n");
+      pushStr(divider);
 
       // 6. Food Items (Crisp, High Legibility)
-      for (const item of slip.items) {
-        const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
-        const nameCol = name.padEnd(34, ' ');
-        const qtyCol = `${item.qty}x`.padStart(6, ' ');
-
-        pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-        pushStr(`${nameCol} ${qtyCol}\n`);
-        pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+      const nameLimit = width === 48 ? 38 : 24;
+      for (const item of (slip.items || [])) {
+        const name = item.name.length > nameLimit ? item.name.slice(0, nameLimit) : item.name;
+        if (width === 48) {
+          const nameCol = name.padEnd(38, ' ');
+          const qtyCol = `${item.qty}x`.padStart(9, ' ');
+          pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+          pushStr(`${nameCol} ${qtyCol}\n`);
+          pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+        } else {
+          const nameCol = name.padEnd(24, ' ');
+          const qtyCol = `${item.qty}x`.padStart(7, ' ');
+          pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+          pushStr(`${nameCol} ${qtyCol}\n`);
+          pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+        }
 
         if (item.variation) {
           pushStr(`   - Cut: ${item.variation}\n`);
@@ -408,7 +447,7 @@ async function startServer() {
         }
       }
 
-      pushStr("------------------------------------------\n");
+      pushStr(divider);
     }
 
     // 7. Small feed to clear tear blade (only 3 newlines = ~2.5cm)
@@ -1628,7 +1667,7 @@ async function startServer() {
           console.log(` ➔ Printing KOT Slip ${i + 1}/${slips.length} on "${targetPrinter}"...`);
 
           const rawBuffer = buildKotEscPosBuffer(
-            { tableName, tableZone, waiter, customer, invoiceNo, dateTime },
+            { tableName, tableZone, waiter, customer, invoiceNo, dateTime, showPrices: req.body.showPrices, showWaiter: req.body.showWaiter, showCustomer: req.body.showCustomer, showDateTime: req.body.showDateTime, paperWidth: req.body.paperWidth },
             slip,
             i + 1,
             slips.length
