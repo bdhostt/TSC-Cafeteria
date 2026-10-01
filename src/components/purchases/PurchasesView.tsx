@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { 
   PurchaseVoucher, 
+  PurchaseOrder, 
+  PurchaseReturn, 
   PurchaseItem, 
   PurchasePaymentType, 
-  PurchaseStatus, 
-  PurchaseOrder, 
-  PurchaseReturn 
+  PurchaseStatus 
 } from '../../types';
 import { 
   ShoppingCart, 
@@ -17,16 +17,21 @@ import {
   CheckCircle, 
   Clock, 
   X, 
-  Layers, 
-  ChevronDown,
-  RotateCcw,
-  CheckCircle2,
-  Calendar,
-  Building2,
+  PackageCheck, 
+  RotateCcw, 
+  Building2, 
+  Calendar, 
+  Printer, 
+  CheckCircle2, 
+  AlertCircle, 
+  ArrowRight,
+  Truck,
   DollarSign,
-  AlertTriangle,
-  Eye,
-  FileSpreadsheet
+  ChevronDown,
+  CreditCard,
+  Phone,
+  Tag,
+  Receipt
 } from 'lucide-react';
 
 export const PurchasesView: React.FC = () => {
@@ -37,72 +42,100 @@ export const PurchasesView: React.FC = () => {
     deletePurchaseVoucher,
     savePurchaseOrder,
     deletePurchaseOrder,
+    receivePurchaseOrderItems,
     savePurchaseReturn,
-    deletePurchaseReturn
+    deletePurchaseReturn,
+    addConfigItem,
+    settlePurchaseBill,
+    currentUser
   } = useRestaurant();
 
-  const [subTab, setSubTab] = useState<'vouchers' | 'orders' | 'returns'>('vouchers');
+  // Navigation Tab State: 'vouchers' | 'po' | 'returns' | 'vendors'
+  const [activeTab, setActiveTab] = useState<'vouchers' | 'po' | 'returns' | 'vendors'>('vouchers');
   const [search, setSearch] = useState('');
 
-  // 1. Voucher Form State
+  // --- Purchase Voucher Modal States ---
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [viewingVoucher, setViewingVoucher] = useState<PurchaseVoucher | null>(null);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [vendor, setVendor] = useState(data.vendors[0] || 'Kader Meat Supply');
-  const [billNo, setBillNo] = useState('');
-  const [paymentType, setPaymentType] = useState<PurchasePaymentType>('CREDIT');
+  const [voucherDate, setVoucherDate] = useState(new Date().toISOString().split('T')[0]);
+  const [voucherVendor, setVoucherVendor] = useState(data.vendors[0] || 'Kader Meat Supply');
+  const [voucherBillNo, setVoucherBillNo] = useState('');
+  const [voucherPaymentType, setVoucherPaymentType] = useState<PurchasePaymentType>('CREDIT');
   const [voucherStatus, setVoucherStatus] = useState<PurchaseStatus>('FINAL');
-  const [items, setItems] = useState<PurchaseItem[]>([]);
+  const [voucherItems, setVoucherItems] = useState<PurchaseItem[]>([]);
 
-  // 2. Purchase Order (PO) Form State
+  // --- Purchase Order (PO) Modal States ---
   const [isPoModalOpen, setIsPoModalOpen] = useState(false);
-  const [poForm, setPoForm] = useState<{
-    vendor: string;
-    date: string;
-    expectedDate: string;
-    items: PurchaseItem[];
-    status: 'PENDING' | 'PARTIALLY_RECEIVED' | 'FULFILLED' | 'CANCELLED';
-  }>({
-    vendor: data.vendors[0] || 'Kader Meat Supply',
-    date: new Date().toISOString().split('T')[0],
-    expectedDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-    items: [],
-    status: 'PENDING'
-  });
+  const [viewingPo, setViewingPo] = useState<PurchaseOrder | null>(null);
+  const [poNo, setPoNo] = useState('');
+  const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0]);
+  const [poExpectedDate, setPoExpectedDate] = useState(new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
+  const [poVendor, setPoVendor] = useState(data.vendors[0] || 'Kader Meat Supply');
+  const [poNotes, setPoNotes] = useState('');
+  const [poItems, setPoItems] = useState<PurchaseItem[]>([]);
 
-  // 3. Purchase Return Form State
-  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
-  const [returnForm, setReturnForm] = useState<{
-    vendor: string;
-    date: string;
-    billNo: string;
+  // --- Receive Items Modal State ---
+  const [receivingPo, setReceivingPo] = useState<PurchaseOrder | null>(null);
+  const [receiveBillNo, setReceiveBillNo] = useState('');
+  const [receivePaymentType, setReceivePaymentType] = useState<PurchasePaymentType>('CREDIT');
+  const [receiveDate, setReceiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [receiveItemsList, setReceiveItemsList] = useState<{
     itemId: number;
-    qty: number;
+    item: string;
+    category: string;
+    uom: string;
+    orderedQty: number;
+    alreadyReceivedQty: number;
+    receiveQty: number;
     rate: number;
-    reason: string;
-    refundStatus: 'REFUNDED' | 'ADJUSTED' | 'PENDING';
-  }>({
-    vendor: data.vendors[0] || 'Kader Meat Supply',
-    date: new Date().toISOString().split('T')[0],
-    billNo: '',
-    itemId: data.masterItems[0]?.id || 1,
-    qty: 1,
-    rate: data.masterItems[0]?.defaultRate || 100,
-    reason: 'Damaged / Spoilage during transit',
-    refundStatus: 'ADJUSTED'
-  });
+    total: number;
+  }[]>([]);
 
-  // --- Handlers for Purchase Voucher ---
+  // --- Supplier Return Modal States ---
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnNo, setReturnNo] = useState('');
+  const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
+  const [returnVendor, setReturnVendor] = useState(data.vendors[0] || 'Kader Meat Supply');
+  const [returnBillNo, setReturnBillNo] = useState('');
+  const [returnItemId, setReturnItemId] = useState<number>(data.masterItems[0]?.id || 1);
+  const [returnQty, setReturnQty] = useState<number>(1);
+  const [returnRate, setReturnRate] = useState<number>(data.masterItems[0]?.defaultRate || 0);
+  const [returnReason, setReturnReason] = useState('Damaged packaging or quality mismatch on delivery');
+  const [refundStatus, setRefundStatus] = useState<'REFUNDED' | 'ADJUSTED' | 'PENDING'>('ADJUSTED');
+
+  // --- Vendor Add Modal State ---
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [newVendorName, setNewVendorName] = useState('');
+
+  // --- SUPPLIER LEDGER & BILL-WISE PAYMENT MODAL STATES ---
+  const [selectedSupplierLedger, setSelectedSupplierLedger] = useState<string | null>(null);
+  const [ledgerFilter, setLedgerFilter] = useState<'ALL' | 'RECEIVED' | 'PENDING'>('ALL');
+  
+  // Specific Pay Bill Popup inside Ledger
+  const [payBillTarget, setPayBillTarget] = useState<{
+    billNo?: string;
+    vendor: string;
+    dueAmount: number;
+    totalAmount: number;
+    isAllDues?: boolean;
+  } | null>(null);
+  const [payAmount, setPayAmount] = useState<number>(0);
+  const [payMethod, setPayMethod] = useState<'CASH' | 'BANK' | 'BKASH'>('CASH');
+  const [payNote, setPayNote] = useState('');
+
+  // ================= HANDLERS ================= //
+
+  // --- Voucher Handlers ---
   const handleOpenNewVoucher = () => {
-    setDate(new Date().toISOString().split('T')[0]);
-    setVendor(data.vendors[0] || 'Kader Meat Supply');
-    setBillNo('BILL-' + Date.now().toString().slice(-4));
-    setPaymentType('CREDIT');
+    setVoucherDate(new Date().toISOString().split('T')[0]);
+    setVoucherVendor(data.vendors[0] || 'Kader Meat Supply');
+    setVoucherBillNo('BILL-' + Date.now().toString().slice(-4));
+    setVoucherPaymentType('CREDIT');
     setVoucherStatus('FINAL');
     
     if (data.masterItems.length > 0) {
       const defaultRaw = data.masterItems[0];
-      setItems([{
+      setVoucherItems([{
         itemId: defaultRaw.id,
         item: defaultRaw.name,
         category: defaultRaw.category,
@@ -112,18 +145,18 @@ export const PurchasesView: React.FC = () => {
         total: defaultRaw.defaultRate
       }]);
     } else {
-      setItems([]);
+      setVoucherItems([]);
     }
     setIsVoucherModalOpen(true);
   };
 
-  const handleAddRow = () => {
+  const handleAddVoucherRow = () => {
     if (data.masterItems.length === 0) {
       alert('No raw materials found. Please create raw materials in master inventory first.');
       return;
     }
     const defaultRaw = data.masterItems[0];
-    setItems(prev => [...prev, {
+    setVoucherItems(prev => [...prev, {
       itemId: defaultRaw.id,
       item: defaultRaw.name,
       category: defaultRaw.category,
@@ -134,479 +167,674 @@ export const PurchasesView: React.FC = () => {
     }]);
   };
 
-  const handleItemChange = (index: number, rawId: number | string) => {
-    const raw = data.masterItems.find(m => String(m.id) === String(rawId) || Number(m.id) === Number(rawId));
+  const handleVoucherItemChange = (index: number, rawId: number) => {
+    const raw = data.masterItems.find(m => m.id === rawId);
     if (!raw) return;
-
-    const standardRate = Number(raw.defaultRate) || 0;
-
-    setItems(prev => prev.map((row, i) => {
-      if (i !== index) return row;
-      const currentQty = Number(row.qty) || 1;
-      return {
-        ...row,
+    setVoucherItems(prev => {
+      const arr = [...prev];
+      const qty = arr[index].qty || 1;
+      arr[index] = {
         itemId: raw.id,
         item: raw.name,
         category: raw.category,
         uom: raw.uom,
-        qty: currentQty,
-        rate: standardRate,
-        total: Math.round(currentQty * standardRate)
-      };
-    }));
-  };
-
-  const updateRowQty = (index: number, rawVal: string) => {
-    const val = rawVal === '' ? 0 : parseFloat(rawVal);
-    const qty = isNaN(val) ? 0 : val;
-    setItems(prev => prev.map((row, i) => {
-      if (i !== index) return row;
-      const currentRate = Number(row.rate) || 0;
-      return {
-        ...row,
         qty,
-        total: Math.round(qty * currentRate)
+        rate: raw.defaultRate,
+        total: qty * raw.defaultRate
       };
-    }));
+      return arr;
+    });
   };
 
-  const updateRowRate = (index: number, rawVal: string) => {
-    const val = rawVal === '' ? 0 : parseFloat(rawVal);
-    const rate = isNaN(val) ? 0 : val;
-    setItems(prev => prev.map((row, i) => {
-      if (i !== index) return row;
-      const currentQty = Number(row.qty) || 0;
-      return {
-        ...row,
+  const handleVoucherQtyRateChange = (index: number, qty: number, rate: number) => {
+    setVoucherItems(prev => {
+      const arr = [...prev];
+      arr[index] = {
+        ...arr[index],
+        qty,
         rate,
-        total: Math.round(currentQty * rate)
+        total: Math.round(qty * rate)
       };
-    }));
+      return arr;
+    });
   };
 
-  const handleRemoveRow = (index: number) => {
-    setItems(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveVoucherRow = (index: number) => {
+    setVoucherItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const totalVoucherAmount = items.reduce(
-    (sum, i) => sum + Math.round((Number(i.qty) || 0) * (Number(i.rate) || 0)), 
-    0
-  );
+  const totalVoucherAmount = voucherItems.reduce((sum, i) => sum + (i.total || 0), 0);
 
   const handleSubmitVoucher = (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) {
-      alert('Please add at least one item to the voucher!');
+    if (voucherItems.length === 0) {
+      alert('Please add at least one raw item to the voucher!');
       return;
     }
 
-    const calculatedItems = items.map(i => ({
-      ...i,
-      qty: Number(i.qty) || 0,
-      rate: Number(i.rate) || 0,
-      total: Math.round((Number(i.qty) || 0) * (Number(i.rate) || 0))
-    }));
-
     const newVoucher: PurchaseVoucher = {
       id: Date.now(),
-      date,
-      vendor,
-      billNo: billNo.trim() || ('BILL-' + Date.now().toString().slice(-4)),
-      paymentType,
+      date: voucherDate,
+      vendor: voucherVendor,
+      billNo: voucherBillNo.trim() || ('BILL-' + Date.now().toString().slice(-4)),
+      paymentType: voucherPaymentType,
       status: voucherStatus,
-      total: calculatedItems.reduce((sum, i) => sum + i.total, 0),
-      items: calculatedItems
+      total: totalVoucherAmount,
+      items: JSON.parse(JSON.stringify(voucherItems))
     };
 
     savePurchaseVoucher(newVoucher);
     setIsVoucherModalOpen(false);
   };
 
-  // --- Handlers for Purchase Orders (PO) ---
+  // --- Purchase Order (PO) Handlers ---
   const handleOpenNewPo = () => {
-    const defaultRaw = data.masterItems[0];
-    setPoForm({
-      vendor: data.vendors[0] || 'Supplier',
-      date: new Date().toISOString().split('T')[0],
-      expectedDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-      items: defaultRaw ? [{
-        itemId: defaultRaw.id,
-        item: defaultRaw.name,
-        category: defaultRaw.category,
-        uom: defaultRaw.uom,
-        qty: 10,
-        rate: Number(defaultRaw.defaultRate) || 0,
-        total: (Number(defaultRaw.defaultRate) || 0) * 10
-      }] : [],
-      status: 'PENDING'
-    });
-    setIsPoModalOpen(true);
-  };
+    setPoNo('DCC-PO-2026-' + Math.floor(1000 + Math.random() * 9000));
+    setPoDate(new Date().toISOString().split('T')[0]);
+    setPoExpectedDate(new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
+    setPoVendor(data.vendors[0] || 'Kader Meat Supply');
+    setPoNotes('');
 
-  const handleAddPoRow = () => {
-    if (data.masterItems.length === 0) return;
-    const defaultRaw = data.masterItems[0];
-    setPoForm(prev => ({
-      ...prev,
-      items: [...prev.items, {
+    if (data.masterItems.length > 0) {
+      const defaultRaw = data.masterItems[0];
+      setPoItems([{
         itemId: defaultRaw.id,
         item: defaultRaw.name,
         category: defaultRaw.category,
         uom: defaultRaw.uom,
         qty: 5,
-        rate: Number(defaultRaw.defaultRate) || 0,
-        total: (Number(defaultRaw.defaultRate) || 0) * 5
-      }]
-    }));
+        rate: defaultRaw.defaultRate,
+        total: 5 * defaultRaw.defaultRate
+      }]);
+    } else {
+      setPoItems([]);
+    }
+    setIsPoModalOpen(true);
   };
 
-  const handlePoItemChange = (index: number, rawId: number | string) => {
-    const raw = data.masterItems.find(m => String(m.id) === String(rawId) || Number(m.id) === Number(rawId));
+  const handleAddPoRow = () => {
+    if (data.masterItems.length === 0) {
+      alert('No raw materials available. Please add raw materials first.');
+      return;
+    }
+    const defaultRaw = data.masterItems[0];
+    setPoItems(prev => [...prev, {
+      itemId: defaultRaw.id,
+      item: defaultRaw.name,
+      category: defaultRaw.category,
+      uom: defaultRaw.uom,
+      qty: 1,
+      rate: defaultRaw.defaultRate,
+      total: defaultRaw.defaultRate
+    }]);
+  };
+
+  const handlePoItemChange = (index: number, rawId: number) => {
+    const raw = data.masterItems.find(m => m.id === rawId);
     if (!raw) return;
-
-    const standardRate = Number(raw.defaultRate) || 0;
-
-    setPoForm(prev => ({
-      ...prev,
-      items: prev.items.map((row, i) => {
-        if (i !== index) return row;
-        const currentQty = Number(row.qty) || 1;
-        return {
-          ...row,
-          itemId: raw.id,
-          item: raw.name,
-          category: raw.category,
-          uom: raw.uom,
-          qty: currentQty,
-          rate: standardRate,
-          total: Math.round(currentQty * standardRate)
-        };
-      })
-    }));
+    setPoItems(prev => {
+      const arr = [...prev];
+      const qty = arr[index].qty || 1;
+      arr[index] = {
+        itemId: raw.id,
+        item: raw.name,
+        category: raw.category,
+        uom: raw.uom,
+        qty,
+        rate: raw.defaultRate,
+        total: qty * raw.defaultRate
+      };
+      return arr;
+    });
   };
 
-  const updatePoRowQty = (index: number, rawVal: string) => {
-    const val = rawVal === '' ? 0 : parseFloat(rawVal);
-    const qty = isNaN(val) ? 0 : val;
-    setPoForm(prev => ({
-      ...prev,
-      items: prev.items.map((row, i) => {
-        if (i !== index) return row;
-        const currentRate = Number(row.rate) || 0;
-        return {
-          ...row,
-          qty,
-          total: Math.round(qty * currentRate)
-        };
-      })
-    }));
-  };
-
-  const updatePoRowRate = (index: number, rawVal: string) => {
-    const val = rawVal === '' ? 0 : parseFloat(rawVal);
-    const rate = isNaN(val) ? 0 : val;
-    setPoForm(prev => ({
-      ...prev,
-      items: prev.items.map((row, i) => {
-        if (i !== index) return row;
-        const currentQty = Number(row.qty) || 0;
-        return {
-          ...row,
-          rate,
-          total: Math.round(currentQty * rate)
-        };
-      })
-    }));
+  const handlePoQtyRateChange = (index: number, qty: number, rate: number) => {
+    setPoItems(prev => {
+      const arr = [...prev];
+      arr[index] = {
+        ...arr[index],
+        qty,
+        rate,
+        total: Math.round(qty * rate)
+      };
+      return arr;
+    });
   };
 
   const handleRemovePoRow = (index: number) => {
-    setPoForm(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
+    setPoItems(prev => prev.filter((_, i) => i !== index));
   };
+
+  const totalPoAmount = poItems.reduce((sum, i) => sum + (i.total || 0), 0);
 
   const handleSubmitPo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (poForm.items.length === 0) {
+    if (poItems.length === 0) {
       alert('Please add at least one item to the Purchase Order!');
       return;
     }
-    const poTotal = poForm.items.reduce((sum, i) => sum + (i.total || 0), 0);
-    savePurchaseOrder({
-      vendor: poForm.vendor,
-      date: poForm.date,
-      expectedDate: poForm.expectedDate,
-      items: poForm.items,
-      total: poTotal,
-      status: poForm.status
-    });
+
+    const newPo: PurchaseOrder = {
+      id: Date.now(),
+      poNo: poNo.trim() || ('DCC-PO-2026-' + Date.now().toString().slice(-4)),
+      date: poDate,
+      expectedDate: poExpectedDate,
+      vendor: poVendor,
+      items: JSON.parse(JSON.stringify(poItems)),
+      total: totalPoAmount,
+      status: 'PENDING',
+      notes: poNotes
+    };
+
+    savePurchaseOrder(newPo);
     setIsPoModalOpen(false);
   };
 
-  // --- Handlers for Purchase Returns ---
-  const handleOpenNewReturn = () => {
-    const defaultRaw = data.masterItems[0];
-    setReturnForm({
-      vendor: data.vendors[0] || 'Supplier',
-      date: new Date().toISOString().split('T')[0],
-      billNo: '',
-      itemId: defaultRaw?.id || 1,
-      qty: 2,
-      rate: defaultRaw?.defaultRate || 100,
-      reason: 'Damaged / Quality rejection',
-      refundStatus: 'ADJUSTED'
+  // --- Receive Items against PO Handlers ---
+  const handleOpenReceiveModal = (po: PurchaseOrder) => {
+    setReceivingPo(po);
+    setReceiveBillNo('INV-' + Math.floor(1000 + Math.random() * 9000));
+    setReceivePaymentType('CREDIT');
+    setReceiveDate(new Date().toISOString().split('T')[0]);
+
+    // Calculate already received quantities
+    const receivedMap = new Map<number, number>();
+    (po.receivedHistory || []).forEach(hist => {
+      hist.items.forEach(hi => {
+        receivedMap.set(hi.itemId, (receivedMap.get(hi.itemId) || 0) + (hi.qty || 0));
+      });
     });
+
+    const initialList = po.items.map(item => {
+      const alreadyReceived = receivedMap.get(item.itemId) || 0;
+      const remaining = Math.max(0, item.qty - alreadyReceived);
+      return {
+        itemId: item.itemId,
+        item: item.item,
+        category: item.category,
+        uom: item.uom,
+        orderedQty: item.qty,
+        alreadyReceivedQty: alreadyReceived,
+        receiveQty: remaining,
+        rate: item.rate,
+        total: Math.round(remaining * item.rate)
+      };
+    });
+
+    setReceiveItemsList(initialList);
+  };
+
+  const handleReceiveQtyChange = (index: number, newQty: number) => {
+    setReceiveItemsList(prev => {
+      const arr = [...prev];
+      const maxAllowed = arr[index].orderedQty - arr[index].alreadyReceivedQty;
+      const validQty = Math.max(0, Math.min(newQty, maxAllowed > 0 ? maxAllowed * 2 : newQty));
+      arr[index] = {
+        ...arr[index],
+        receiveQty: validQty,
+        total: Math.round(validQty * arr[index].rate)
+      };
+      return arr;
+    });
+  };
+
+  const totalReceiveBillAmount = receiveItemsList.reduce((sum, i) => sum + i.total, 0);
+
+  const handleSubmitReceive = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!receivingPo) return;
+
+    const itemsToReceive = receiveItemsList
+      .filter(i => i.receiveQty > 0)
+      .map(i => ({
+        itemId: i.itemId,
+        item: i.item,
+        category: i.category,
+        uom: i.uom,
+        qty: i.receiveQty,
+        rate: i.rate,
+        total: i.total
+      }));
+
+    if (itemsToReceive.length === 0) {
+      alert('Please enter at least 1 received quantity greater than 0!');
+      return;
+    }
+
+    receivePurchaseOrderItems(
+      receivingPo.id,
+      itemsToReceive,
+      receiveBillNo,
+      receivePaymentType,
+      receiveDate
+    );
+
+    setReceivingPo(null);
+  };
+
+  // --- Supplier Return Handlers ---
+  const handleOpenNewReturn = () => {
+    setReturnNo('RET-' + new Date().getFullYear().toString().slice(-2) + '-' + Math.floor(10 + Math.random() * 90));
+    setReturnDate(new Date().toISOString().split('T')[0]);
+    setReturnVendor(data.vendors[0] || 'Kader Meat Supply');
+    setReturnBillNo('INV-9901');
+    if (data.masterItems.length > 0) {
+      setReturnItemId(data.masterItems[0].id);
+      setReturnRate(data.masterItems[0].defaultRate);
+    }
+    setReturnQty(1);
+    setReturnReason('Damaged packaging / seal broken upon delivery');
+    setRefundStatus('ADJUSTED');
     setIsReturnModalOpen(true);
+  };
+
+  const handleReturnItemSelect = (rawId: number) => {
+    const raw = data.masterItems.find(m => m.id === rawId);
+    if (!raw) return;
+    setReturnItemId(raw.id);
+    setReturnRate(raw.defaultRate);
   };
 
   const handleSubmitReturn = (e: React.FormEvent) => {
     e.preventDefault();
-    const raw = data.masterItems.find(m => m.id === returnForm.itemId);
-    const returnTotal = Math.round(returnForm.qty * returnForm.rate);
+    const raw = data.masterItems.find(m => m.id === returnItemId);
+    if (!raw) {
+      alert('Selected item not found!');
+      return;
+    }
 
-    savePurchaseReturn({
-      vendor: returnForm.vendor,
-      date: returnForm.date,
-      billNo: returnForm.billNo ? returnForm.billNo.trim() : undefined,
-      itemId: returnForm.itemId,
-      item: raw ? raw.name : 'Item',
-      uom: raw ? raw.uom : 'Kg',
-      qty: Number(returnForm.qty),
-      rate: Number(returnForm.rate),
-      total: returnTotal,
-      reason: returnForm.reason,
-      refundStatus: returnForm.refundStatus
-    });
+    const totalRetAmount = Math.round(returnQty * returnRate);
+
+    const newReturn: PurchaseReturn = {
+      id: Date.now(),
+      returnNo: returnNo.trim() || ('RET-' + Date.now().toString().slice(-4)),
+      date: returnDate,
+      vendor: returnVendor,
+      billNo: returnBillNo.trim(),
+      itemId: raw.id,
+      item: raw.name,
+      qty: returnQty,
+      uom: raw.uom,
+      rate: returnRate,
+      total: totalRetAmount,
+      reason: returnReason,
+      refundStatus
+    };
+
+    savePurchaseReturn(newReturn);
     setIsReturnModalOpen(false);
   };
 
-  // Filtered lists
-  const filteredPurchases = data.purchases.filter(p => {
+  // --- Vendor Handlers ---
+  const handleAddVendor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVendorName.trim()) return;
+    addConfigItem('vendors', newVendorName.trim());
+    setNewVendorName('');
+    setIsVendorModalOpen(false);
+  };
+
+  const handleSettleVendorPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payBillTarget || payAmount <= 0) return;
+
+    settlePurchaseBill(
+      payBillTarget.billNo || '',
+      payBillTarget.vendor,
+      payAmount,
+      payMethod,
+      payNote || (payBillTarget.isAllDues ? 'Full Vendor Dues Settlement' : `Payment for Bill ${payBillTarget.billNo}`)
+    );
+
+    setPayBillTarget(null);
+    setPayNote('');
+  };
+
+  // --- Filtering Data ---
+  const purchaseOrders = data.purchaseOrders || [];
+  const purchaseReturns = data.purchaseReturns || [];
+
+  const filteredVouchers = data.purchases.filter(p => {
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
     return p.vendor.toLowerCase().includes(q) || p.billNo.toLowerCase().includes(q) || p.date.includes(q);
   });
 
-  const filteredOrders = (data.purchaseOrders || []).filter(po => {
+  const filteredPOs = purchaseOrders.filter(p => {
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
-    return po.vendor.toLowerCase().includes(q) || po.poNo.toLowerCase().includes(q) || po.date.includes(q);
+    return p.poNo.toLowerCase().includes(q) || p.vendor.toLowerCase().includes(q) || p.status.toLowerCase().includes(q);
   });
 
-  const filteredReturns = (data.purchaseReturns || []).filter(pr => {
+  const filteredReturns = purchaseReturns.filter(r => {
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
-    return pr.vendor.toLowerCase().includes(q) || pr.returnNo.toLowerCase().includes(q) || pr.item.toLowerCase().includes(q);
+    return r.returnNo.toLowerCase().includes(q) || r.vendor.toLowerCase().includes(q) || r.item.toLowerCase().includes(q);
   });
+
+  // Calculate Ledger Data for Selected Supplier (matching screenshot)
+  const getSupplierLedgerDetails = (supplierName: string) => {
+    const vouchers = data.purchases.filter(p => p.vendor === supplierName);
+    const pos = (data.purchaseOrders || []).filter(p => p.vendor === supplierName && p.status === 'PENDING');
+
+    let totalBillsVal = 0;
+    let totalPaidVal = 0;
+    let totalDueVal = 0;
+
+    const billRows: {
+      id: string | number;
+      poNoOrBillNo: string;
+      date: string;
+      itemsSummary: string;
+      destination: string;
+      total: number;
+      paid: number;
+      due: number;
+      status: 'PENDING_UNRECEIVED' | 'DUE' | 'PAID';
+      type: 'BILL' | 'PO';
+      poObject?: PurchaseOrder;
+    }[] = [];
+
+    // Add Received Purchase Bills
+    vouchers.forEach(v => {
+      const paid = v.paid !== undefined ? v.paid : (v.paymentType === 'CASH' ? v.total : 0);
+      const due = Math.max(0, v.total - paid);
+
+      totalBillsVal += v.total;
+      totalPaidVal += paid;
+      totalDueVal += due;
+
+      billRows.push({
+        id: `BILL-${v.id}`,
+        poNoOrBillNo: v.billNo,
+        date: v.date,
+        itemsSummary: v.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', '),
+        destination: 'Main Kitchen',
+        total: v.total,
+        paid,
+        due,
+        status: due > 0 ? 'DUE' : 'PAID',
+        type: 'BILL'
+      });
+    });
+
+    // Add Pending Unreceived POs
+    let pendingOrdersVal = 0;
+    pos.forEach(p => {
+      pendingOrdersVal += p.total;
+      totalBillsVal += p.total;
+
+      billRows.push({
+        id: `PO-${p.id}`,
+        poNoOrBillNo: p.poNo,
+        date: p.date,
+        itemsSummary: p.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', '),
+        destination: 'Factory / Kitchen',
+        total: p.total,
+        paid: 0,
+        due: 0,
+        status: 'PENDING_UNRECEIVED',
+        type: 'PO',
+        poObject: p
+      });
+    });
+
+    return {
+      totalBillsVal,
+      totalPaidVal,
+      totalDueVal,
+      receivedBillsCount: vouchers.length,
+      pendingOrdersCount: pos.length,
+      pendingOrdersVal,
+      billRows
+    };
+  };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+    <div className="space-y-6 pb-16">
+      {/* Module Title Header */}
+      <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-blue-600" />
             <span>Purchases, Purchase Orders & Supplier Returns</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage raw material procurement vouchers (GRN), supplier purchase orders (PO), and return debit notes
+            Manage raw material purchases, PO requisition & receiving, vendor bills, and supplier returns
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {subTab === 'vouchers' && (
-            <button
-              id="btn-create-purchase-voucher"
-              onClick={handleOpenNewVoucher}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Purchase Voucher</span>
-            </button>
-          )}
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('vouchers')}
+            className={`px-3.5 py-2 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'vouchers' 
+                ? 'bg-white text-slate-900 shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <span>Purchase Bills ({data.purchases.length})</span>
+          </button>
 
-          {subTab === 'orders' && (
-            <button
-              id="btn-create-purchase-order"
-              onClick={handleOpenNewPo}
-              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Purchase Order (PO)</span>
-            </button>
-          )}
+          <button
+            id="tab-btn-purchase-orders"
+            onClick={() => setActiveTab('po')}
+            className={`px-3.5 py-2 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'po' 
+                ? 'bg-white text-slate-900 shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <PackageCheck className="w-3.5 h-3.5 text-amber-600" />
+            <span>Purchase Orders / PO ({purchaseOrders.length})</span>
+          </button>
 
-          {subTab === 'returns' && (
-            <button
-              id="btn-create-purchase-return"
-              onClick={handleOpenNewReturn}
-              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>New Supplier Return</span>
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab('returns')}
+            className={`px-3.5 py-2 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'returns' 
+                ? 'bg-white text-slate-900 shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+            <span>Supplier Returns ({purchaseReturns.length})</span>
+          </button>
+
+          <button
+            id="tab-btn-suppliers-directory"
+            onClick={() => setActiveTab('vendors')}
+            className={`px-3.5 py-2 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'vendors' 
+                ? 'bg-white text-slate-900 shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Suppliers Directory ({data.vendors.length})</span>
+          </button>
         </div>
       </div>
 
-      {/* Mini KPI Cards */}
+      {/* KPI Stats Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3.5 rounded-xl bg-white border border-slate-200">
-          <div className="text-[11px] font-bold text-slate-500">Total Purchases (Inward)</div>
+          <div className="text-[11px] font-bold text-slate-500">Total Purchase Bills</div>
           <div className="text-lg font-extrabold text-blue-700 mt-0.5">৳ {metrics.totalPurchases.toLocaleString()}</div>
+          <div className="text-[10px] text-slate-400 font-medium">{data.purchases.length} invoices</div>
         </div>
+
         <div className="p-3.5 rounded-xl bg-white border border-slate-200">
-          <div className="text-[11px] font-bold text-slate-500">Purchase Invoices</div>
-          <div className="text-lg font-extrabold text-slate-900 mt-0.5">{metrics.purchaseCount} vouchers</div>
+          <div className="text-[11px] font-bold text-slate-500">Pending POs</div>
+          <div className="text-lg font-extrabold text-amber-600 mt-0.5">
+            {purchaseOrders.filter(p => p.status === 'PENDING' || p.status === 'PARTIALLY_RECEIVED').length} Active POs
+          </div>
+          <div className="text-[10px] text-slate-400 font-medium">Items awaiting receiving</div>
         </div>
+
         <div className="p-3.5 rounded-xl bg-white border border-slate-200">
-          <div className="text-[11px] font-bold text-slate-500">Purchase Orders (PO)</div>
-          <div className="text-lg font-extrabold text-indigo-700 mt-0.5">{(data.purchaseOrders || []).length} POs</div>
+          <div className="text-[11px] font-bold text-slate-500">Supplier Dues & Payables</div>
+          <div className="text-lg font-extrabold text-rose-600 mt-0.5">৳ {metrics.totalVendorDue.toLocaleString()}</div>
+          <div className="text-[10px] text-slate-400 font-medium">Unsettled credit bills</div>
         </div>
+
         <div className="p-3.5 rounded-xl bg-white border border-slate-200">
-          <div className="text-[11px] font-bold text-slate-500">Vendor Payables</div>
-          <div className="text-lg font-extrabold text-amber-700 mt-0.5">৳ {metrics.totalVendorDue.toLocaleString()}</div>
+          <div className="text-[11px] font-bold text-slate-500">Supplier Returns</div>
+          <div className="text-lg font-extrabold text-emerald-700 mt-0.5">
+            ৳ {purchaseReturns.reduce((sum, r) => sum + r.total, 0).toLocaleString()}
+          </div>
+          <div className="text-[10px] text-slate-400 font-medium">{purchaseReturns.length} return claims</div>
         </div>
       </div>
 
-      {/* Sub navigation tabs */}
-      <div className="flex border-b border-slate-200 gap-2">
-        <button
-          onClick={() => setSubTab('vouchers')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer ${
-            subTab === 'vouchers'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <ShoppingCart className="w-4 h-4" />
-          <span>1. Purchase Vouchers & GRN ({data.purchases.length})</span>
-        </button>
-
-        <button
-          onClick={() => setSubTab('orders')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer ${
-            subTab === 'orders'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>2. Purchase Orders / PO ({(data.purchaseOrders || []).length})</span>
-        </button>
-
-        <button
-          onClick={() => setSubTab('returns')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer ${
-            subTab === 'returns'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <RotateCcw className="w-4 h-4" />
-          <span>3. Supplier Returns ({(data.purchaseReturns || []).length})</span>
-        </button>
-      </div>
-
-      {/* Search Bar */}
-      <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-        <div className="relative">
+      {/* Filter / Search & Action Bar */}
+      <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={
-              subTab === 'vouchers' 
-                ? "Search vendor name, bill no, or date..."
-                : subTab === 'orders'
-                  ? "Search PO number, supplier, or date..."
-                  : "Search return number, item, or vendor..."
+              activeTab === 'po' ? "Search PO#, supplier..." :
+              activeTab === 'returns' ? "Search return#, item..." :
+              activeTab === 'vendors' ? "Search supplier name..." :
+              "Search vendor, bill no, date..."
             }
             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
         </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          {activeTab === 'vouchers' && (
+            <button
+              onClick={handleOpenNewVoucher}
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Purchase Bill</span>
+            </button>
+          )}
+
+          {activeTab === 'po' && (
+            <button
+              id="btn-create-purchase-order"
+              onClick={handleOpenNewPo}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Create Purchase Order (PO)</span>
+            </button>
+          )}
+
+          {activeTab === 'returns' && (
+            <button
+              onClick={handleOpenNewReturn}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ New Supplier Return</span>
+            </button>
+          )}
+
+          {activeTab === 'vendors' && (
+            <button
+              onClick={() => setIsVendorModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Add New Supplier</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 1. Purchases Vouchers Table */}
-      {subTab === 'vouchers' && (
+      {/* ================= TAB 1: PURCHASE BILLS / VOUCHERS ================= */}
+      {activeTab === 'vouchers' && (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left border-collapse">
-              <thead className="bg-slate-900 text-slate-300 border-b border-slate-800 text-[11px]">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-900 text-slate-300 border-b border-slate-800">
                 <tr>
-                  <th className="py-2.5 px-3 font-bold">Voucher & Date</th>
-                  <th className="py-2.5 px-3 font-bold">Vendor & Payment</th>
-                  <th className="py-2.5 px-3 font-bold">Items Inward</th>
-                  <th className="py-2.5 px-3 font-bold text-right">Bill Total & Paid</th>
-                  <th className="py-2.5 px-2 font-bold text-center">Action</th>
+                  <th className="py-3 px-4 font-bold">Date</th>
+                  <th className="py-3 px-4 font-bold">Voucher / Bill No</th>
+                  <th className="py-3 px-4 font-bold">Vendor / Supplier</th>
+                  <th className="py-3 px-4 font-bold">Payment Type</th>
+                  <th className="py-3 px-4 font-bold text-center">Status</th>
+                  <th className="py-3 px-4 font-bold">Items Received</th>
+                  <th className="py-3 px-4 font-bold text-right">Total (৳)</th>
+                  <th className="py-3 px-4 font-bold text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {filteredPurchases.length === 0 ? (
+                {filteredVouchers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400">
-                      No purchase vouchers found.
+                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                      No purchase bills found. Click "+ New Purchase Bill" to record a bill.
                     </td>
                   </tr>
                 ) : (
-                  filteredPurchases.map(voucher => {
-                    const paidAmt = voucher.paid || (voucher.paymentType === 'CASH' ? voucher.total : 0);
-                    const remainingDue = Math.max(0, voucher.total - paidAmt);
+                  filteredVouchers.map(voucher => {
+                    const paid = voucher.paid !== undefined ? voucher.paid : (voucher.paymentType === 'CASH' ? voucher.total : 0);
+                    const due = Math.max(0, voucher.total - paid);
 
                     return (
-                      <tr key={voucher.id} className="hover:bg-slate-50/80 transition">
-                        <td className="py-2.5 px-3">
-                          <div className="font-mono font-bold text-slate-900">{voucher.billNo}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{voucher.date}</div>
+                      <tr key={voucher.id} className="hover:bg-slate-50 transition">
+                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{voucher.date}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{voucher.billNo}</td>
+                        <td className="py-3 px-4 font-extrabold text-slate-900">{voucher.vendor}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                            voucher.paymentType === 'CREDIT' ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'
+                          }`}>
+                            {voucher.paymentType === 'CREDIT' ? 'Credit (Due)' : 'Cash Paid'}
+                          </span>
                         </td>
-                        <td className="py-2.5 px-3">
-                          <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{voucher.vendor}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
-                              voucher.paymentType === 'CREDIT' ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'
-                            }`}>
-                              {voucher.paymentType === 'CREDIT' ? 'Credit' : 'Cash'}
-                            </span>
-                            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-                              voucher.status === 'FINAL' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {voucher.status === 'FINAL' ? '✓ In-Stock' : 'Draft'}
-                            </span>
-                          </div>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            voucher.status === 'FINAL' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {voucher.status === 'FINAL' ? '✓ Final (Inwarded)' : 'Draft'}
+                          </span>
                         </td>
-                        <td className="py-2.5 px-3 max-w-xs">
-                          <div className="line-clamp-1 text-slate-600 font-medium text-[11px]">
-                            {voucher.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', ')}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {voucher.items.length} raw material line items
-                          </div>
+                        <td className="py-3 px-4 max-w-xs truncate text-slate-600 font-medium">
+                          {voucher.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', ')}
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <div className="font-extrabold text-blue-700 text-xs sm:text-sm font-mono">
-                            ৳ {voucher.total.toLocaleString()}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-mono">
-                            <span className="font-bold text-emerald-700">Paid: ৳{paidAmt.toLocaleString()}</span>
-                            {remainingDue > 0 && (
-                              <span className="text-amber-600 font-bold ml-1">Due: ৳{remainingDue.toLocaleString()}</span>
-                            )}
-                          </div>
+                        <td className="py-3 px-4 text-right font-extrabold text-blue-700 text-sm whitespace-nowrap">
+                          ৳ {voucher.total.toLocaleString()}
                         </td>
-                        <td className="py-2.5 px-2 text-center">
-                          <div className="flex items-center justify-center gap-1">
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => setViewingVoucher(voucher)}
-                              className="p-1.5 text-blue-600 hover:text-blue-800 rounded-lg hover:bg-blue-50 transition cursor-pointer"
+                              className="p-1.5 text-blue-600 hover:text-blue-800 rounded hover:bg-blue-50 cursor-pointer"
                               title="View Voucher Memo"
                             >
-                              <FileText className="w-3.5 h-3.5" />
+                              <FileText className="w-4 h-4" />
                             </button>
+                            {due > 0 && (
+                              <button
+                                onClick={() => {
+                                  setPayBillTarget({
+                                    billNo: voucher.billNo,
+                                    vendor: voucher.vendor,
+                                    dueAmount: due,
+                                    totalAmount: voucher.total
+                                  });
+                                  setPayAmount(due);
+                                }}
+                                className="p-1 px-2.5 text-[10px] bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-lg shadow-2xs transition cursor-pointer flex items-center gap-1"
+                                title="Pay Bill"
+                              >
+                                <CreditCard className="w-3 h-3" />
+                                <span>Pay Bill</span>
+                              </button>
+                            )}
                             <button
                               onClick={() => deletePurchaseVoucher(voucher.id)}
-                              className="p-1.5 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
                               title="Delete"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -623,127 +851,163 @@ export const PurchasesView: React.FC = () => {
         </div>
       )}
 
-      {/* 2. Purchase Orders (PO) Table */}
-      {subTab === 'orders' && (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-900 text-slate-300 border-b border-slate-800">
-                <tr>
-                  <th className="py-3 px-4 font-bold">Date</th>
-                  <th className="py-3 px-4 font-bold">PO Number</th>
-                  <th className="py-3 px-4 font-bold">Supplier</th>
-                  <th className="py-3 px-4 font-bold">Expected Date</th>
-                  <th className="py-3 px-4 font-bold text-center">Status</th>
-                  <th className="py-3 px-4 font-bold">Items Required</th>
-                  <th className="py-3 px-4 font-bold text-right">Order Value (৳)</th>
-                  <th className="py-3 px-4 font-bold text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {filteredOrders.length === 0 ? (
+      {/* ================= TAB 2: PURCHASE ORDERS (PO) ================= */}
+      {activeTab === 'po' && (
+        <div className="space-y-4">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <PackageCheck className="w-5 h-5 text-amber-400" />
+                <h3 className="font-extrabold text-sm">Purchase Orders (PO) & Receiving Workbench</h3>
+              </div>
+              <span className="text-xs text-slate-400">
+                1. Create PO → 2. Supplier Delivers → 3. Click "Receive Items" to Generate Bill & Inward Stock
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-100 text-slate-700 border-b border-slate-200 font-bold">
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      No Purchase Orders recorded yet.
-                    </td>
+                    <th className="py-3 px-4">PO Number</th>
+                    <th className="py-3 px-4">PO Date</th>
+                    <th className="py-3 px-4">Expected Date</th>
+                    <th className="py-3 px-4">Vendor / Supplier</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4">Items Summary</th>
+                    <th className="py-3 px-4 text-right">PO Total (৳)</th>
+                    <th className="py-3 px-4 text-center">Actions / Receive</th>
                   </tr>
-                ) : (
-                  filteredOrders.map(po => (
-                    <tr key={po.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{po.date}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-indigo-900">{po.poNo}</td>
-                      <td className="py-3 px-4 font-extrabold text-slate-900">{po.vendor}</td>
-                      <td className="py-3 px-4 text-slate-600">{po.expectedDate || '-'}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          po.status === 'FULFILLED'
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            : po.status === 'PARTIALLY_RECEIVED'
-                              ? 'bg-amber-50 text-amber-800 border border-amber-300'
-                              : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {po.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 max-w-xs truncate text-slate-600 font-medium">
-                        {po.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', ')}
-                      </td>
-                      <td className="py-3 px-4 text-right font-extrabold text-slate-900 text-sm whitespace-nowrap">
-                        ৳ {po.total.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => deletePurchaseOrder(po.id)}
-                          className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
-                          title="Delete PO"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredPOs.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        No purchase orders found. Click "+ Create Purchase Order (PO)" to create one.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredPOs.map(po => (
+                      <tr key={po.id} className="hover:bg-slate-50 transition">
+                        <td className="py-3 px-4 font-mono font-extrabold text-blue-700">{po.poNo}</td>
+                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{po.date}</td>
+                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{po.expectedDate || 'N/A'}</td>
+                        <td className="py-3 px-4 font-extrabold text-slate-900">{po.vendor}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide ${
+                            po.status === 'FULFILLED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                            po.status === 'PARTIALLY_RECEIVED' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                            po.status === 'CANCELLED' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                            'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                          }`}>
+                            {po.status === 'FULFILLED' ? '✓ FULFILLED' :
+                             po.status === 'PARTIALLY_RECEIVED' ? 'PARTIAL RECEIVED' :
+                             po.status === 'CANCELLED' ? 'CANCELLED' :
+                             '⏳ PENDING'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 max-w-xs truncate text-slate-600 font-medium">
+                          {po.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', ')}
+                        </td>
+                        <td className="py-3 px-4 text-right font-extrabold text-slate-900 text-sm whitespace-nowrap">
+                          ৳ {po.total.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            {po.status !== 'FULFILLED' && po.status !== 'CANCELLED' && (
+                              <button
+                                id={`btn-receive-po-${po.id}`}
+                                onClick={() => handleOpenReceiveModal(po)}
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-lg shadow-xs transition flex items-center gap-1 cursor-pointer"
+                                title="Receive Items & Auto-Generate Bill"
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                                <span>Receive Items</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => setViewingPo(po)}
+                              className="p-1.5 text-blue-600 hover:text-blue-800 rounded hover:bg-blue-50 cursor-pointer"
+                              title="View PO Details"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => deletePurchaseOrder(po.id)}
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
+                              title="Delete PO"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 3. Supplier Returns Table */}
-      {subTab === 'returns' && (
+      {/* ================= TAB 3: SUPPLIER RETURNS ================= */}
+      {activeTab === 'returns' && (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-900 text-slate-300 border-b border-slate-800">
                 <tr>
-                  <th className="py-3 px-4 font-bold">Date</th>
                   <th className="py-3 px-4 font-bold">Return No</th>
+                  <th className="py-3 px-4 font-bold">Date</th>
                   <th className="py-3 px-4 font-bold">Vendor / Supplier</th>
-                  <th className="py-3 px-4 font-bold">Returned Item</th>
-                  <th className="py-3 px-4 font-bold text-center">Quantity</th>
+                  <th className="py-3 px-4 font-bold">Bill No</th>
+                  <th className="py-3 px-4 font-bold">Item Name</th>
+                  <th className="py-3 px-4 font-bold text-center">Returned Qty</th>
+                  <th className="py-3 px-4 font-bold text-right">Amount (৳)</th>
                   <th className="py-3 px-4 font-bold">Reason</th>
                   <th className="py-3 px-4 font-bold text-center">Refund Status</th>
-                  <th className="py-3 px-4 font-bold text-right">Debit Amount (৳)</th>
                   <th className="py-3 px-4 font-bold text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredReturns.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400">
-                      No Supplier Returns recorded.
+                    <td colSpan={10} className="py-8 text-center text-slate-400">
+                      No supplier returns recorded. Click "+ New Supplier Return" to record one.
                     </td>
                   </tr>
                 ) : (
-                  filteredReturns.map(pr => (
-                    <tr key={pr.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{pr.date}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-rose-900">{pr.returnNo}</td>
-                      <td className="py-3 px-4 font-extrabold text-slate-900">{pr.vendor}</td>
-                      <td className="py-3 px-4 font-bold text-slate-800">{pr.item}</td>
-                      <td className="py-3 px-4 text-center font-extrabold text-slate-900">
-                        {pr.qty} {pr.uom}
+                  filteredReturns.map(ret => (
+                    <tr key={ret.id} className="hover:bg-slate-50 transition">
+                      <td className="py-3 px-4 font-mono font-extrabold text-rose-700">{ret.returnNo}</td>
+                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{ret.date}</td>
+                      <td className="py-3 px-4 font-extrabold text-slate-900">{ret.vendor}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-slate-600">{ret.billNo || 'N/A'}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{ret.item}</td>
+                      <td className="py-3 px-4 text-center font-bold text-slate-900">
+                        {ret.qty} {ret.uom}
                       </td>
-                      <td className="py-3 px-4 text-slate-600 max-w-xs truncate">{pr.reason}</td>
+                      <td className="py-3 px-4 text-right font-extrabold text-rose-600 whitespace-nowrap">
+                        ৳ {ret.total.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 max-w-xs truncate text-slate-600">{ret.reason}</td>
                       <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          pr.refundStatus === 'REFUNDED'
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            : pr.refundStatus === 'ADJUSTED'
-                              ? 'bg-blue-50 text-blue-800 border border-blue-300'
-                              : 'bg-amber-50 text-amber-800 border border-amber-300'
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                          ret.refundStatus === 'REFUNDED' ? 'bg-emerald-100 text-emerald-800' :
+                          ret.refundStatus === 'ADJUSTED' ? 'bg-blue-100 text-blue-800' :
+                          'bg-amber-100 text-amber-800'
                         }`}>
-                          {pr.refundStatus}
+                          {ret.refundStatus}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 text-right font-extrabold text-rose-700 text-sm whitespace-nowrap">
-                        ৳ {pr.total.toLocaleString()}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <button
-                          onClick={() => deletePurchaseReturn(pr.id)}
+                          onClick={() => deletePurchaseReturn(ret.id)}
                           className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
-                          title="Delete Return"
+                          title="Delete Return Record"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -757,165 +1021,464 @@ export const PurchasesView: React.FC = () => {
         </div>
       )}
 
-      {/* --- Modal 1: New Purchase Voucher --- */}
-      {isVoucherModalOpen && (
+      {/* ================= TAB 4: SUPPLIERS DIRECTORY ================= */}
+      {activeTab === 'vendors' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {data.vendors.map((v, idx) => {
+              const vendorBills = data.purchases.filter(p => p.vendor === v);
+              const vendorPos = (data.purchaseOrders || []).filter(p => p.vendor === v && p.status === 'PENDING');
+
+              const totalVendorPurchase = vendorBills.reduce((sum, b) => sum + b.total, 0);
+              const vendorPaid = vendorBills.reduce((sum, b) => sum + (b.paid !== undefined ? b.paid : (b.paymentType === 'CASH' ? b.total : 0)), 0);
+              const vendorDues = Math.max(0, totalVendorPurchase - vendorPaid);
+              const phoneMock = `017${(56007600 + idx * 111111).toString().slice(0, 8)}`;
+
+              return (
+                <div key={v} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3 flex flex-col justify-between hover:shadow-md transition">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-blue-600 text-white rounded-2xl font-bold shadow-xs">
+                          <Building2 className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-base text-slate-900">{v}</h4>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-extrabold rounded-full border border-blue-200">
+                              Raw Materials Supplier
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-1">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{phoneMock}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-bold block">Received Bills</span>
+                        <strong className="text-slate-900">{vendorBills.length} Invoices</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-bold block">Pending Orders</span>
+                        <strong className="text-amber-700">{vendorPos.length} POs</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 block">Balance Payable Due</span>
+                      <strong className={`text-base font-extrabold ${vendorDues > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        ৳ {vendorDues.toLocaleString()}
+                      </strong>
+                    </div>
+
+                    <button
+                      id={`btn-view-ledger-${v.replace(/\s+/g, '-').toLowerCase()}`}
+                      onClick={() => {
+                        setSelectedSupplierLedger(v);
+                        setLedgerFilter('ALL');
+                      }}
+                      className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Receipt className="w-4 h-4" />
+                      <span>View Bills & Ledger</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: SUPPLIER LEDGER & INDIVIDUAL BILL-WISE PAYMENTS (MATCHING SCREENSHOT) ================= */}
+      {selectedSupplierLedger && (() => {
+        const ledgerData = getSupplierLedgerDetails(selectedSupplierLedger);
+        const supplierIndex = data.vendors.indexOf(selectedSupplierLedger);
+        const mockPhone = `017${(56007600 + (supplierIndex >= 0 ? supplierIndex : 0) * 111111).toString().slice(0, 8)}`;
+
+        const filteredRows = ledgerData.billRows.filter(row => {
+          if (ledgerFilter === 'RECEIVED') return row.type === 'BILL';
+          if (ledgerFilter === 'PENDING') return row.type === 'PO';
+          return true;
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs">
+            <div className="bg-white rounded-3xl max-w-5xl w-full p-6 shadow-2xl border border-slate-200 max-h-[94vh] flex flex-col overflow-hidden">
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-xs">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-xl text-slate-900 tracking-tight">{selectedSupplierLedger}</h3>
+                      <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 text-[11px] font-extrabold rounded-full">
+                        Raw Materials Supplier
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold mt-0.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{mockPhone}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedSupplierLedger(null)}
+                  className="p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition cursor-pointer"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto my-4 pr-1 space-y-6">
+                {/* 3 Summary Cards (Top) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Card 1: TOTAL BILLS */}
+                  <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <span>TOTAL BILLS</span>
+                        <Receipt className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <div className="text-2xl font-black text-slate-900 mt-2">
+                        ৳ {ledgerData.totalBillsVal.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500 font-semibold mt-3">
+                      {ledgerData.receivedBillsCount} received bills • ({ledgerData.pendingOrdersCount} pending)
+                    </div>
+                  </div>
+
+                  {/* Card 2: TOTAL PAID */}
+                  <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                        <span>TOTAL PAID</span>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div className="text-2xl font-black text-emerald-700 mt-2">
+                        ৳ {ledgerData.totalPaidVal.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="text-xs text-emerald-700 font-semibold mt-3">
+                      Paid to vendor
+                    </div>
+                  </div>
+
+                  {/* Card 3: BALANCE (DUE) */}
+                  <div className="p-5 rounded-2xl bg-amber-50/70 border border-amber-300 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold text-amber-900 uppercase tracking-wider">
+                        <span>BALANCE (DUE)</span>
+                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div className="text-2xl font-black text-amber-800 mt-2">
+                        ৳ {ledgerData.totalDueVal.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-amber-800/80 font-medium mt-1">
+                        Pending orders: ৳ {ledgerData.pendingOrdersVal.toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      {ledgerData.totalDueVal > 0 ? (
+                        <button
+                          onClick={() => {
+                            setPayBillTarget({
+                              vendor: selectedSupplierLedger,
+                              dueAmount: ledgerData.totalDueVal,
+                              totalAmount: ledgerData.totalBillsVal,
+                              isAllDues: true
+                            });
+                            setPayAmount(ledgerData.totalDueVal);
+                          }}
+                          className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-black text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          <span>💳 Pay All Dues</span>
+                        </button>
+                      ) : (
+                        <div className="px-3 py-2 bg-emerald-100 text-emerald-900 font-extrabold text-xs rounded-xl text-center">
+                          ✓ All Dues Settled
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Header & Filter Pills */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                  <div>
+                    <h4 className="text-base font-extrabold text-slate-900">Individual Purchase Bills</h4>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Bills are due upon receiving and can be paid individually.
+                    </p>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setLedgerFilter('ALL')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer ${
+                        ledgerFilter === 'ALL'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      All ({ledgerData.billRows.length})
+                    </button>
+                    <button
+                      onClick={() => setLedgerFilter('RECEIVED')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer ${
+                        ledgerFilter === 'RECEIVED'
+                          ? 'bg-emerald-700 text-white'
+                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                      }`}
+                    >
+                      {ledgerData.receivedBillsCount} Received
+                    </button>
+                    <button
+                      onClick={() => setLedgerFilter('PENDING')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer ${
+                        ledgerFilter === 'PENDING'
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                      }`}
+                    >
+                      {ledgerData.pendingOrdersCount} Pending
+                    </button>
+                  </div>
+                </div>
+
+                {/* Individual Purchase Bills Table */}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="py-3 px-4">PO NO & DATE</th>
+                          <th className="py-3 px-4">ITEMS & DESTINATION</th>
+                          <th className="py-3 px-4 text-right">TOTAL BILL</th>
+                          <th className="py-3 px-4 text-right">PAID</th>
+                          <th className="py-3 px-4 text-right">DUE</th>
+                          <th className="py-3 px-4 text-center">STATUS</th>
+                          <th className="py-3 px-4 text-center">ACTION</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                              No bills found for this filter.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredRows.map(row => (
+                            <tr key={row.id} className="hover:bg-slate-50 transition">
+                              {/* PO NO & DATE */}
+                              <td className="py-3.5 px-4">
+                                <div className="font-mono font-black text-slate-900 text-xs">{row.poNoOrBillNo}</div>
+                                <div className="text-[10px] text-slate-400 font-medium mt-0.5 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 text-slate-400" />
+                                  <span>{row.date}</span>
+                                </div>
+                              </td>
+
+                              {/* ITEMS & DESTINATION */}
+                              <td className="py-3.5 px-4 max-w-xs">
+                                <div className="font-bold text-slate-900 text-xs truncate">{row.itemsSummary}</div>
+                                <span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded">
+                                  {row.destination}
+                                </span>
+                              </td>
+
+                              {/* TOTAL BILL */}
+                              <td className="py-3.5 px-4 text-right font-black text-slate-900 text-xs">
+                                ৳{row.total.toLocaleString()}
+                              </td>
+
+                              {/* PAID */}
+                              <td className="py-3.5 px-4 text-right font-bold text-emerald-700 text-xs">
+                                ৳{row.paid.toLocaleString()}
+                              </td>
+
+                              {/* DUE */}
+                              <td className="py-3.5 px-4 text-right">
+                                {row.status === 'PENDING_UNRECEIVED' ? (
+                                  <span className="text-slate-400 font-medium text-xs">— (Pending)</span>
+                                ) : (
+                                  <span className={`font-black text-xs ${row.due > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+                                    ৳{row.due.toLocaleString()}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* STATUS */}
+                              <td className="py-3.5 px-4 text-center">
+                                {row.status === 'PENDING_UNRECEIVED' && (
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1 justify-center">
+                                    <Clock className="w-3 h-3 text-slate-500" />
+                                    <span>Pending (Unreceived)</span>
+                                  </span>
+                                )}
+
+                                {row.status === 'DUE' && (
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+                                    Due
+                                  </span>
+                                )}
+
+                                {row.status === 'PAID' && (
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    ✓ Paid
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* ACTION */}
+                              <td className="py-3.5 px-4 text-center">
+                                {row.status === 'PENDING_UNRECEIVED' && row.poObject && (
+                                  <button
+                                    onClick={() => handleOpenReceiveModal(row.poObject!)}
+                                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition flex items-center gap-1 mx-auto cursor-pointer"
+                                  >
+                                    <Truck className="w-3.5 h-3.5" />
+                                    <span>Receive</span>
+                                  </button>
+                                )}
+
+                                {row.status === 'DUE' && (
+                                  <button
+                                    onClick={() => {
+                                      setPayBillTarget({
+                                        billNo: row.poNoOrBillNo,
+                                        vendor: selectedSupplierLedger,
+                                        dueAmount: row.due,
+                                        totalAmount: row.total
+                                      });
+                                      setPayAmount(row.due);
+                                    }}
+                                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-black text-xs rounded-xl shadow-2xs transition flex items-center gap-1 mx-auto cursor-pointer"
+                                  >
+                                    <CreditCard className="w-3.5 h-3.5" />
+                                    <span>Pay Bill</span>
+                                  </button>
+                                )}
+
+                                {row.status === 'PAID' && (
+                                  <span className="text-emerald-700 font-extrabold text-xs flex items-center justify-center gap-1">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span>Cleared</span>
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Close Action */}
+              <div className="pt-3 border-t border-slate-200 flex justify-end">
+                <button
+                  onClick={() => setSelectedSupplierLedger(null)}
+                  className="px-6 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-extrabold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ================= MODAL: PAY SPECIFIC BILL / PAY ALL DUES POPUP ================= */}
+      {payBillTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-blue-600" />
-                <span>Create Inward Purchase Voucher</span>
-              </h3>
-              <button onClick={() => setIsVoucherModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-amber-600" />
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  {payBillTarget.isAllDues ? 'Pay All Vendor Dues' : `Pay Bill #${payBillTarget.billNo}`}
+                </h3>
+              </div>
+              <button onClick={() => setPayBillTarget(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitVoucher} className="flex-1 flex flex-col overflow-hidden my-4 space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Voucher Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={e => setDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Supplier / Vendor *</label>
-                  <select
-                    value={vendor}
-                    onChange={e => setVendor(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
-                  >
-                    {data.vendors.map(v => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Bill / Invoice No</label>
-                  <input
-                    type="text"
-                    value={billNo}
-                    onChange={e => setBillNo(e.target.value)}
-                    placeholder="e.g. INV-9901"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Payment Term</label>
-                  <select
-                    value={paymentType}
-                    onChange={e => setPaymentType(e.target.value as PurchasePaymentType)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
-                  >
-                    <option value="CREDIT">Credit (Accounts Payable)</option>
-                    <option value="CASH">Cash Paid Instantly</option>
-                  </select>
-                </div>
+            <form onSubmit={handleSettleVendorPayment} className="py-4 space-y-3">
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs space-y-1">
+                <div className="text-slate-600">Supplier: <strong className="text-slate-900 font-extrabold">{payBillTarget.vendor}</strong></div>
+                {payBillTarget.billNo && (
+                  <div className="text-slate-600">Bill Invoice: <strong className="text-slate-900 font-mono font-bold">{payBillTarget.billNo}</strong></div>
+                )}
+                <div className="text-slate-600">Total Outstanding Balance: <strong className="text-rose-600 font-extrabold">৳ {payBillTarget.dueAmount.toLocaleString()}</strong></div>
               </div>
 
-              {/* Items Table */}
-              <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 text-slate-700 sticky top-0">
-                    <tr>
-                      <th className="py-2.5 px-3 font-bold">Raw Material</th>
-                      <th className="py-2.5 px-2 font-bold text-center">UOM</th>
-                      <th className="py-2.5 px-2 font-bold text-right">Qty</th>
-                      <th className="py-2.5 px-2 font-bold text-right">Unit Rate (৳)</th>
-                      <th className="py-2.5 px-3 font-bold text-right">Total (৳)</th>
-                      <th className="py-2.5 px-2 font-bold text-center">Del</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {items.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-2 px-3">
-                          <select
-                            value={row.itemId}
-                            onChange={e => handleItemChange(idx, Number(e.target.value))}
-                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
-                          >
-                            {data.masterItems.map(m => (
-                              <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-slate-700">{row.uom}</td>
-                        <td className="py-2 px-2 text-right">
-                          <input
-                            type="number"
-                            min="0.01"
-                            step="any"
-                            value={row.qty === 0 ? '' : row.qty}
-                            onChange={e => updateRowQty(idx, e.target.value)}
-                            className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-right">
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={row.rate === 0 ? '' : row.rate}
-                            onChange={e => updateRowRate(idx, e.target.value)}
-                            className="w-20 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right font-extrabold text-blue-700 whitespace-nowrap">
-                          ৳ {Math.round((Number(row.qty) || 0) * (Number(row.rate) || 0)).toLocaleString()}
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRow(idx)}
-                            className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Amount (৳) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={payBillTarget.dueAmount}
+                  required
+                  value={payAmount}
+                  onChange={e => setPayAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-base font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500"
+                />
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={handleAddRow}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer"
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Method *</label>
+                <select
+                  value={payMethod}
+                  onChange={e => setPayMethod(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Line Item</span>
-                </button>
-
-                <div className="text-right">
-                  <span className="text-xs text-slate-500 font-semibold mr-2">Voucher Total:</span>
-                  <span className="text-lg font-black text-blue-800">৳ {totalVoucherAmount.toLocaleString()}</span>
-                </div>
+                  <option value="CASH">Cash Drawer</option>
+                  <option value="BANK">Bank Account Transfer</option>
+                  <option value="BKASH">bKash Merchant</option>
+                </select>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Note / Reference (Optional)</label>
+                <input
+                  type="text"
+                  value={payNote}
+                  onChange={e => setPayNote(e.target.value)}
+                  placeholder="e.g. Bank slip #9821 / Cash voucher"
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsVoucherModalOpen(false)}
+                  onClick={() => setPayBillTarget(null)}
                   className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md transition cursor-pointer"
                 >
-                  Save & Inward Stock (৳{totalVoucherAmount.toLocaleString()})
+                  Confirm Payment
                 </button>
               </div>
             </form>
@@ -923,27 +1486,41 @@ export const PurchasesView: React.FC = () => {
         </div>
       )}
 
-      {/* --- Modal 2: New Purchase Order (PO) --- */}
+      {/* ================= MODAL: NEW PURCHASE ORDER (PO) ================= */}
       {isPoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5 text-indigo-600" />
-                <span>Create Purchase Order (PO Requisition)</span>
-              </h3>
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
+                  <PackageCheck className="w-5 h-5 text-amber-600" />
+                  <span>Create New Purchase Order (PO)</span>
+                </h3>
+                <p className="text-xs text-slate-500">Send purchase requisition to supplier before item delivery</p>
+              </div>
               <button onClick={() => setIsPoModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitPo} className="flex-1 flex flex-col overflow-hidden my-4 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <form onSubmit={handleSubmitPo} className="flex-1 overflow-y-auto my-4 pr-1 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-amber-50/60 p-3.5 rounded-xl border border-amber-200">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Supplier *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">PO Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={poNo}
+                    onChange={e => setPoNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-blue-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Vendor / Supplier *</label>
                   <select
-                    value={poForm.vendor}
-                    onChange={e => setPoForm({ ...poForm, vendor: e.target.value })}
+                    value={poVendor}
+                    onChange={e => setPoVendor(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
                   >
                     {data.vendors.map(v => (
@@ -953,122 +1530,142 @@ export const PurchasesView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">PO Date</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">PO Date *</label>
                   <input
                     type="date"
                     required
-                    value={poForm.date}
-                    onChange={e => setPoForm({ ...poForm, date: e.target.value })}
+                    value={poDate}
+                    onChange={e => setPoDate(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Expected Delivery Date</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Expected Delivery *</label>
                   <input
                     type="date"
-                    value={poForm.expectedDate}
-                    onChange={e => setPoForm({ ...poForm, expectedDate: e.target.value })}
+                    required
+                    value={poExpectedDate}
+                    onChange={e => setPoExpectedDate(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
                   />
                 </div>
               </div>
 
-              {/* Items List */}
-              <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 text-slate-700 sticky top-0">
-                    <tr>
-                      <th className="py-2.5 px-3 font-bold">Item Required</th>
-                      <th className="py-2.5 px-2 font-bold text-right">Order Qty</th>
-                      <th className="py-2.5 px-2 font-bold text-right">Est. Rate (৳)</th>
-                      <th className="py-2.5 px-3 font-bold text-right">Est. Total</th>
-                      <th className="py-2.5 px-2 font-bold text-center">Del</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {poForm.items.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-2 px-3">
-                          <select
-                            value={row.itemId}
-                            onChange={e => handlePoItemChange(idx, Number(e.target.value))}
-                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold"
-                          >
-                            {data.masterItems.map(m => (
-                              <option key={m.id} value={m.id}>{m.name} ({m.uom})</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 px-2 text-right">
-                          <input
-                            type="number"
-                            min="0.01"
-                            step="any"
-                            value={row.qty === 0 ? '' : row.qty}
-                            onChange={e => updatePoRowQty(idx, e.target.value)}
-                            className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-right">
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={row.rate === 0 ? '' : row.rate}
-                            onChange={e => updatePoRowRate(idx, e.target.value)}
-                            className="w-20 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-right"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right font-extrabold text-indigo-700 whitespace-nowrap">
-                          ৳ {Math.round((Number(row.qty) || 0) * (Number(row.rate) || 0)).toLocaleString()}
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePoRow(idx)}
-                            className="p-1 text-rose-500 hover:text-rose-700 rounded cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+              {/* Items Table */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-extrabold text-xs text-slate-900 uppercase tracking-wide">
+                    Ordered Raw Materials
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleAddPoRow}
+                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Line Item</span>
+                  </button>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                      <tr>
+                        <th className="py-2 px-3 font-semibold">Raw Material Item</th>
+                        <th className="py-2 px-2 font-semibold text-center">UOM</th>
+                        <th className="py-2 px-2 font-semibold text-center">Ordered Qty</th>
+                        <th className="py-2 px-2 font-semibold text-right">Rate (৳)</th>
+                        <th className="py-2 px-3 font-semibold text-right">Total (৳)</th>
+                        <th className="py-2 px-2 text-center font-semibold">Remove</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {poItems.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-2 px-2">
+                            <select
+                              value={row.itemId}
+                              onChange={e => handlePoItemChange(idx, parseInt(e.target.value))}
+                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
+                            >
+                              {data.masterItems.map(m => (
+                                <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2 px-2 text-center font-bold text-slate-600">
+                            {row.uom}
+                          </td>
+                          <td className="py-2 px-2 text-center w-24">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              required
+                              value={row.qty}
+                              onChange={e => handlePoQtyRateChange(idx, parseFloat(e.target.value) || 0, row.rate)}
+                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-center text-xs font-extrabold text-blue-800"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right w-28">
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              value={row.rate}
+                              onChange={e => handlePoQtyRateChange(idx, row.qty, parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-right text-xs font-bold"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-right font-extrabold text-slate-900">
+                            ৳ {row.total.toLocaleString()}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePoRow(idx)}
+                              className="p-1 text-rose-500 hover:text-rose-700 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={handleAddPoRow}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Line Item</span>
-                </button>
-
-                <div className="text-right">
-                  <span className="text-xs text-slate-500 font-semibold mr-2">Total PO Amount:</span>
-                  <span className="text-lg font-black text-indigo-800">
-                    ৳ {poForm.items.reduce((s, i) => s + (i.total || 0), 0).toLocaleString()}
-                  </span>
+                <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-400">Total Purchase Order Estimate:</div>
+                  <div className="text-xl font-extrabold text-amber-400">৳ {totalPoAmount.toLocaleString()}</div>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">PO Notes / Special Requirements</label>
+                <textarea
+                  rows={2}
+                  value={poNotes}
+                  onChange={e => setPoNotes(e.target.value)}
+                  placeholder="e.g. Delivery required at morning 8 AM before kitchen prep..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setIsPoModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-sm hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-sm shadow-md transition cursor-pointer"
                 >
-                  Issue Purchase Order
+                  Save & Issue Purchase Order
                 </button>
               </div>
             </form>
@@ -1076,136 +1673,285 @@ export const PurchasesView: React.FC = () => {
         </div>
       )}
 
-      {/* --- Modal 3: New Supplier Return --- */}
+      {/* ================= MODAL: RECEIVE ITEMS AGAINST PO (AUTO GENERATE BILL) ================= */}
+      {receivingPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-extrabold text-slate-900 text-lg">
+                    Receive Goods & Auto-Generate Bill for {receivingPo.poNo}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Vendor: <strong className="text-slate-900">{receivingPo.vendor}</strong> • PO Date: {receivingPo.date}
+                </p>
+              </div>
+              <button onClick={() => setReceivingPo(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReceive} className="flex-1 overflow-y-auto my-4 pr-1 space-y-4">
+              {/* Bill Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Supplier Bill / Invoice No *</label>
+                  <input
+                    type="text"
+                    required
+                    value={receiveBillNo}
+                    onChange={e => setReceiveBillNo(e.target.value)}
+                    placeholder="INV-9901"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-extrabold text-emerald-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Receive Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={receiveDate}
+                    onChange={e => setReceiveDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Bill Payment Type *</label>
+                  <select
+                    value={receivePaymentType}
+                    onChange={e => setReceivePaymentType(e.target.value as PurchasePaymentType)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
+                  >
+                    <option value="CREDIT">Credit (Add to Vendor Payable Due)</option>
+                    <option value="CASH">Cash Paid</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items Receiving Matrix */}
+              <div>
+                <h4 className="font-extrabold text-xs text-slate-900 uppercase tracking-wide mb-2">
+                  Item Receiving Quantities (Full or Partial Receive)
+                </h4>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-3 font-bold">Item Name</th>
+                        <th className="py-2.5 px-2 font-bold text-center">UOM</th>
+                        <th className="py-2.5 px-2 font-bold text-center">Ordered Qty</th>
+                        <th className="py-2.5 px-2 font-bold text-center">Prev Received</th>
+                        <th className="py-2.5 px-3 font-extrabold text-emerald-800 text-center">Receiving Now</th>
+                        <th className="py-2.5 px-2 font-bold text-right">Rate (৳)</th>
+                        <th className="py-2.5 px-3 font-bold text-right">Bill Total (৳)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {receiveItemsList.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-2 px-3 font-bold text-slate-900">{row.item}</td>
+                          <td className="py-2 px-2 text-center text-slate-600 font-bold">{row.uom}</td>
+                          <td className="py-2 px-2 text-center text-slate-600 font-bold">{row.orderedQty}</td>
+                          <td className="py-2 px-2 text-center text-slate-500 font-semibold">{row.alreadyReceivedQty}</td>
+                          <td className="py-2 px-3 text-center w-32 bg-emerald-50/50">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={row.receiveQty}
+                              onChange={e => handleReceiveQtyChange(idx, parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1 bg-white border border-emerald-400 rounded text-center text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right font-bold text-slate-700">৳{row.rate}</td>
+                          <td className="py-2 px-3 text-right font-extrabold text-slate-900">
+                            ৳ {row.total.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-3 p-3.5 bg-slate-900 text-white rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-slate-400 block font-medium">Generated Bill Amount & Stock Inward Value</span>
+                    <span className="text-[10px] text-emerald-400 font-bold">✓ Automatically updates inventory stock upon submit</span>
+                  </div>
+                  <div className="text-xl font-black text-emerald-400">
+                    ৳ {totalReceiveBillAmount.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReceivingPo(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-sm hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm Goods Received & Generate Bill</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: NEW SUPPLIER RETURN ================= */}
       {isReturnModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
                 <RotateCcw className="w-5 h-5 text-rose-600" />
-                <span>Supplier Return (Debit Note)</span>
-              </h3>
+                <h3 className="font-extrabold text-slate-900 text-base">New Supplier Return Entry</h3>
+              </div>
               <button onClick={() => setIsReturnModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitReturn} className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Return Date *</label>
-                <input
-                  type="date"
-                  required
-                  value={returnForm.date}
-                  onChange={e => setReturnForm({ ...returnForm, date: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Vendor / Supplier *</label>
-                <select
-                  value={returnForm.vendor}
-                  onChange={e => setReturnForm({ ...returnForm, vendor: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
-                >
-                  {data.vendors.map(v => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Raw Material Item *</label>
-                <select
-                  value={returnForm.itemId}
-                  onChange={e => {
-                    const rawId = Number(e.target.value);
-                    const raw = data.masterItems.find(m => m.id === rawId);
-                    setReturnForm({
-                      ...returnForm,
-                      itemId: rawId,
-                      rate: raw ? raw.defaultRate : returnForm.rate
-                    });
-                  }}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
-                >
-                  {data.masterItems.map(m => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.uom})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
+            <form onSubmit={handleSubmitReturn} className="py-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Return No *</label>
                   <input
-                    type="number"
-                    min="0.1"
-                    step="any"
+                    type="text"
                     required
-                    value={returnForm.qty}
-                    onChange={e => setReturnForm({ ...returnForm, qty: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                    value={returnNo}
+                    onChange={e => setReturnNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-rose-700"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Rate (৳) *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={returnDate}
+                    onChange={e => setReturnDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Vendor / Supplier *</label>
+                  <select
+                    value={returnVendor}
+                    onChange={e => setReturnVendor(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
+                  >
+                    {data.vendors.map(v => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Original Bill / Invoice No</label>
+                  <input
+                    type="text"
+                    value={returnBillNo}
+                    onChange={e => setReturnBillNo(e.target.value)}
+                    placeholder="INV-9901"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Returned Raw Material *</label>
+                <select
+                  value={returnItemId}
+                  onChange={e => handleReturnItemSelect(parseInt(e.target.value))}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
+                >
+                  {data.masterItems.map(m => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Return Quantity *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={returnQty}
+                    onChange={e => setReturnQty(parseFloat(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Rate per Unit (৳) *</label>
                   <input
                     type="number"
                     min="0"
-                    step="any"
                     required
-                    value={returnForm.rate}
-                    onChange={e => setReturnForm({ ...returnForm, rate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                    value={returnRate}
+                    onChange={e => setReturnRate(parseFloat(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Reason for Return</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Reason for Return *</label>
                 <input
                   type="text"
-                  value={returnForm.reason}
-                  onChange={e => setReturnForm({ ...returnForm, reason: e.target.value })}
-                  placeholder="e.g. Broken packaging, expired, quality issues..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium"
+                  required
+                  value={returnReason}
+                  onChange={e => setReturnReason(e.target.value)}
+                  placeholder="e.g. Excess fat ratio, damaged packaging, quality issues..."
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Refund / Adjustment Status</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Refund / Settlement Status</label>
                 <select
-                  value={returnForm.refundStatus}
-                  onChange={e => setReturnForm({ ...returnForm, refundStatus: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                  value={refundStatus}
+                  onChange={e => setRefundStatus(e.target.value as any)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
                 >
-                  <option value="ADJUSTED">Adjusted in Accounts Payable</option>
-                  <option value="REFUNDED">Refunded in Cash/Bank</option>
-                  <option value="PENDING">Pending Claim</option>
+                  <option value="ADJUSTED">ADJUSTED (Adjusted from vendor payable bill)</option>
+                  <option value="REFUNDED">REFUNDED (Cash / Bank cash refund received)</option>
+                  <option value="PENDING">PENDING (Awaiting supplier decision)</option>
                 </select>
-              </div>
-
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-xs">
-                <span className="font-bold text-rose-800">Total Return Value:</span>
-                <span className="font-black text-rose-900 text-sm">৳ {Math.round(returnForm.qty * returnForm.rate).toLocaleString()}</span>
               </div>
 
               <div className="pt-3 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setIsReturnModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer"
                 >
-                  Save Supplier Return
+                  Save Return Record
                 </button>
               </div>
             </form>
@@ -1213,75 +1959,186 @@ export const PurchasesView: React.FC = () => {
         </div>
       )}
 
-      {/* Viewing Voucher Memo Modal */}
-      {viewingVoucher && (
+      {/* ================= MODAL: ADD NEW VENDOR ================= */}
+      {isVendorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-extrabold text-slate-900 text-sm">Add New Registered Supplier</h3>
+              <button onClick={() => setIsVendorModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddVendor} className="py-3 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Supplier / Vendor Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newVendorName}
+                  onChange={e => setNewVendorName(e.target.value)}
+                  placeholder="e.g. Ali / Bengal Meat / Dhaka Poultry"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsVendorModalOpen(false)}
+                  className="flex-1 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer"
+                >
+                  Add Supplier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: VIEW PO MEMO ================= */}
+      {viewingPo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-bold">
-                  {viewingVoucher.billNo}
-                </span>
-                <h3 className="font-extrabold text-slate-900 text-lg mt-1">Purchase Voucher Memo</h3>
+                <h3 className="font-extrabold text-slate-900 text-base">Purchase Order Memo: {viewingPo.poNo}</h3>
+                <span className="text-xs text-slate-500">Issued to: <strong>{viewingPo.vendor}</strong></span>
               </div>
+              <button onClick={() => setViewingPo(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="py-3 space-y-3 text-xs">
+              <div className="flex justify-between text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <span>Date: <strong className="text-slate-900">{viewingPo.date}</strong></span>
+                <span>Expected Date: <strong className="text-slate-900">{viewingPo.expectedDate || 'N/A'}</strong></span>
+                <span>Status: <strong className="text-amber-700">{viewingPo.status}</strong></span>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 mb-1">Ordered Line Items:</h4>
+                <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="p-2">Item</th>
+                      <th className="p-2 text-center">Ordered Qty</th>
+                      <th className="p-2 text-right">Rate</th>
+                      <th className="p-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {viewingPo.items.map((i, idx) => (
+                      <tr key={idx}>
+                        <td className="p-2 font-bold text-slate-900">{i.item}</td>
+                        <td className="p-2 text-center font-bold">{i.qty} {i.uom}</td>
+                        <td className="p-2 text-right">৳{i.rate}</td>
+                        <td className="p-2 text-right font-extrabold">৳{i.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {viewingPo.receivedHistory && viewingPo.receivedHistory.length > 0 && (
+                <div>
+                  <h4 className="font-bold text-emerald-800 mb-1">Receiving History (GRNs & Bills):</h4>
+                  <div className="space-y-1.5">
+                    {viewingPo.receivedHistory.map((h, idx) => (
+                      <div key={idx} className="p-2 bg-emerald-50 rounded-lg border border-emerald-200 flex items-center justify-between text-[11px]">
+                        <div>
+                          <span className="font-extrabold text-emerald-900">GRN / Bill: {h.billNo}</span>
+                          <span className="text-slate-500 ml-2">({h.date})</span>
+                        </div>
+                        <span className="font-extrabold text-emerald-700">৳ {h.total.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-between font-black text-sm text-slate-900 border-t border-slate-100">
+                <span>Grand Total PO Value:</span>
+                <span className="text-amber-600">৳ {viewingPo.total.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="pt-3">
+              <button
+                onClick={() => setViewingPo(null)}
+                className="w-full py-2 bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer"
+              >
+                Close Memo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: VIEW PURCHASE VOUCHER MEMO ================= */}
+      {viewingVoucher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-extrabold text-slate-900 text-base">Purchase Voucher Memo: {viewingVoucher.billNo}</h3>
               <button onClick={() => setViewingVoucher(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="my-4 space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Date:</span>
-                <span className="font-bold text-slate-900">{viewingVoucher.date}</span>
+            <div className="py-3 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>Date: <strong className="text-slate-900">{viewingVoucher.date}</strong></span>
+                <span>Vendor: <strong className="text-slate-900">{viewingVoucher.vendor}</strong></span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Supplier / Vendor:</span>
-                <span className="font-extrabold text-slate-900">{viewingVoucher.vendor}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Payment Type:</span>
-                <span className="font-bold text-slate-900">{viewingVoucher.paymentType}</span>
+              <div className="flex justify-between text-slate-600">
+                <span>Payment: <strong className="text-slate-900">{viewingVoucher.paymentType}</strong></span>
+                <span>Status: <strong className="text-emerald-700">{viewingVoucher.status}</strong></span>
               </div>
 
               <div className="pt-2">
-                <div className="font-bold text-slate-700 mb-1">Purchased Raw Materials:</div>
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-50 text-slate-600">
-                      <tr>
-                        <th className="py-2 px-3 text-left">Item</th>
-                        <th className="py-2 px-2 text-center">Qty</th>
-                        <th className="py-2 px-2 text-right">Rate</th>
-                        <th className="py-2 px-3 text-right">Total</th>
+                <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="p-2">Item</th>
+                      <th className="p-2 text-center">Qty</th>
+                      <th className="p-2 text-right">Rate</th>
+                      <th className="p-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {viewingVoucher.items.map((i, idx) => (
+                      <tr key={idx}>
+                        <td className="p-2 font-bold">{i.item}</td>
+                        <td className="p-2 text-center">{i.qty} {i.uom}</td>
+                        <td className="p-2 text-right">৳{i.rate}</td>
+                        <td className="p-2 text-right font-extrabold">৳{i.total}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {viewingVoucher.items.map((i, idx) => (
-                        <tr key={idx}>
-                          <td className="py-2 px-3 font-semibold text-slate-800">{i.item}</td>
-                          <td className="py-2 px-2 text-center text-slate-600">{i.qty} {i.uom}</td>
-                          <td className="py-2 px-2 text-right text-slate-600">৳{i.rate}</td>
-                          <td className="py-2 px-3 text-right font-bold text-slate-900">৳{i.total.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
-              <div className="pt-2 flex justify-between text-base font-extrabold text-slate-900">
-                <span>Voucher Total:</span>
+              <div className="pt-2 flex justify-between font-extrabold text-sm text-slate-900">
+                <span>Grand Total:</span>
                 <span className="text-blue-700">৳ {viewingVoucher.total.toLocaleString()}</span>
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-3">
               <button
-                type="button"
                 onClick={() => setViewingVoucher(null)}
-                className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
+                className="w-full py-2 bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer"
               >
-                Close Memo
+                Close
               </button>
             </div>
           </div>

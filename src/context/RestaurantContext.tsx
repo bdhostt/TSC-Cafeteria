@@ -1265,6 +1265,13 @@ interface RestaurantContextType {
   deletePurchaseVoucher: (id: number) => void;
   savePurchaseOrder: (order: Partial<PurchaseOrder> & { id?: number }) => void;
   deletePurchaseOrder: (id: number) => void;
+  receivePurchaseOrderItems: (
+    poId: number,
+    receivedItems: PurchaseItem[],
+    billNo: string,
+    paymentType: PurchasePaymentType,
+    receiveDate?: string
+  ) => void;
   savePurchaseReturn: (returnRecord: Partial<PurchaseReturn> & { id?: number }) => void;
   deletePurchaseReturn: (id: number) => void;
   
@@ -4854,9 +4861,37 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updatedPurchases = [...prev.purchases];
         updatedPurchases[index] = voucher;
       } else {
-        updatedPurchases = [...prev.purchases, voucher];
+        updatedPurchases = [voucher, ...prev.purchases];
       }
-      return { ...prev, purchases: updatedPurchases };
+
+      // Update inventory stock if voucher is FINAL
+      let updatedInventory = prev.inventory || [];
+      if (voucher.status === 'FINAL') {
+        const invMap = new Map<number, StockInventoryRecord>(updatedInventory.map(i => [i.id, { ...i }]));
+        voucher.items.forEach(itm => {
+          if (itm.itemId) {
+            const existing = invMap.get(itm.itemId);
+            if (existing) {
+              existing.open += (itm.qty || 0);
+              existing.rate = itm.rate || existing.rate;
+            } else {
+              invMap.set(itm.itemId, {
+                id: itm.itemId,
+                open: itm.qty || 0,
+                used: 0,
+                rate: itm.rate
+              });
+            }
+          }
+        });
+        updatedInventory = Array.from(invMap.values());
+      }
+
+      return {
+        ...prev,
+        purchases: updatedPurchases,
+        inventory: updatedInventory
+      };
     });
   };
 
@@ -4866,27 +4901,31 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const savePurchaseOrder = (order: Partial<PurchaseOrder> & { id?: number }) => {
     setData(prev => {
-      const list = prev.purchaseOrders || DEFAULT_PURCHASE_ORDERS;
+      const pos = prev.purchaseOrders || DEFAULT_PURCHASE_ORDERS;
       if (order.id) {
-        return {
-          ...prev,
-          purchaseOrders: list.map(po => po.id === order.id ? { ...po, ...order } as PurchaseOrder : po)
-        };
+        const index = pos.findIndex(p => p.id === order.id);
+        if (index >= 0) {
+          const updatedPOs = [...pos];
+          updatedPOs[index] = { ...pos[index], ...order } as PurchaseOrder;
+          return { ...prev, purchaseOrders: updatedPOs };
+        }
       }
       const newPo: PurchaseOrder = {
-        id: Date.now(),
-        poNo: order.poNo || `PO-${new Date().getFullYear()}-${(list.length + 1).toString().padStart(3, '0')}`,
+        id: order.id || Date.now(),
+        poNo: order.poNo || `PO-${new Date().getFullYear()}-${(pos.length + 1).toString().padStart(3, '0')}`,
         date: order.date || new Date().toISOString().split('T')[0],
         vendor: order.vendor || prev.vendors[0] || 'Supplier',
         expectedDate: order.expectedDate || new Date().toISOString().split('T')[0],
         items: order.items || [],
         total: order.total || 0,
         status: order.status || 'PENDING',
-        grnNo: order.grnNo
+        grnNo: order.grnNo,
+        notes: order.notes,
+        receivedHistory: order.receivedHistory || []
       };
       return {
         ...prev,
-        purchaseOrders: [newPo, ...list]
+        purchaseOrders: [newPo, ...pos]
       };
     });
   };
@@ -4898,33 +4937,153 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
+  const receivePurchaseOrderItems = (
+    poId: number,
+    receivedItems: PurchaseItem[],
+    billNo: string,
+    paymentType: PurchasePaymentType,
+    receiveDate?: string
+  ) => {
+    if (!receivedItems || receivedItems.length === 0) return;
+
+    const dateStr = receiveDate || new Date().toISOString().split('T')[0];
+
+    setData(prev => {
+      const pos = prev.purchaseOrders || [];
+      const targetPO = pos.find(p => p.id === poId);
+      if (!targetPO) return prev;
+
+      const totalReceivedVal = receivedItems.reduce((sum, item) => sum + (item.total || 0), 0);
+      const generatedBillNo = billNo.trim() || (`INV-${Date.now().toString().slice(-4)}`);
+
+      // 1. Create Purchase Voucher (Bill)
+      const newVoucher: PurchaseVoucher = {
+        id: Date.now(),
+        date: dateStr,
+        vendor: targetPO.vendor,
+        billNo: generatedBillNo,
+        paymentType: paymentType || 'CREDIT',
+        status: 'FINAL',
+        total: totalReceivedVal,
+        items: JSON.parse(JSON.stringify(receivedItems))
+      };
+
+      // 2. Update Stock Inventory
+      const invMap = new Map<number, StockInventoryRecord>((prev.inventory || []).map(i => [i.id, { ...i }]));
+      receivedItems.forEach(itm => {
+        if (itm.itemId) {
+          const existing = invMap.get(itm.itemId);
+          if (existing) {
+            existing.open += (itm.qty || 0);
+            existing.rate = itm.rate || existing.rate;
+          } else {
+            invMap.set(itm.itemId, {
+              id: itm.itemId,
+              open: itm.qty || 0,
+              used: 0,
+              rate: itm.rate
+            });
+          }
+        }
+      });
+
+      // 3. Update PO status & receivedHistory
+      const prevHistory = targetPO.receivedHistory || [];
+      const newHistoryEntry = {
+        grnNo: generatedBillNo,
+        billNo: generatedBillNo,
+        date: dateStr,
+        items: JSON.parse(JSON.stringify(receivedItems)),
+        total: totalReceivedVal
+      };
+
+      // Check overall received quantities against ordered quantities
+      const allReceivedMap = new Map<number, number>();
+      [...prevHistory, newHistoryEntry].forEach(hist => {
+        hist.items.forEach(hi => {
+          allReceivedMap.set(hi.itemId, (allReceivedMap.get(hi.itemId) || 0) + (hi.qty || 0));
+        });
+      });
+
+      let isFullyFulfilled = true;
+      targetPO.items.forEach(orderedItem => {
+        const totalRcv = allReceivedMap.get(orderedItem.itemId) || 0;
+        if (totalRcv < orderedItem.qty) {
+          isFullyFulfilled = false;
+        }
+      });
+
+      const updatedPO: PurchaseOrder = {
+        ...targetPO,
+        status: isFullyFulfilled ? 'FULFILLED' : 'PARTIALLY_RECEIVED',
+        grnNo: generatedBillNo,
+        receivedHistory: [...prevHistory, newHistoryEntry]
+      };
+
+      const updatedPOs = pos.map(p => p.id === poId ? updatedPO : p);
+
+      return {
+        ...prev,
+        purchases: [newVoucher, ...prev.purchases],
+        inventory: Array.from(invMap.values()),
+        purchaseOrders: updatedPOs
+      };
+    });
+  };
+
   const savePurchaseReturn = (returnRecord: Partial<PurchaseReturn> & { id?: number }) => {
     setData(prev => {
       const list = prev.purchaseReturns || DEFAULT_PURCHASE_RETURNS;
+      let updatedReturns: PurchaseReturn[];
+      let targetRet: PurchaseReturn;
+
       if (returnRecord.id) {
-        return {
-          ...prev,
-          purchaseReturns: list.map(pr => pr.id === returnRecord.id ? { ...pr, ...returnRecord } as PurchaseReturn : pr)
+        const index = list.findIndex(pr => pr.id === returnRecord.id);
+        if (index >= 0) {
+          targetRet = { ...list[index], ...returnRecord } as PurchaseReturn;
+          updatedReturns = [...list];
+          updatedReturns[index] = targetRet;
+        } else {
+          targetRet = returnRecord as PurchaseReturn;
+          updatedReturns = [targetRet, ...list];
+        }
+      } else {
+        targetRet = {
+          id: Date.now(),
+          returnNo: returnRecord.returnNo || `RET-${new Date().getFullYear()}-${(list.length + 1).toString().padStart(3, '0')}`,
+          date: returnRecord.date || new Date().toISOString().split('T')[0],
+          vendor: returnRecord.vendor || prev.vendors[0] || 'Supplier',
+          billNo: returnRecord.billNo,
+          itemId: returnRecord.itemId || 1,
+          item: returnRecord.item || 'Item',
+          qty: returnRecord.qty || 1,
+          uom: returnRecord.uom || 'Kg',
+          rate: returnRecord.rate || 0,
+          total: returnRecord.total || 0,
+          reason: returnRecord.reason || 'Damaged / Spoilage return',
+          refundStatus: returnRecord.refundStatus || 'ADJUSTED'
         };
+        updatedReturns = [targetRet, ...list];
       }
-      const newPr: PurchaseReturn = {
-        id: Date.now(),
-        returnNo: returnRecord.returnNo || `RET-${new Date().getFullYear()}-${(list.length + 1).toString().padStart(3, '0')}`,
-        date: returnRecord.date || new Date().toISOString().split('T')[0],
-        vendor: returnRecord.vendor || prev.vendors[0] || 'Supplier',
-        billNo: returnRecord.billNo,
-        itemId: returnRecord.itemId || 1,
-        item: returnRecord.item || 'Item',
-        qty: returnRecord.qty || 1,
-        uom: returnRecord.uom || 'Kg',
-        rate: returnRecord.rate || 0,
-        total: returnRecord.total || 0,
-        reason: returnRecord.reason || 'Damaged / Spoilage return',
-        refundStatus: returnRecord.refundStatus || 'ADJUSTED'
-      };
+
+      // Deduct returned stock from inventory
+      let updatedInventory = prev.inventory || [];
+      if (targetRet.itemId) {
+        updatedInventory = updatedInventory.map(inv => {
+          if (inv.id === targetRet.itemId) {
+            return {
+              ...inv,
+              open: Math.max(0, inv.open - targetRet.qty)
+            };
+          }
+          return inv;
+        });
+      }
+
       return {
         ...prev,
-        purchaseReturns: [newPr, ...list]
+        purchaseReturns: updatedReturns,
+        inventory: updatedInventory
       };
     });
   };
@@ -5475,16 +5634,64 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
-  // Settle specific Purchase Bill / Voucher
+  // Settle specific Purchase Bill / Voucher or Pay All Dues
   const settlePurchaseBill = (billNo: string, vendor: string, amount: number, method: string, note?: string) => {
     if (amount <= 0) return;
-    saveVendorPayment({
-      date: new Date().toISOString().split('T')[0],
-      vendor,
-      billNo: billNo ? billNo.trim() : undefined,
-      amount: Number(amount) || 0,
-      method: method || 'Cash Drawer',
-      note: note ? note.trim() : `Payment for Bill / Voucher #${billNo}`
+    const paymentAmount = Number(amount) || 0;
+    const today = new Date().toISOString().split('T')[0];
+
+    setData(prev => {
+      // 1. Add vendor payment record
+      const newPayment: VendorPayment = {
+        id: Date.now(),
+        date: today,
+        vendor,
+        billNo: billNo ? billNo.trim() : undefined,
+        amount: paymentAmount,
+        method: method || 'Cash Drawer',
+        note: note ? note.trim() : (billNo ? `Bill Payment #${billNo}` : `Vendor Due Settlement`)
+      };
+
+      // 2. Update paid amount on matching purchases
+      let updatedPurchases = prev.purchases.map(p => ({ ...p }));
+
+      if (billNo && billNo.trim()) {
+        const targetBillNo = billNo.trim();
+        updatedPurchases = updatedPurchases.map(p => {
+          if (p.vendor === vendor && p.billNo === targetBillNo) {
+            const currentPaid = p.paid ?? (p.paymentType === 'CASH' ? p.total : 0);
+            return {
+              ...p,
+              paid: Math.min(p.total, currentPaid + paymentAmount)
+            };
+          }
+          return p;
+        });
+      } else {
+        // Pay All Dues: Distribute payment across unpaid credit bills for this vendor
+        let remainingToDistribute = paymentAmount;
+        updatedPurchases = updatedPurchases.map(p => {
+          if (p.vendor === vendor && p.paymentType === 'CREDIT' && remainingToDistribute > 0) {
+            const currentPaid = p.paid || 0;
+            const due = Math.max(0, p.total - currentPaid);
+            if (due > 0) {
+              const payForThisBill = Math.min(due, remainingToDistribute);
+              remainingToDistribute -= payForThisBill;
+              return {
+                ...p,
+                paid: currentPaid + payForThisBill
+              };
+            }
+          }
+          return p;
+        });
+      }
+
+      return {
+        ...prev,
+        purchases: updatedPurchases,
+        payments: [newPayment, ...prev.payments]
+      };
     });
   };
 
@@ -5797,6 +6004,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       deletePurchaseVoucher,
       savePurchaseOrder,
       deletePurchaseOrder,
+      receivePurchaseOrderItems,
       savePurchaseReturn,
       deletePurchaseReturn,
       saveExpense,

@@ -365,12 +365,12 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
               setSelectedVendor('ALL');
             }}
           >
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 w-full">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Vendor:</span>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                className="w-full bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Suppliers</option>
                 {data.vendors.map(v => (
@@ -535,12 +535,12 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
               setSelectedVendor('ALL');
             }}
           >
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 w-full">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Vendor:</span>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                className="w-full bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Suppliers</option>
                 {data.vendors.map(v => (
@@ -564,46 +564,50 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[11px]">
-                    <th className="py-2.5 px-3">GRN / Bill & Date</th>
-                    <th className="py-2.5 px-3">Supplier & Terms</th>
-                    <th className="py-2.5 px-3">Received Items & Quantities</th>
-                    <th className="py-2.5 px-3 text-right">Inward Total (৳)</th>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold">
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">GRN / Bill No</th>
+                    <th className="py-3 px-4">Supplier Name</th>
+                    <th className="py-3 px-4">Received Items & Raw Quantities</th>
+                    <th className="py-3 px-4 text-center">Items Count</th>
+                    <th className="py-3 px-4 text-right">Inward Total (৳)</th>
+                    <th className="py-3 px-4 text-center">Terms</th>
+                    <th className="py-3 px-4 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {supplierGrnData.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-12 text-center text-slate-400 font-medium">
+                      <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
                         No GRN inward vouchers found matching the active filters.
                       </td>
                     </tr>
                   ) : (
                     supplierGrnData.map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/70 transition">
-                        <td className="py-2.5 px-3">
-                          <div className="font-mono font-bold text-slate-900">{row.billNo}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{row.date}</div>
+                        <td className="py-3 px-4 font-mono text-slate-600">{row.date}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{row.billNo}</td>
+                        <td className="py-3 px-4 font-extrabold text-slate-900">{row.vendor}</td>
+                        <td className="py-3 px-4 text-slate-700 text-[11px] max-w-xs truncate" title={row.itemsSummary}>
+                          {row.itemsSummary}
                         </td>
-                        <td className="py-2.5 px-3">
-                          <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{row.vendor}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
-                              row.paymentType === 'CASH' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {row.paymentType}
-                            </span>
-                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-teal-100 text-teal-800">
-                              {row.status}
-                            </span>
-                          </div>
+                        <td className="py-3 px-4 text-center font-mono font-bold text-slate-700">
+                          {row.itemsCount}
                         </td>
-                        <td className="py-2.5 px-3 max-w-xs truncate text-slate-700 text-[11px]" title={row.itemsSummary}>
-                          <div className="line-clamp-1">{row.itemsSummary}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{row.itemsCount} raw materials</div>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700 text-xs sm:text-sm">
+                        <td className="py-3 px-4 text-right font-mono font-black text-emerald-600">
                           ৳{row.total.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            row.paymentType === 'CASH' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {row.paymentType}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-100 text-teal-800">
+                            {row.status}
+                          </span>
                         </td>
                       </tr>
                     ))
@@ -611,11 +615,12 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
                 </tbody>
                 {supplierGrnData.length > 0 && (
                   <tfoot>
-                    <tr className="bg-slate-100/90 font-black text-slate-900 border-t-2 border-slate-300 text-xs">
-                      <td colSpan={3} className="py-3 px-3">Total Received Goods Valuation</td>
-                      <td className="py-3 px-3 text-right font-mono text-emerald-700 text-sm">
+                    <tr className="bg-slate-100/90 font-black text-slate-900 border-t-2 border-slate-300">
+                      <td colSpan={5} className="py-3 px-4">Total Received Goods Valuation</td>
+                      <td className="py-3 px-4 text-right font-mono text-emerald-700 text-sm">
                         ৳{supplierGrnData.reduce((s, r) => s + r.total, 0).toLocaleString()}
                       </td>
+                      <td colSpan={2}></td>
                     </tr>
                   </tfoot>
                 )}
@@ -649,12 +654,12 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
               setSelectedVendor('ALL');
             }}
           >
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 w-full">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Vendor:</span>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                className="w-full bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Suppliers</option>
                 {data.vendors.map(v => (
@@ -767,12 +772,12 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
               setSelectedVendor('ALL');
             }}
           >
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 w-full">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Vendor:</span>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                className="w-full bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Suppliers</option>
                 {data.vendors.map(v => (
@@ -831,56 +836,56 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-[11px]">
-                    <th className="py-2.5 px-3">Bill No & Date</th>
-                    <th className="py-2.5 px-3">Vendor & Status</th>
-                    <th className="py-2.5 px-3">Items Summary</th>
-                    <th className="py-2.5 px-3 text-right">Bill Total & Dues</th>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold">
+                    <th className="py-3 px-4">Bill No</th>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Vendor</th>
+                    <th className="py-3 px-4">Items Summary</th>
+                    <th className="py-3 px-4 text-right">Total Amount (৳)</th>
+                    <th className="py-3 px-4 text-right">Paid (৳)</th>
+                    <th className="py-3 px-4 text-right">Balance Due (৳)</th>
+                    <th className="py-3 px-4 text-center">Payment Mode</th>
+                    <th className="py-3 px-4 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {allPurchasesData.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-12 text-center text-slate-400 font-medium">
+                      <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
                         No purchase records found matching the active criteria.
                       </td>
                     </tr>
                   ) : (
                     allPurchasesData.map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/70 transition">
-                        <td className="py-2.5 px-3">
-                          <div className="font-mono font-bold text-slate-900">{row.billNo}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{row.date}</div>
+                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{row.billNo}</td>
+                        <td className="py-3 px-4 font-mono text-slate-600">{row.date}</td>
+                        <td className="py-3 px-4 font-extrabold text-slate-900">{row.vendor}</td>
+                        <td className="py-3 px-4 text-slate-700 text-[11px] max-w-xs truncate" title={row.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', ')}>
+                          {row.items.map(i => `${i.item} (x${i.qty})`).join(', ')}
                         </td>
-                        <td className="py-2.5 px-3">
-                          <div className="font-extrabold text-slate-900 text-xs sm:text-sm">{row.vendor}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
-                              row.paymentType === 'CASH' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {row.paymentType}
-                            </span>
-                            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
-                              row.due === 0 ? 'bg-emerald-100 text-emerald-800' : (row.paid > 0 ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800')
-                            }`}>
-                              {row.due === 0 ? 'PAID' : (row.paid > 0 ? 'PARTIAL' : 'DUE')}
-                            </span>
-                          </div>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                          ৳{row.total.toLocaleString()}
                         </td>
-                        <td className="py-2.5 px-3 max-w-xs truncate text-slate-700 text-[11px]" title={row.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', ')}>
-                          <div className="line-clamp-1">{row.items.map(i => `${i.item} (x${i.qty})`).join(', ')}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{row.items.length} line items</div>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">
+                          ৳{row.paid.toLocaleString()}
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <div className="font-mono font-black text-slate-900 text-xs sm:text-sm">
-                            ৳{row.total.toLocaleString()}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-mono">
-                            <span className="text-emerald-700 font-bold">Paid: ৳{row.paid.toLocaleString()}</span>
-                            {row.due > 0 && (
-                              <span className="text-rose-700 font-black ml-1">Due: ৳{row.due.toLocaleString()}</span>
-                            )}
-                          </div>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-rose-600">
+                          {row.due > 0 ? `৳${row.due.toLocaleString()}` : '—'}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            row.paymentType === 'CASH' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {row.paymentType}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            row.due === 0 ? 'bg-emerald-100 text-emerald-800' : (row.paid > 0 ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800')
+                          }`}>
+                            {row.due === 0 ? 'PAID' : (row.paid > 0 ? 'PARTIAL' : 'DUE')}
+                          </span>
                         </td>
                       </tr>
                     ))
@@ -888,14 +893,18 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
                 </tbody>
                 {allPurchasesData.length > 0 && (
                   <tfoot>
-                    <tr className="bg-slate-100/90 font-black text-slate-900 border-t-2 border-slate-300 text-xs">
-                      <td colSpan={3} className="py-3 px-3">Total Purchases Register</td>
-                      <td className="py-3 px-3 text-right font-mono text-sm">
-                        <div className="text-slate-900 font-black">৳{allPurchasesData.reduce((s, r) => s + r.total, 0).toLocaleString()}</div>
-                        <div className="text-[10px] text-slate-500">
-                          Paid: ৳{allPurchasesData.reduce((s, r) => s + r.paid, 0).toLocaleString()} • Due: ৳{allPurchasesData.reduce((s, r) => s + r.due, 0).toLocaleString()}
-                        </div>
+                    <tr className="bg-slate-100/90 font-black text-slate-900 border-t-2 border-slate-300">
+                      <td colSpan={4} className="py-3 px-4">Total Purchases Register</td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-900 text-sm">
+                        ৳{allPurchasesData.reduce((s, r) => s + r.total, 0).toLocaleString()}
                       </td>
+                      <td className="py-3 px-4 text-right font-mono text-emerald-700 text-sm">
+                        ৳{allPurchasesData.reduce((s, r) => s + r.paid, 0).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-rose-700 text-sm">
+                        ৳{allPurchasesData.reduce((s, r) => s + r.due, 0).toLocaleString()}
+                      </td>
+                      <td colSpan={2}></td>
                     </tr>
                   </tfoot>
                 )}
@@ -929,12 +938,12 @@ export const ProcurementReports: React.FC<SubReportProps> = ({ reportType }) => 
               setSelectedVendor('ALL');
             }}
           >
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 w-full">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Vendor:</span>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                className="w-full bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Suppliers</option>
                 {data.vendors.map(v => (

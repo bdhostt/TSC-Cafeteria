@@ -369,6 +369,14 @@ export interface PurchaseOrder {
   total: number;
   status: 'PENDING' | 'PARTIALLY_RECEIVED' | 'FULFILLED' | 'CANCELLED';
   grnNo?: string;
+  notes?: string;
+  receivedHistory?: {
+    grnNo: string;
+    billNo: string;
+    date: string;
+    items: PurchaseItem[];
+    total: number;
+  }[];
 }
 
 export interface PurchaseReturn {
