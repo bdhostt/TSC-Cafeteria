@@ -272,8 +272,8 @@ async function startServer() {
 
   // Build ESC/POS binary buffer for a compact single-page KOT slip
   function buildKotEscPosBuffer(
-    req: { tableName: string; tableZone?: string; waiter?: string; customer?: string; invoiceNo: string; dateTime?: string },
-    slip: { station: string; category?: string; items: { name: string; qty: number; variation?: string; addons?: string[]; notes?: string }[] },
+    req: { tableName: string; tableZone?: string; waiter?: string; customer?: string; invoiceNo: string; dateTime?: string; showPrices?: boolean },
+    slip: { station: string; category?: string; showPrices?: boolean; items: { name: string; qty: number; price?: number; variation?: string; addons?: string[]; notes?: string }[] },
     index: number,
     total: number
   ): Buffer {
@@ -316,36 +316,102 @@ async function startServer() {
     }
     pushStr("------------------------------------------\n");
 
-    // 5. Items Header
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr("ITEM NAME                              QTY\n");
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-    pushStr("------------------------------------------\n");
+    const shouldShowPrices = Boolean(slip.showPrices ?? req.showPrices);
 
-    // 6. Food Items (Crisp, High Legibility)
-    let totalQty = 0;
-    for (const item of slip.items) {
-      totalQty += item.qty;
-      const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
-      const nameCol = name.padEnd(34, ' ');
-      const qtyCol = `${item.qty}x`.padStart(6, ' ');
-
+    if (shouldShowPrices) {
+      // 5. Items Header with Price (Exact 42 character columns: 22 item + 1 space + 5 qty + 1 space + 13 price = 42)
       pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-      pushStr(`${nameCol} ${qtyCol}\n`);
+      const colItemH = "ITEM NAME".padEnd(22, ' ');
+      const colQtyH = "QTY".padStart(5, ' ');
+      const colPriceH = "PRICE".padStart(13, ' ');
+      pushStr(`${colItemH} ${colQtyH} ${colPriceH}\n`);
       pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+      pushStr("------------------------------------------\n");
 
-      if (item.variation) {
-        pushStr(`   - Cut: ${item.variation}\n`);
+      // 6. Food Items (with prices)
+      let totalAmount = 0;
+      for (const item of slip.items) {
+        const itemTotal = Number(item.price || 0) * item.qty;
+        totalAmount += itemTotal;
+
+        let firstLineName = item.name.trim();
+        let remainder = "";
+        if (firstLineName.length > 22) {
+          const lastSpace = firstLineName.lastIndexOf(" ", 22);
+          if (lastSpace > 10) {
+            remainder = firstLineName.slice(lastSpace + 1).trim();
+            firstLineName = firstLineName.slice(0, lastSpace);
+          } else {
+            remainder = firstLineName.slice(22).trim();
+            firstLineName = firstLineName.slice(0, 22);
+          }
+        }
+
+        const nameCol = firstLineName.padEnd(22, ' ');
+        const qtyCol = `${item.qty}x`.padStart(5, ' ');
+        const priceCol = (item.price != null ? `Tk ${itemTotal}` : "").padStart(13, ' ');
+
+        pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+        pushStr(`${nameCol} ${qtyCol} ${priceCol}\n`);
+        pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+
+        if (remainder) {
+          pushStr(`  ${remainder}\n`);
+        }
+        if (item.variation) {
+          pushStr(`   - Cut: ${item.variation}\n`);
+        }
+        if (item.addons && item.addons.length > 0) {
+          pushStr(`   - Extras: ${item.addons.join(", ")}\n`);
+        }
+        if (item.notes) {
+          pushStr(`   - Note: ${item.notes}\n`);
+        }
       }
-      if (item.addons && item.addons.length > 0) {
-        pushStr(`   - Extras: ${item.addons.join(", ")}\n`);
+
+      pushStr("------------------------------------------\n");
+      const line2Col = (left: string, right: string, width = 42) => {
+        const l = left.trim();
+        const r = right.trim();
+        const maxL = Math.max(0, width - 1 - r.length);
+        const safeL = l.length > maxL ? l.slice(0, maxL) : l;
+        const spaces = Math.max(1, width - safeL.length - r.length);
+        return safeL + ' '.repeat(spaces) + r + '\n';
+      };
+      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+      pushStr(line2Col("TOTAL AMOUNT:", `Tk ${totalAmount}`));
+      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+      pushStr("------------------------------------------\n");
+    } else {
+      // 5. Items Header
+      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+      pushStr("ITEM NAME                              QTY\n");
+      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+      pushStr("------------------------------------------\n");
+
+      // 6. Food Items (Crisp, High Legibility)
+      for (const item of slip.items) {
+        const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
+        const nameCol = name.padEnd(34, ' ');
+        const qtyCol = `${item.qty}x`.padStart(6, ' ');
+
+        pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+        pushStr(`${nameCol} ${qtyCol}\n`);
+        pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+
+        if (item.variation) {
+          pushStr(`   - Cut: ${item.variation}\n`);
+        }
+        if (item.addons && item.addons.length > 0) {
+          pushStr(`   - Extras: ${item.addons.join(", ")}\n`);
+        }
+        if (item.notes) {
+          pushStr(`   - Note: ${item.notes}\n`);
+        }
       }
-      if (item.notes) {
-        pushStr(`   - Note: ${item.notes}\n`);
-      }
+
+      pushStr("------------------------------------------\n");
     }
-
-    pushStr("------------------------------------------\n");
 
     // 7. Small feed to clear tear blade (only 3 newlines = ~2.5cm)
     pushStr("\n\n\n");

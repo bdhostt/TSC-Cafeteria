@@ -735,4 +735,5 @@ export interface PrintableReceipt {
   restaurantBin?: string;
   isPaid?: boolean;
   isDirectPrint?: boolean;
+  showPrices?: boolean;
 }

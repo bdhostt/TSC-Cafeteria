@@ -1150,6 +1150,7 @@ interface RestaurantContextType {
   updatePrintTemplate: (id: string, updates: Partial<PrintTemplate>) => void;
   deletePrintTemplate: (id: string) => void;
   duplicatePrintTemplate: (id: string) => void;
+  setDefaultPrintTemplate: (id: string) => void;
   
   // Session & Shift Management
   businessDay: BusinessDay;
@@ -1749,6 +1750,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 return st;
               });
             }
+          }
+        }
+
+        if (result.data) {
+          if (!result.data.printTemplates || result.data.printTemplates.length === 0) {
+            result.data.printTemplates = (dataRef.current.printTemplates && dataRef.current.printTemplates.length > 0)
+              ? dataRef.current.printTemplates
+              : DEFAULT_PRINT_TEMPLATES;
           }
         }
         const serverStateStr = JSON.stringify(result.data);
@@ -2436,21 +2445,49 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const newTpl: PrintTemplate = {
       ...tpl,
       id,
+      showPricesOnKot: Boolean(tpl.showPricesOnKot),
       isActive: tpl.isActive !== undefined ? tpl.isActive : true
     };
-    setData(prev => ({
-      ...prev,
-      printTemplates: [...(prev.printTemplates || DEFAULT_PRINT_TEMPLATES), newTpl]
-    }));
+    setData(prev => {
+      const currentList = prev.printTemplates || DEFAULT_PRINT_TEMPLATES;
+      const updatedList = newTpl.isDefault
+        ? currentList.map(t => (t.templateType === newTpl.templateType || t.templateType === 'BOTH') ? { ...t, isDefault: false } : t)
+        : currentList;
+      return {
+        ...prev,
+        printTemplates: [...updatedList, newTpl]
+      };
+    });
+    lastLocalEditTimeRef.current = Date.now();
   };
 
   const updatePrintTemplate = (id: string, updates: Partial<PrintTemplate>) => {
-    setData(prev => ({
-      ...prev,
-      printTemplates: (prev.printTemplates || DEFAULT_PRINT_TEMPLATES).map(t => 
-        t.id === id ? { ...t, ...updates } : t
-      )
-    }));
+    setData(prev => {
+      const currentList = prev.printTemplates || DEFAULT_PRINT_TEMPLATES;
+      const target = currentList.find(t => t.id === id);
+      const targetType = updates.templateType || target?.templateType || 'KOT';
+      return {
+        ...prev,
+        printTemplates: currentList.map(t => {
+          if (t.id === id) {
+            return {
+              ...t,
+              ...updates,
+              showPricesOnKot: updates.showPricesOnKot !== undefined ? Boolean(updates.showPricesOnKot) : Boolean(t.showPricesOnKot)
+            };
+          }
+          if (updates.isDefault && (t.templateType === targetType || t.templateType === 'BOTH')) {
+            return { ...t, isDefault: false };
+          }
+          return t;
+        })
+      };
+    });
+    lastLocalEditTimeRef.current = Date.now();
+  };
+
+  const setDefaultPrintTemplate = (id: string) => {
+    updatePrintTemplate(id, { isDefault: true });
   };
 
   const deletePrintTemplate = (id: string) => {
@@ -2458,6 +2495,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ...prev,
       printTemplates: (prev.printTemplates || DEFAULT_PRINT_TEMPLATES).filter(t => t.id !== id)
     }));
+    lastLocalEditTimeRef.current = Date.now();
   };
 
   const duplicatePrintTemplate = (id: string) => {
@@ -2474,6 +2512,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ...prev,
       printTemplates: [...(prev.printTemplates || DEFAULT_PRINT_TEMPLATES), duplicated]
     }));
+    lastLocalEditTimeRef.current = Date.now();
   };
 
   const setTableChannel = (tableId: string, channelOrAgentId: string) => {
@@ -3009,6 +3048,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const invoiceNo = 'KOT-' + Date.now().toString().slice(-5);
     const dateTime = new Date().toLocaleString('en-US');
 
+    const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
+    const defaultPrimaryKotTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+      || allTemplates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+      || allTemplates[0];
+
     if (showModal) {
       setPrintableReceipt({
         invoiceNo,
@@ -3027,7 +3071,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         netTotal: subtotal,
         isSettled: false,
         receiptType: 'KOT',
-        isDirectPrint: false
+        isDirectPrint: false,
+        targetTemplateId: defaultPrimaryKotTemplate?.id,
+        showPrices: Boolean(defaultPrimaryKotTemplate?.showPricesOnKot)
       });
     } else {
       // Direct submit / print: dispatch directly to hardware printer in background
@@ -3054,16 +3100,25 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return p || printers.find(pr => pr.isDefault && pr.isActive) || printers[0] || null;
       };
 
+      const getTemplateForDept = (dept: string) => {
+        return allTemplates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH') && t.departments?.includes(dept))
+          || defaultPrimaryKotTemplate;
+      };
+
       const slipsToPrint = (orderDepartments.length > 1)
         ? orderDepartments.map(dept => {
             const deptItems = enriched.filter(i => i.department === dept);
             const deptPrinter = getPrinterForDept(dept);
+            const deptTemplate = getTemplateForDept(dept);
+            const showPrices = Boolean(deptTemplate?.showPricesOnKot);
             return {
               station: dept,
               targetPrinterName: deptPrinter?.name,
+              showPrices,
               items: deptItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
+                price: i.price,
                 variation: i.selectedVariation?.name,
                 addons: i.selectedAddons?.map(a => a.name),
                 notes: i.notes
@@ -3073,9 +3128,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         : [{
             station: orderDepartments[0] || 'Main Kitchen',
             targetPrinterName: getPrinterForDept(orderDepartments[0] || 'Main Kitchen')?.name,
+            showPrices: Boolean(getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showPricesOnKot),
             items: enriched.map(i => ({
               name: i.name,
               qty: i.qty,
+              price: i.price,
               variation: i.selectedVariation?.name,
               addons: i.selectedAddons?.map(a => a.name),
               notes: i.notes
@@ -3089,6 +3146,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         customer: table.customer || 'Walk-in Customer',
         invoiceNo,
         dateTime,
+        showPrices: Boolean(defaultPrimaryKotTemplate?.showPricesOnKot),
         slips: slipsToPrint
       };
 
@@ -5580,6 +5638,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       updatePrintTemplate,
       deletePrintTemplate,
       duplicatePrintTemplate,
+      setDefaultPrintTemplate,
       businessDay: data.businessDay || {
         date: new Date().toISOString().split('T')[0],
         isOpen: true,

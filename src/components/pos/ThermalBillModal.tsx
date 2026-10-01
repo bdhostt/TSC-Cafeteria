@@ -137,13 +137,30 @@ export const ThermalBillModal: React.FC = () => {
   // Initial matched template
   const defaultMatchedTemplate = useMemo(() => {
     const targetType = isKot ? 'KOT' : 'BILL';
-    const found = templates.find(t => t.isActive && (t.templateType === targetType || t.templateType === 'BOTH'));
-    return found || templates[0] || null;
-  }, [templates, isKot]);
+    if (printableReceipt?.targetTemplateId) {
+      const found = templates.find(t => t.id === printableReceipt.targetTemplateId && t.isActive);
+      if (found) return found;
+    }
+    if (selectedDeptFilter && selectedDeptFilter !== 'ALL' && selectedDeptFilter !== 'SPLIT_ALL') {
+      const found = templates.find(t => t.isActive && (t.templateType === targetType || t.templateType === 'BOTH') && t.departments?.includes(selectedDeptFilter));
+      if (found) return found;
+    }
+    const defaultTpl = templates.find(t => t.isActive && t.isDefault && (t.templateType === targetType || t.templateType === 'BOTH'));
+    if (defaultTpl) return defaultTpl;
+    const anyType = templates.find(t => t.isActive && (t.templateType === targetType || t.templateType === 'BOTH'));
+    if (anyType) return anyType;
+    return templates[0] || null;
+  }, [templates, isKot, printableReceipt?.targetTemplateId, selectedDeptFilter]);
 
   const [selectedPrinterId, setSelectedPrinterId] = useState<string>(defaultMatchedPrinter?.id || '');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(defaultMatchedTemplate?.id || '');
   const [showConfigBar, setShowConfigBar] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (defaultMatchedTemplate) {
+      setSelectedTemplateId(defaultMatchedTemplate.id);
+    }
+  }, [defaultMatchedTemplate?.id]);
 
   // Switch tab and automatically align active hardware printer
   const handleSelectDept = (dept: string) => {
@@ -245,12 +262,16 @@ export const ThermalBillModal: React.FC = () => {
 
     // 2. KOT Ticket: Hardware kitchen station print
     try {
+      const showPrices = Boolean(activeTemplate?.showPricesOnKot);
       const slipsToPrint = (selectedDeptFilter === 'ALL')
         ? [{
             station: 'Master KOT (All Stations)',
+            targetPrinterName: activePrinter?.name || 'Kot Printer',
+            showPrices,
             items: displayedItems.map(i => ({
               name: i.name,
               qty: i.qty,
+              price: i.price,
               variation: i.selectedVariation?.name,
               addons: i.selectedAddons?.map(a => a.name),
               notes: i.notes
@@ -261,12 +282,15 @@ export const ThermalBillModal: React.FC = () => {
               ? orderDepartments.map(dept => {
                   const deptItems = enrichedItems.filter(i => i.department === dept);
                   const deptPrinter = getPrinterForDept(dept);
+                  const deptTemplate = templates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH') && t.departments?.includes(dept)) || activeTemplate;
                   return {
                     station: dept,
                     targetPrinterName: deptPrinter?.name || 'Kot Printer',
+                    showPrices: Boolean(deptTemplate?.showPricesOnKot),
                     items: deptItems.map(i => ({
                       name: i.name,
                       qty: i.qty,
+                      price: i.price,
                       variation: i.selectedVariation?.name,
                       addons: i.selectedAddons?.map(a => a.name),
                       notes: i.notes
@@ -275,9 +299,12 @@ export const ThermalBillModal: React.FC = () => {
                 }).filter(s => s.items.length > 0)
               : [{
                   station: 'Main Kitchen',
+                  targetPrinterName: activePrinter?.name || 'Kot Printer',
+                  showPrices,
                   items: displayedItems.map(i => ({
                     name: i.name,
                     qty: i.qty,
+                    price: i.price,
                     variation: i.selectedVariation?.name,
                     addons: i.selectedAddons?.map(a => a.name),
                     notes: i.notes
@@ -286,9 +313,11 @@ export const ThermalBillModal: React.FC = () => {
           : [{
               station: selectedDeptFilter,
               targetPrinterName: activePrinter?.name || 'Kot Printer',
+              showPrices,
               items: displayedItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
+                price: i.price,
                 variation: i.selectedVariation?.name,
                 addons: i.selectedAddons?.map(a => a.name),
                 notes: i.notes
@@ -303,6 +332,7 @@ export const ThermalBillModal: React.FC = () => {
         waiter: printableReceipt.waiter,
         customer: printableReceipt.customer,
         isCancelKot,
+        showPrices,
         slips: slipsToPrint
       };
 
@@ -365,22 +395,50 @@ export const ThermalBillModal: React.FC = () => {
       }
       kotLines.push('------------------------------------------');
 
-      // 34 chars item + 1 space + 7 chars qty = 42 chars
-      const kotItemH = 'ITEM'.padEnd(34, ' ');
-      const kotQtyH = 'QTY'.padStart(7, ' ');
-      kotLines.push(`${kotItemH} ${kotQtyH}`);
-      kotLines.push('------------------------------------------');
+      const showPrices = Boolean(activeTemplate?.showPricesOnKot);
+      if (showPrices) {
+        // 22 chars item + 1 space + 5 chars qty + 1 space + 13 chars price = 42 chars
+        const kotItemH = 'ITEM'.padEnd(22, ' ');
+        const kotQtyH = 'QTY'.padStart(5, ' ');
+        const kotPriceH = 'PRICE'.padStart(13, ' ');
+        kotLines.push(`${kotItemH} ${kotQtyH} ${kotPriceH}`);
+        kotLines.push('------------------------------------------');
 
-      for (const item of displayedItems) {
-        const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
-        const nameCol = name.padEnd(34, ' ');
-        const qtyCol = `${item.qty}x`.padStart(7, ' ');
-        kotLines.push(`${nameCol} ${qtyCol}`);
-        if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);
-        if (item.selectedAddons && item.selectedAddons.length > 0) {
-          kotLines.push(`   - Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}`);
+        let kotTotal = 0;
+        for (const item of displayedItems) {
+          const itemTotal = item.price * item.qty;
+          kotTotal += itemTotal;
+          const name = item.name.length > 21 ? item.name.slice(0, 21) : item.name;
+          const nameCol = name.padEnd(22, ' ');
+          const qtyCol = `${item.qty}x`.padStart(5, ' ');
+          const priceCol = `৳${itemTotal.toLocaleString()}`.padStart(13, ' ');
+          kotLines.push(`${nameCol} ${qtyCol} ${priceCol}`);
+          if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);
+          if (item.selectedAddons && item.selectedAddons.length > 0) {
+            kotLines.push(`   - Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}`);
+          }
+          if (item.notes) kotLines.push(`   - Note: ${item.notes}`);
         }
-        if (item.notes) kotLines.push(`   - Note: ${item.notes}`);
+        kotLines.push('------------------------------------------');
+        kotLines.push(line2Col('TOTAL AMOUNT:', `৳${kotTotal.toLocaleString()}`));
+      } else {
+        // 34 chars item + 1 space + 7 chars qty = 42 chars
+        const kotItemH = 'ITEM'.padEnd(34, ' ');
+        const kotQtyH = 'QTY'.padStart(7, ' ');
+        kotLines.push(`${kotItemH} ${kotQtyH}`);
+        kotLines.push('------------------------------------------');
+
+        for (const item of displayedItems) {
+          const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
+          const nameCol = name.padEnd(34, ' ');
+          const qtyCol = `${item.qty}x`.padStart(7, ' ');
+          kotLines.push(`${nameCol} ${qtyCol}`);
+          if (item.selectedVariation?.name) kotLines.push(`   - Cut: ${item.selectedVariation.name}`);
+          if (item.selectedAddons && item.selectedAddons.length > 0) {
+            kotLines.push(`   - Extras: ${item.selectedAddons.map((a: any) => a.name).join(', ')}`);
+          }
+          if (item.notes) kotLines.push(`   - Note: ${item.notes}`);
+        }
       }
 
       kotLines.push('------------------------------------------');
@@ -717,7 +775,8 @@ export const ThermalBillModal: React.FC = () => {
             <thead>
               <tr className="border-b border-slate-300 text-slate-500 font-semibold text-xs">
                 <th className="py-1">Food Item &amp; Customization</th>
-                <th className="py-1 text-right">Qty</th>
+                <th className={`py-1 ${activeTemplate?.showPricesOnKot ? 'text-center' : 'text-right'}`}>Qty</th>
+                {activeTemplate?.showPricesOnKot && <th className="py-1 text-right">Price</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -743,14 +802,37 @@ export const ThermalBillModal: React.FC = () => {
                       </div>
                     )}
                   </td>
-                  <td className="py-1.5 text-right font-bold text-xs text-slate-900 align-top">
+                  <td className={`py-1.5 font-bold text-xs text-slate-900 align-top ${activeTemplate?.showPricesOnKot ? 'text-center' : 'text-right'}`}>
                     {item.qty}x {isCancelKot ? 'VOID' : ''}
                   </td>
+                  {activeTemplate?.showPricesOnKot && (
+                    <td className="py-1.5 text-right font-bold text-xs text-slate-900 align-top">
+                      ৳{Number(item.price * item.qty).toLocaleString()}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Totals when Show Prices on KOT is enabled */}
+        {activeTemplate?.showPricesOnKot && (
+          <div className="py-2 border-b border-dashed border-slate-700 space-y-1 font-mono text-xs">
+            <div className="flex justify-between text-slate-700">
+              <span>Subtotal:</span>
+              <span className="font-bold">
+                ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between font-extrabold text-slate-900 border-t border-slate-200 pt-1 text-xs">
+              <span>Total Amount:</span>
+              <span>
+                ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -872,10 +954,12 @@ export const ThermalBillModal: React.FC = () => {
                     onChange={e => setSelectedTemplateId(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#004b9b]"
                   >
-                    {templates.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} [{t.paperWidth}]
-                      </option>
+                    {templates
+                      .filter(t => isKot ? (t.templateType === 'KOT' || t.templateType === 'BOTH') : (t.templateType === 'BILL' || t.templateType === 'BOTH'))
+                      .map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} [{t.paperWidth}] {t.showPricesOnKot ? '• ৳ Price ON' : ''} {t.isDefault ? '★' : ''}
+                        </option>
                     ))}
                   </select>
                 </div>

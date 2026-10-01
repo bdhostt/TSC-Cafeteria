@@ -29,6 +29,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
     updatePrintTemplate, 
     deletePrintTemplate, 
     duplicatePrintTemplate, 
+    setDefaultPrintTemplate,
     language 
   } = useRestaurant();
 
@@ -133,8 +134,8 @@ export const PrintTemplatesConfigView: React.FC = () => {
   };
 
   // Save Template
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!name.trim()) {
       alert('Please enter a template name!');
       return;
@@ -156,7 +157,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
       showWaiter,
       showCustomer,
       showDateTime,
-      showPricesOnKot,
+      showPricesOnKot: Boolean(showPricesOnKot),
       showNotes,
       fontSize,
       footerMessage: footerMessage.trim(),
@@ -164,8 +165,8 @@ export const PrintTemplatesConfigView: React.FC = () => {
       showVatBreakdown,
       showPaymentBreakdown,
       showOrderCount,
-      isDefault,
-      isActive
+      isDefault: Boolean(isDefault),
+      isActive: Boolean(isActive)
     };
 
     if (editingTemplateId) {
@@ -303,10 +304,19 @@ export const PrintTemplatesConfigView: React.FC = () => {
                     </span>
                   </div>
 
-                  {template.isDefault && (
+                  {template.isDefault ? (
                     <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-200">
-                      Primary Default
+                      ★ Primary Default
                     </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDefaultPrintTemplate(template.id)}
+                      className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-900 text-[10px] font-bold border border-slate-200 transition cursor-pointer"
+                      title="Set as Primary Default Template"
+                    >
+                      ☆ Make Default
+                    </button>
                   )}
                 </div>
 
@@ -337,7 +347,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
                 </div>
 
                 {/* Feature Chips */}
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1.5">
                   <div className="flex justify-between">
                     <span>Show Logo / Branding:</span>
                     <span className="font-bold text-slate-800">{template.showLogo ? 'Yes' : 'No'}</span>
@@ -346,9 +356,20 @@ export const PrintTemplatesConfigView: React.FC = () => {
                     <span>Table & Zone Prominent:</span>
                     <span className="font-bold text-slate-800">{template.showTableZone ? 'Yes' : 'No'}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Prices Displayed:</span>
-                    <span className="font-bold text-slate-800">{template.showPricesOnKot ? 'Yes' : 'Hidden (Chef Only)'}</span>
+                    <button
+                      type="button"
+                      onClick={() => updatePrintTemplate(template.id, { showPricesOnKot: !template.showPricesOnKot })}
+                      className={`px-2 py-0.5 rounded text-[10px] font-black cursor-pointer transition flex items-center gap-1 ${
+                        template.showPricesOnKot 
+                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300' 
+                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300 border border-slate-300'
+                      }`}
+                      title="Click to toggle Show Prices on KOT"
+                    >
+                      <span>{template.showPricesOnKot ? '✓ Yes (Prices ON)' : '✕ Hidden (Chef Only)'}</span>
+                    </button>
                   </div>
                   <div className="flex justify-between">
                     <span>Font Size:</span>
@@ -469,7 +490,6 @@ export const PrintTemplatesConfigView: React.FC = () => {
                         setTemplateType(newType);
                         if (newType === 'KOT') {
                           setHeaderTitle('*** KITCHEN ORDER TICKET ***');
-                          setShowPricesOnKot(false);
                         } else if (newType === 'BILL') {
                           setHeaderTitle('INVOICE / CASH MEMO');
                           setShowPricesOnKot(true);
@@ -963,6 +983,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
               <button
                 type="submit"
                 form="template-edit-form"
+                onClick={handleSave}
                 className="px-6 py-2.5 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-xs shadow-md transition cursor-pointer"
               >
                 {editingTemplateId ? 'Save Template Changes' : 'Create Template'}

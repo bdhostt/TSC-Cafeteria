@@ -402,28 +402,81 @@ function buildKotEscPosBuffer(req, slip, index, total) {
   }
   pushStr('------------------------------------------\n');
 
-  // 5. Items Header
-  pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-  pushStr('ITEM NAME                              QTY\n');
-  pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-  pushStr('------------------------------------------\n');
+  const shouldShowPrices = Boolean(slip.showPrices ?? req.showPrices);
 
-  // 6. Food Items (Crisp, High Legibility)
-  for (const item of (slip.items || [])) {
-    const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
-    const nameCol = name.padEnd(34, ' ');
-    const qtyCol = (item.qty + 'x').padStart(6, ' ');
-
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON for item name and qty
-    pushStr(nameCol + ' ' + qtyCol + '\n');
+  if (shouldShowPrices) {
+    // 5. Items Header with Price (Exact 42 character columns: 22 item + 1 space + 5 qty + 1 space + 13 price = 42)
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+    const colItemH = 'ITEM NAME'.padEnd(22, ' ');
+    const colQtyH = 'QTY'.padStart(5, ' ');
+    const colPriceH = 'PRICE'.padStart(13, ' ');
+    pushStr(colItemH + ' ' + colQtyH + ' ' + colPriceH + '\n');
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+    pushStr('------------------------------------------\n');
 
-    if (item.variation) pushStr('   - Cut: ' + item.variation + '\n');
-    if (item.addons && item.addons.length > 0) pushStr('   - Extras: ' + item.addons.join(', ') + '\n');
-    if (item.notes) pushStr('   - Note: ' + item.notes + '\n');
+    // 6. Food Items with Prices
+    let totalAmount = 0;
+    for (const item of (slip.items || [])) {
+      const itemTotal = Number(item.price || 0) * item.qty;
+      totalAmount += itemTotal;
+
+      let firstLineName = (item.name || '').trim();
+      let remainder = '';
+      if (firstLineName.length > 22) {
+        const lastSpace = firstLineName.lastIndexOf(' ', 22);
+        if (lastSpace > 10) {
+          remainder = firstLineName.slice(lastSpace + 1).trim();
+          firstLineName = firstLineName.slice(0, lastSpace);
+        } else {
+          remainder = firstLineName.slice(22).trim();
+          firstLineName = firstLineName.slice(0, 22);
+        }
+      }
+
+      const nameCol = firstLineName.padEnd(22, ' ');
+      const qtyCol = (item.qty + 'x').padStart(5, ' ');
+      const priceCol = (item.price != null ? 'Tk ' + itemTotal : '').padStart(13, ' ');
+
+      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+      pushStr(nameCol + ' ' + qtyCol + ' ' + priceCol + '\n');
+      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+
+      if (remainder) pushStr('  ' + remainder + '\n');
+      if (item.variation) pushStr('   - Cut: ' + item.variation + '\n');
+      if (item.addons && item.addons.length > 0) pushStr('   - Extras: ' + item.addons.join(', ') + '\n');
+      if (item.notes) pushStr('   - Note: ' + item.notes + '\n');
+    }
+
+    pushStr('------------------------------------------\n');
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+    pushStr(line2Col('TOTAL AMOUNT:', 'Tk ' + totalAmount));
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+    pushStr('------------------------------------------\n');
+  } else {
+    // 5. Items Header
+    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
+    pushStr('ITEM NAME                              QTY\n');
+    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+    pushStr('------------------------------------------\n');
+
+    // 6. Food Items (Crisp, High Legibility)
+    for (const item of (slip.items || [])) {
+      const name = item.name.length > 33 ? item.name.slice(0, 33) : item.name;
+      const nameCol = name.padEnd(34, ' ');
+      const qtyCol = (item.qty + 'x').padStart(6, ' ');
+
+      pushBytes([0x1B, 0x45, 0x01]); // Bold ON for item name and qty
+      pushStr(nameCol + ' ' + qtyCol + '\n');
+      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
+
+      if (item.variation) pushStr('   - Cut: ' + item.variation + '\n');
+      if (item.addons && item.addons.length > 0) pushStr('   - Extras: ' + item.addons.join(', ') + '\n');
+      if (item.notes) pushStr('   - Note: ' + item.notes + '\n');
+    }
+
+    pushStr('------------------------------------------\n');
   }
 
-  pushStr('------------------------------------------\n');
   pushStr('\n\n\n');
   pushBytes([0x1D, 0x56, 0x00]);
 
