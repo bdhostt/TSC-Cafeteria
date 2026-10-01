@@ -1075,19 +1075,7 @@ export const PosBillingView: React.FC = () => {
                 </span>
               </button>
 
-              {/* Void / Cancel Order Button - Only for Admin / Authorized users */}
-              {canCancelOrEditOrder && activeTable.cart.length > 0 && (
-                <button
-                  type="button"
-                  id="btn-void-table-order"
-                  onClick={() => setReleasingTable(activeTable)}
-                  className="px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] flex items-center gap-1 border border-rose-200 cursor-pointer transition shadow-2xs"
-                  title="Cancel/Void entire order and release table (Admin/Authorized)"
-                >
-                  <Ban className="w-3 h-3 text-rose-600" />
-                  <span>Void Order</span>
-                </button>
-              )}
+
             </div>
           </div>
 
@@ -1512,9 +1500,14 @@ export const PosBillingView: React.FC = () => {
               <button
                 id="btn-cancel-pos-order"
                 type="button"
-                onClick={() => setPosView('floor')}
+                onClick={() => {
+                  if (activeTable) {
+                    releaseTable(activeTable.id, 'Cancelled from POS Cart', currentUser?.name);
+                  }
+                  setPosView('floor');
+                }}
                 className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] sm:text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
-                title="Cancel and return to Floor Plan"
+                title="Cancel, clear items, and release table"
               >
                 <X className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span className="truncate">Cancel</span>
