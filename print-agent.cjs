@@ -449,10 +449,6 @@ function buildKotEscPosBuffer(req, slip, index, total) {
     }
 
     pushStr('------------------------------------------\n');
-    pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    pushStr(line2Col('TOTAL AMOUNT:', 'Tk ' + totalAmount));
-    pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-    pushStr('------------------------------------------\n');
   } else {
     // 5. Items Header
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON

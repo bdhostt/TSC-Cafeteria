@@ -421,7 +421,6 @@ export const ThermalBillModal: React.FC = () => {
           if (item.notes) kotLines.push(`   - Note: ${item.notes}`);
         }
         kotLines.push('------------------------------------------');
-        kotLines.push(line2Col('TOTAL AMOUNT:', `৳${kotTotal.toLocaleString()}`));
       } else {
         // 34 chars item + 1 space + 7 chars qty = 42 chars
         const kotItemH = 'ITEM'.padEnd(34, ' ');
@@ -820,24 +819,6 @@ export const ThermalBillModal: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-
-              {/* Totals when Show Prices on KOT is enabled */}
-              {isKotPricesEnabled && (
-                <div className="py-2 border-b border-dashed border-slate-700 space-y-1 font-mono text-xs">
-                  <div className="flex justify-between text-slate-700">
-                    <span>Subtotal:</span>
-                    <span className="font-bold">
-                      ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-extrabold text-slate-900 border-t border-slate-200 pt-1 text-xs">
-                    <span>Total Amount:</span>
-                    <span>
-                      ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              )}
             </>
           );
         })()}

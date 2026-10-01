@@ -1099,7 +1099,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
                             {showNotes && <div className="text-[9px] text-slate-500">+ Extra Cheese</div>}
                           </td>
                           <td className="py-1 text-center font-extrabold text-rose-700">2x</td>
-                          {showPricesOnKot && <td className="py-1 text-right font-bold">৳1,160</td>}
+                          {showPricesOnKot && <td className="py-1 text-right font-bold">৳580</td>}
                         </tr>
                         <tr>
                           <td className="py-1 font-bold font-sans">Mineral Water 500ml</td>
@@ -1111,7 +1111,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
                   </div>
 
                   {/* Financials for Bill */}
-                  {showPricesOnKot && (
+                  {(targetSlipType === 'BILL' || targetSlipType === 'BOTH') && (
                     <div className="py-1.5 space-y-0.5 border-b border-dashed border-slate-400">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>

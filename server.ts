@@ -371,18 +371,6 @@ async function startServer() {
       }
 
       pushStr("------------------------------------------\n");
-      const line2Col = (left: string, right: string, width = 42) => {
-        const l = left.trim();
-        const r = right.trim();
-        const maxL = Math.max(0, width - 1 - r.length);
-        const safeL = l.length > maxL ? l.slice(0, maxL) : l;
-        const spaces = Math.max(1, width - safeL.length - r.length);
-        return safeL + ' '.repeat(spaces) + r + '\n';
-      };
-      pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-      pushStr(line2Col("TOTAL AMOUNT:", `Tk ${totalAmount}`));
-      pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
-      pushStr("------------------------------------------\n");
     } else {
       // 5. Items Header
       pushBytes([0x1B, 0x45, 0x01]); // Bold ON
