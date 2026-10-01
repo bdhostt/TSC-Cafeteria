@@ -395,7 +395,7 @@ export const ThermalBillModal: React.FC = () => {
       }
       kotLines.push('------------------------------------------');
 
-      const showPrices = Boolean(activeTemplate?.showPricesOnKot);
+      const showPrices = Boolean(activeTemplate?.showPricesOnKot || printableReceipt?.showPrices);
       if (showPrices) {
         // 22 chars item + 1 space + 5 chars qty + 1 space + 13 chars price = 42 chars
         const kotItemH = 'ITEM'.padEnd(22, ' ');
@@ -770,69 +770,76 @@ export const ThermalBillModal: React.FC = () => {
         </div>
 
         {/* Food Items Table with Uniform Font Sizes */}
-        <div className="py-2 border-b border-dashed border-slate-800">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-300 text-slate-500 font-semibold text-xs">
-                <th className="py-1">Food Item &amp; Customization</th>
-                <th className={`py-1 ${activeTemplate?.showPricesOnKot ? 'text-center' : 'text-right'}`}>Qty</th>
-                {activeTemplate?.showPricesOnKot && <th className="py-1 text-right">Price</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {itemsList.map((item, idx) => (
-                <tr key={idx}>
-                  <td className="py-1.5 text-xs">
-                    <div className={`font-bold ${isCancelKot ? 'text-rose-900 line-through' : 'text-slate-900'}`}>
-                      {item.name}
-                    </div>
-                    {item.selectedVariation && (
-                      <div className="text-xs text-blue-700">
-                        • Cut: {item.selectedVariation.name}
-                      </div>
-                    )}
-                    {item.selectedAddons && item.selectedAddons.length > 0 && (
-                      <div className="text-xs text-amber-800">
-                        • Extras: {item.selectedAddons.map(a => a.name).join(', ')}
-                      </div>
-                    )}
-                    {item.notes && (
-                      <div className="text-xs italic text-rose-600">
-                        • Note: {item.notes}
-                      </div>
-                    )}
-                  </td>
-                  <td className={`py-1.5 font-bold text-xs text-slate-900 align-top ${activeTemplate?.showPricesOnKot ? 'text-center' : 'text-right'}`}>
-                    {item.qty}x {isCancelKot ? 'VOID' : ''}
-                  </td>
-                  {activeTemplate?.showPricesOnKot && (
-                    <td className="py-1.5 text-right font-bold text-xs text-slate-900 align-top">
-                      ৳{Number(item.price * item.qty).toLocaleString()}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {(() => {
+          const isKotPricesEnabled = Boolean(activeTemplate?.showPricesOnKot || printableReceipt?.showPrices);
+          return (
+            <>
+              <div className="py-2 border-b border-dashed border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-300 text-slate-500 font-semibold text-xs">
+                      <th className="py-1">Food Item &amp; Customization</th>
+                      <th className={`py-1 ${isKotPricesEnabled ? 'text-center' : 'text-right'}`}>Qty</th>
+                      {isKotPricesEnabled && <th className="py-1 text-right">Price</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {itemsList.map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="py-1.5 text-xs">
+                          <div className={`font-bold ${isCancelKot ? 'text-rose-900 line-through' : 'text-slate-900'}`}>
+                            {item.name}
+                          </div>
+                          {item.selectedVariation && (
+                            <div className="text-xs text-blue-700">
+                              • Cut: {item.selectedVariation.name}
+                            </div>
+                          )}
+                          {item.selectedAddons && item.selectedAddons.length > 0 && (
+                            <div className="text-xs text-amber-800">
+                              • Extras: {item.selectedAddons.map(a => a.name).join(', ')}
+                            </div>
+                          )}
+                          {item.notes && (
+                            <div className="text-xs italic text-rose-600">
+                              • Note: {item.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className={`py-1.5 font-bold text-xs text-slate-900 align-top ${isKotPricesEnabled ? 'text-center' : 'text-right'}`}>
+                          {item.qty}x {isCancelKot ? 'VOID' : ''}
+                        </td>
+                        {isKotPricesEnabled && (
+                          <td className="py-1.5 text-right font-bold text-xs text-slate-900 align-top">
+                            ৳{Number(item.price * item.qty).toLocaleString()}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-        {/* Totals when Show Prices on KOT is enabled */}
-        {activeTemplate?.showPricesOnKot && (
-          <div className="py-2 border-b border-dashed border-slate-700 space-y-1 font-mono text-xs">
-            <div className="flex justify-between text-slate-700">
-              <span>Subtotal:</span>
-              <span className="font-bold">
-                ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between font-extrabold text-slate-900 border-t border-slate-200 pt-1 text-xs">
-              <span>Total Amount:</span>
-              <span>
-                ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
-              </span>
-            </div>
-          </div>
-        )}
+              {/* Totals when Show Prices on KOT is enabled */}
+              {isKotPricesEnabled && (
+                <div className="py-2 border-b border-dashed border-slate-700 space-y-1 font-mono text-xs">
+                  <div className="flex justify-between text-slate-700">
+                    <span>Subtotal:</span>
+                    <span className="font-bold">
+                      ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-extrabold text-slate-900 border-t border-slate-200 pt-1 text-xs">
+                    <span>Total Amount:</span>
+                    <span>
+                      ৳{itemsList.reduce((acc, i) => acc + (Number(i.price || 0) * i.qty), 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     );
   };

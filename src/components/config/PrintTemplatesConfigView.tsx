@@ -30,11 +30,28 @@ export const PrintTemplatesConfigView: React.FC = () => {
     deletePrintTemplate, 
     duplicatePrintTemplate, 
     setDefaultPrintTemplate,
+    setAllKotShowPrices,
     language 
   } = useRestaurant();
 
   const templates = data.printTemplates || [];
   const profile = data.restaurantProfile;
+
+  // Resolve Primary Default Templates
+  const primaryKotTemplate = templates.find(t => t.isActive && t.isDefault && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+    || templates.find(t => t.isActive && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
+    || templates[0];
+
+  const primaryBillTemplate = templates.find(t => t.isActive && t.isDefault && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
+    || templates.find(t => t.isActive && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
+    || templates[1];
+
+  // Toast feedback
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setSaveToast(msg);
+    setTimeout(() => setSaveToast(null), 3500);
+  };
 
   // Filter
   const [filterType, setFilterType] = useState<string>('ALL');
@@ -59,7 +76,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
   const [showWaiter, setShowWaiter] = useState(true);
   const [showCustomer, setShowCustomer] = useState(true);
   const [showDateTime, setShowDateTime] = useState(true);
-  const [showPricesOnKot, setShowPricesOnKot] = useState(false);
+  const [showPricesOnKot, setShowPricesOnKot] = useState(true);
   const [showNotes, setShowNotes] = useState(true);
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
   const [footerMessage, setFooterMessage] = useState('⚡ Fast Kitchen Dispatch Required');
@@ -67,37 +84,38 @@ export const PrintTemplatesConfigView: React.FC = () => {
   const [showVatBreakdown, setShowVatBreakdown] = useState(false);
   const [showPaymentBreakdown, setShowPaymentBreakdown] = useState(false);
   const [showOrderCount, setShowOrderCount] = useState(true);
-  const [isDefault, setIsDefault] = useState(false);
+  const [isDefault, setIsDefault] = useState(true);
   const [isActive, setIsActive] = useState(true);
 
   // Open Modal for Add
   const handleOpenAdd = (type: TemplateTargetType = 'KOT') => {
+    const base = type === 'KOT' ? primaryKotTemplate : primaryBillTemplate;
     setEditingTemplateId(null);
     setName(type === 'KOT' ? 'Custom Kitchen KOT (80mm)' : 'Custom Guest Bill (80mm)');
     setTemplateType(type);
-    setPaperWidth('80mm');
-    setSelectedDepts([]);
+    setPaperWidth(base?.paperWidth || '80mm');
+    setSelectedDepts(base?.departments ? [...base.departments] : []);
     setSelectedCats([]);
-    setHeaderTitle(type === 'KOT' ? '*** KITCHEN ORDER TICKET ***' : 'INVOICE / CASH MEMO');
-    setShowLogo(true);
-    setShowTagline(type === 'BILL');
-    setShowAddress(type === 'BILL');
-    setShowPhone(type === 'BILL');
-    setShowBinVat(type === 'BILL');
-    setShowTableZone(true);
-    setShowWaiter(true);
-    setShowCustomer(true);
-    setShowDateTime(true);
-    setShowPricesOnKot(type === 'BILL');
-    setShowNotes(true);
-    setFontSize('base');
+    setHeaderTitle(base?.headerTitle || (type === 'KOT' ? '*** KITCHEN ORDER TICKET ***' : 'INVOICE / CASH MEMO'));
+    setShowLogo(base ? base.showLogo !== false : true);
+    setShowTagline(base ? Boolean(base.showTagline) : type === 'BILL');
+    setShowAddress(base ? Boolean(base.showAddress) : type === 'BILL');
+    setShowPhone(base ? Boolean(base.showPhone) : type === 'BILL');
+    setShowBinVat(base ? Boolean(base.showBinVat) : type === 'BILL');
+    setShowTableZone(base ? base.showTableZone !== false : true);
+    setShowWaiter(base ? base.showWaiter !== false : true);
+    setShowCustomer(base ? base.showCustomer !== false : true);
+    setShowDateTime(base ? base.showDateTime !== false : true);
+    setShowPricesOnKot(base ? Boolean(base.showPricesOnKot) : true);
+    setShowNotes(base ? base.showNotes !== false : true);
+    setFontSize(base?.fontSize || 'base');
     const currentRestName = profile?.name || 'Restaurant POS';
-    setFooterMessage(type === 'KOT' ? '⚡ Fast Kitchen Dispatch Required' : `Thank you for dining at ${currentRestName}!`);
-    setFooterNotes(type === 'KOT' ? 'Generated via POS Kitchen Link' : `Powered by ${currentRestName} • VAT & SD Included`);
-    setShowVatBreakdown(type === 'BILL');
-    setShowPaymentBreakdown(type === 'BILL');
-    setShowOrderCount(true);
-    setIsDefault(false);
+    setFooterMessage(base?.footerMessage || (type === 'KOT' ? '⚡ Fast Kitchen Dispatch Required' : `Thank you for dining at ${currentRestName}!`));
+    setFooterNotes(base?.footerNotes || (type === 'KOT' ? 'Generated via POS Kitchen Link' : `Powered by ${currentRestName} • VAT & SD Included`));
+    setShowVatBreakdown(base ? Boolean(base.showVatBreakdown) : type === 'BILL');
+    setShowPaymentBreakdown(base ? Boolean(base.showPaymentBreakdown) : type === 'BILL');
+    setShowOrderCount(base ? base.showOrderCount !== false : true);
+    setIsDefault(true);
     setIsActive(true);
     setIsModalOpen(true);
   };
@@ -108,8 +126,8 @@ export const PrintTemplatesConfigView: React.FC = () => {
     setName(t.name);
     setTemplateType(t.templateType);
     setPaperWidth(t.paperWidth);
-    setSelectedDepts(t.departments || []);
-    setSelectedCats(t.categories || []);
+    setSelectedDepts(t.departments ? [...t.departments] : []);
+    setSelectedCats(t.categories ? [...t.categories] : []);
     setHeaderTitle(t.headerTitle || (t.templateType === 'KOT' ? '*** KITCHEN ORDER TICKET ***' : 'INVOICE / CASH MEMO'));
     setShowLogo(t.showLogo !== false);
     setShowTagline(Boolean(t.showTagline));
@@ -171,8 +189,16 @@ export const PrintTemplatesConfigView: React.FC = () => {
 
     if (editingTemplateId) {
       updatePrintTemplate(editingTemplateId, payload);
+      if ((templateType === 'KOT' || templateType === 'BOTH') && isDefault) {
+        setAllKotShowPrices(Boolean(showPricesOnKot));
+      }
+      showToast(language === 'bn' ? 'সফলভাবে টেমপ্লেট সেটিংস আপডেট ও সংরক্ষণ করা হয়েছে!' : 'Template settings updated and saved successfully!');
     } else {
       addPrintTemplate(payload);
+      if ((templateType === 'KOT' || templateType === 'BOTH') && isDefault) {
+        setAllKotShowPrices(Boolean(showPricesOnKot));
+      }
+      showToast(language === 'bn' ? 'নতুন টেমপ্লেট সফলভাবে তৈরি এবং কার্যকর করা হয়েছে!' : 'New template created and set as active!');
     }
 
     setIsModalOpen(false);
@@ -181,6 +207,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
   // Delete Template
   const handleDelete = (id: string) => {
     deletePrintTemplate(id);
+    showToast(language === 'bn' ? 'টেমপ্লেট মুছে ফেলা হয়েছে' : 'Template deleted');
   };
 
   // Duplicate
@@ -210,7 +237,7 @@ export const PrintTemplatesConfigView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      {/* Header & Add Button */}
+      {/* Header & Main Actions */}
       <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -219,35 +246,191 @@ export const PrintTemplatesConfigView: React.FC = () => {
             </div>
             <div>
               <h3 className="font-extrabold text-base text-slate-900">
-                'Bill & KOT Template Builder'
+                Bill & KOT Template Builder
               </h3>
               <p className="text-xs text-slate-500">
                 {language === 'bn'
-                  ? 'Design, edit, and manage multiple bill and KOT slip templates by department and category'
-                  : 'Design, edit, and assign custom KOT and Bill slip templates per Department or Category'}
+                  ? 'রান্নাঘরের KOT ও কাস্টমার বিল স্লিপের সেটিংস এবং মূল্য প্রদর্শন কনফিগার করুন'
+                  : 'Design, edit, and configure Kitchen KOT and Customer Bill slip templates'}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => handleOpenAdd('KOT')}
+            onClick={() => primaryKotTemplate ? handleOpenEdit(primaryKotTemplate) : handleOpenAdd('KOT')}
             className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Configure Active Primary Kitchen KOT Slip"
           >
             <ChefHat className="w-4 h-4" />
-            <span>+ Add KOT Template</span>
+            <span>Configure KOT Slip</span>
           </button>
 
           <button
             type="button"
-            onClick={() => handleOpenAdd('BILL')}
+            onClick={() => primaryBillTemplate ? handleOpenEdit(primaryBillTemplate) : handleOpenAdd('BILL')}
             className="px-3.5 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Configure Active Primary Customer Bill Slip"
           >
             <ReceiptText className="w-4 h-4" />
-            <span>+ Add Bill Template</span>
+            <span>Configure Bill Slip</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleOpenAdd('KOT')}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center gap-1 cursor-pointer"
+            title="Add a new custom template for a specific kitchen counter or station"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Custom</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Primary Print Slips Quick Configuration Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Card 1: Kitchen Order Ticket (KOT) */}
+        <div className="p-5 bg-gradient-to-br from-rose-50/70 via-white to-amber-50/40 border-2 border-rose-200/90 rounded-2xl shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-rose-600 text-white rounded-xl shadow-xs">
+                  <ChefHat className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">
+                    Kitchen KOT Slip (রান্নাঘরের KOT স্লিপ)
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Active: <span className="font-bold text-slate-800">{primaryKotTemplate?.name || 'Standard Kitchen KOT'}</span> • {primaryKotTemplate?.paperWidth || '80mm'}
+                  </p>
+                </div>
+              </div>
+
+              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-200">
+                ★ Primary Active
+              </span>
+            </div>
+
+            {/* Quick 1-Click Toggles */}
+            <div className="bg-white/90 p-3.5 rounded-xl border border-rose-100 space-y-2.5 my-3 shadow-2xs">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>৳ Show Prices on KOT (মূল্য প্রিন্ট):</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextVal = !primaryKotTemplate?.showPricesOnKot;
+                    if (primaryKotTemplate) {
+                      updatePrintTemplate(primaryKotTemplate.id, { showPricesOnKot: nextVal });
+                    }
+                    setAllKotShowPrices(nextVal);
+                    showToast(nextVal ? '✓ KOT-এ মূল্য প্রিন্ট চালু করা হয়েছে (Prices ON)' : '✓ KOT-এ মূল্য প্রিন্ট বন্ধ করা হয়েছে (Prices OFF)');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer transition shadow-xs flex items-center gap-1.5 ${
+                    primaryKotTemplate?.showPricesOnKot
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300'
+                      : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                  }`}
+                  title="Click to toggle price printing on kitchen slips"
+                >
+                  <span>{primaryKotTemplate?.showPricesOnKot ? '✓ ৳ Prices ON (মূল্য সহ)' : '✕ Hidden (মূল্য ছাড়া)'}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-600">
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>Table & Zone:</span>
+                  <span className="font-bold text-slate-900">{primaryKotTemplate?.showTableZone !== false ? '✓ Yes' : '✕ No'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>Waiter Name:</span>
+                  <span className="font-bold text-slate-900">{primaryKotTemplate?.showWaiter !== false ? '✓ Yes' : '✕ No'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>Item Notes:</span>
+                  <span className="font-bold text-slate-900">{primaryKotTemplate?.showNotes !== false ? '✓ Yes' : '✕ No'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>Paper Width:</span>
+                  <span className="font-bold text-slate-900">{primaryKotTemplate?.paperWidth || '80mm'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => primaryKotTemplate ? handleOpenEdit(primaryKotTemplate) : handleOpenAdd('KOT')}
+              className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Configure Kitchen KOT Slip (KOT সেটিংস পরিবর্তন করুন)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Card 2: Customer Bill Slip */}
+        <div className="p-5 bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/40 border-2 border-blue-200/90 rounded-2xl shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-[#004b9b] text-white rounded-xl shadow-xs">
+                  <ReceiptText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">
+                    Customer Bill Slip (কাস্টমার বিল / ক্যাশ মেমো)
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Active: <span className="font-bold text-slate-800">{primaryBillTemplate?.name || 'Standard Bill Slip'}</span> • {primaryBillTemplate?.paperWidth || '80mm'}
+                  </p>
+                </div>
+              </div>
+
+              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-200">
+                ★ Primary Active
+              </span>
+            </div>
+
+            {/* Quick 1-Click Info */}
+            <div className="bg-white/90 p-3.5 rounded-xl border border-blue-100 space-y-2.5 my-3 shadow-2xs">
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>Logo Branding:</span>
+                  <span className="font-bold text-slate-900">{primaryBillTemplate?.showLogo !== false ? '✓ Yes' : '✕ No'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>Phone & Address:</span>
+                  <span className="font-bold text-slate-900">{primaryBillTemplate?.showPhone ? '✓ Yes' : '✕ No'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>BIN / VAT Reg:</span>
+                  <span className="font-bold text-slate-900">{primaryBillTemplate?.showBinVat ? '✓ Yes' : '✕ No'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded-lg">
+                  <span>Payment Breakdown:</span>
+                  <span className="font-bold text-slate-900">{primaryBillTemplate?.showPaymentBreakdown ? '✓ Yes' : '✕ No'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => primaryBillTemplate ? handleOpenEdit(primaryBillTemplate) : handleOpenAdd('BILL')}
+              className="w-full py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Configure Customer Bill Slip (বিল মেমো সেটিংস পরিবর্তন করুন)</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -360,7 +543,14 @@ export const PrintTemplatesConfigView: React.FC = () => {
                     <span>Prices Displayed:</span>
                     <button
                       type="button"
-                      onClick={() => updatePrintTemplate(template.id, { showPricesOnKot: !template.showPricesOnKot })}
+                      onClick={() => {
+                        const nextVal = !template.showPricesOnKot;
+                        updatePrintTemplate(template.id, { showPricesOnKot: nextVal });
+                        if (template.isDefault && (template.templateType === 'KOT' || template.templateType === 'BOTH')) {
+                          setAllKotShowPrices(nextVal);
+                        }
+                        showToast(nextVal ? '✓ KOT-এ মূল্য প্রিন্ট চালু (Prices ON)' : '✓ KOT-এ মূল্য প্রিন্ট বন্ধ (Prices OFF)');
+                      }}
                       className={`px-2 py-0.5 rounded text-[10px] font-black cursor-pointer transition flex items-center gap-1 ${
                         template.showPricesOnKot 
                           ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300' 
@@ -442,10 +632,14 @@ export const PrintTemplatesConfigView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base text-slate-900">
-                    {editingTemplateId ? 'Edit Bill & KOT Template' : 'Create Custom Bill & KOT Template'}
+                    {editingTemplateId 
+                      ? (templateType === 'KOT' ? 'Configure Kitchen KOT Slip' : 'Configure Customer Bill Slip') 
+                      : (templateType === 'KOT' ? 'Create Custom KOT Template' : 'Create Custom Bill Template')}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Customize layout, toggles, paper width (58mm / 80mm), and view live preview
+                    {language === 'bn' 
+                      ? 'লেআউট, টগলসমূহ, পেপার সাইজ কনফিগার করে সংরক্ষণ করুন' 
+                      : 'Customize layout, toggles, paper width (58mm / 80mm), and save changes'}
                   </p>
                 </div>
               </div>
@@ -981,15 +1175,22 @@ export const PrintTemplatesConfigView: React.FC = () => {
               </button>
 
               <button
-                type="submit"
-                form="template-edit-form"
+                type="button"
                 onClick={handleSave}
                 className="px-6 py-2.5 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-xs shadow-md transition cursor-pointer"
               >
-                {editingTemplateId ? 'Save Template Changes' : 'Create Template'}
+                {editingTemplateId ? 'Save & Apply Changes (সংরক্ষণ করুন)' : 'Create & Apply Template'}
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {saveToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-5 h-5" />
+          <span className="font-bold text-xs">{saveToast}</span>
         </div>
       )}
     </div>
