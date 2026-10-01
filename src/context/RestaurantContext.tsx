@@ -3137,10 +3137,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const deptPrinter = getPrinterForDept(dept);
             const deptTemplate = getTemplateForDept(dept);
             const showPrices = Boolean(deptTemplate?.showPricesOnKot || isGlobalKotPricesEnabled);
+            const showWaiter = deptTemplate?.showWaiter !== undefined ? Boolean(deptTemplate.showWaiter) : (defaultPrimaryKotTemplate?.showWaiter !== false);
             return {
               station: dept,
               targetPrinterName: deptPrinter?.name,
               showPrices,
+              showWaiter,
+              showCustomer: Boolean(deptTemplate?.showCustomer ?? defaultPrimaryKotTemplate?.showCustomer),
+              showDateTime: deptTemplate?.showDateTime !== false,
               items: deptItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
@@ -3155,6 +3159,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             station: orderDepartments[0] || 'Main Kitchen',
             targetPrinterName: getPrinterForDept(orderDepartments[0] || 'Main Kitchen')?.name,
             showPrices: Boolean(getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showPricesOnKot || isGlobalKotPricesEnabled),
+            showWaiter: getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showWaiter !== undefined 
+              ? Boolean(getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showWaiter) 
+              : (defaultPrimaryKotTemplate?.showWaiter !== false),
+            showCustomer: Boolean(getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showCustomer ?? defaultPrimaryKotTemplate?.showCustomer),
+            showDateTime: getTemplateForDept(orderDepartments[0] || 'Main Kitchen')?.showDateTime !== false,
             items: enriched.map(i => ({
               name: i.name,
               qty: i.qty,
@@ -3173,6 +3182,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         invoiceNo,
         dateTime,
         showPrices: isGlobalKotPricesEnabled,
+        showWaiter: defaultPrimaryKotTemplate?.showWaiter !== false,
+        showCustomer: Boolean(defaultPrimaryKotTemplate?.showCustomer),
+        showDateTime: defaultPrimaryKotTemplate?.showDateTime !== false,
         slips: slipsToPrint
       };
 

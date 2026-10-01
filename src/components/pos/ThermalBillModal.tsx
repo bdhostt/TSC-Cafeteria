@@ -268,6 +268,7 @@ export const ThermalBillModal: React.FC = () => {
             station: 'Master KOT (All Stations)',
             targetPrinterName: activePrinter?.name || 'Kot Printer',
             showPrices,
+            showWaiter: activeTemplate?.showWaiter !== false,
             items: displayedItems.map(i => ({
               name: i.name,
               qty: i.qty,
@@ -287,6 +288,7 @@ export const ThermalBillModal: React.FC = () => {
                     station: dept,
                     targetPrinterName: deptPrinter?.name || 'Kot Printer',
                     showPrices: Boolean(deptTemplate?.showPricesOnKot || showPrices || printableReceipt?.showPrices),
+                    showWaiter: Boolean(deptTemplate?.showWaiter ?? activeTemplate?.showWaiter ?? true),
                     items: deptItems.map(i => ({
                       name: i.name,
                       qty: i.qty,
@@ -301,6 +303,7 @@ export const ThermalBillModal: React.FC = () => {
                   station: 'Main Kitchen',
                   targetPrinterName: activePrinter?.name || 'Kot Printer',
                   showPrices,
+                  showWaiter: activeTemplate?.showWaiter !== false,
                   items: displayedItems.map(i => ({
                     name: i.name,
                     qty: i.qty,
@@ -314,6 +317,7 @@ export const ThermalBillModal: React.FC = () => {
               station: selectedDeptFilter,
               targetPrinterName: activePrinter?.name || 'Kot Printer',
               showPrices,
+              showWaiter: activeTemplate?.showWaiter !== false,
               items: displayedItems.map(i => ({
                 name: i.name,
                 qty: i.qty,
@@ -333,6 +337,9 @@ export const ThermalBillModal: React.FC = () => {
         customer: printableReceipt.customer,
         isCancelKot,
         showPrices,
+        showWaiter: activeTemplate?.showWaiter !== false,
+        showCustomer: Boolean(activeTemplate?.showCustomer),
+        showDateTime: activeTemplate?.showDateTime !== false,
         slips: slipsToPrint
       };
 
@@ -382,7 +389,9 @@ export const ThermalBillModal: React.FC = () => {
       }
       kotLines.push('------------------------------------------');
       kotLines.push(line2Col('Table & Z  :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`));
-      kotLines.push(line2Col('Waiter     :', printableReceipt.waiter || 'Staff'));
+      if (activeTemplate?.showWaiter !== false) {
+        kotLines.push(line2Col('Waiter     :', printableReceipt.waiter || 'Staff'));
+      }
       kotLines.push(line2Col('Date & Time:', printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`));
       if (printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
         kotLines.push(line2Col('Customer   :', printableReceipt.customer));

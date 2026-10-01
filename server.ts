@@ -309,9 +309,18 @@ async function startServer() {
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
 
     const timeStr = req.dateTime || new Date().toLocaleString("en-US");
-    pushStr(`TIME    : ${timeStr}\n`);
-    pushStr(`WAITER  : ${req.waiter || "Staff"}\n`);
-    if (req.customer && req.customer !== "Walk-in Customer") {
+    const shouldShowDateTime = slip.showDateTime !== undefined ? Boolean(slip.showDateTime) : (req.showDateTime !== false);
+    if (shouldShowDateTime) {
+      pushStr(`TIME    : ${timeStr}\n`);
+    }
+
+    const shouldShowWaiter = slip.showWaiter !== undefined ? Boolean(slip.showWaiter) : (req.showWaiter !== undefined ? Boolean(req.showWaiter) : true);
+    if (shouldShowWaiter) {
+      pushStr(`WAITER  : ${req.waiter || "Staff"}\n`);
+    }
+
+    const shouldShowCustomer = slip.showCustomer !== undefined ? Boolean(slip.showCustomer) : Boolean(req.showCustomer);
+    if (shouldShowCustomer && req.customer && req.customer !== "Walk-in Customer") {
       pushStr(`CUSTOMER: ${req.customer}\n`);
     }
     pushStr("------------------------------------------\n");
