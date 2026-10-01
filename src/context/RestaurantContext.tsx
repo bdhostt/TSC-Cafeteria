@@ -4805,7 +4805,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           category: item.category || prev.menuCategories[0] || 'Main Course',
           price: Number(item.price) || 0,
           cost: Number(item.cost) || 0,
-          recipe: item.recipe || []
+          recipe: item.recipe || [],
+          channelPrices: item.channelPrices || {},
+          variations: item.variations || [],
+          addons: item.addons || [],
+          promo: item.promo
         };
         updated = [...prev.menuItems, newItem];
       }
