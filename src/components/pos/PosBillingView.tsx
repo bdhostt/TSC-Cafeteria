@@ -380,10 +380,6 @@ export const PosBillingView: React.FC = () => {
     ? data.tableZones 
     : ['Floor 1', 'Floor 2', 'VIP Lounge', 'Rooftop Garden'];
 
-  // Find last settled sale for quick undo in POS
-  const lastSettledSale = useMemo(() => {
-    return [...data.sales].reverse().find(s => isSaleActive(s) && (s.status === 'SETTLED' || !s.status));
-  }, [data.sales]);
 
   // Find last settled sale for the currently active table
   const lastActiveTableSale = useMemo(() => {
@@ -551,29 +547,6 @@ export const PosBillingView: React.FC = () => {
                 </>
               )}
 
-              {lastSettledSale && canCancelOrEditOrder && (
-                <button
-                  type="button"
-                  id="btn-pos-undo-last-sale"
-                  onClick={() => {
-                    const confirmed = window.confirm(`Undo settlement for ${lastSettledSale.table || 'Table'} (${lastSettledSale.invoiceNo}) and re-open order in cart?`);
-                    if (confirmed) {
-                      voidSale(lastSettledSale.id, {
-                        reason: 'Settlement undone by cashier - Returned to POS Cart',
-                        refundPayment: true,
-                        refundMethod: 'CASH',
-                        restoreToTable: true
-                      });
-                    }
-                  }}
-                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs active:scale-95"
-                  title={`Undo last settled order: ${lastSettledSale.invoiceNo} (৳${lastSettledSale.total}) and re-open table in cart`}
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-                  <span className="hidden sm:inline">Undo Last Settle</span>
-                  <span className="font-mono text-[10px] text-amber-700 font-bold">({lastSettledSale.invoiceNo})</span>
-                </button>
-              )}
             </div>
           </div>
         </div>
