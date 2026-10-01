@@ -538,7 +538,12 @@ export const ThermalBillModal: React.FC = () => {
     lines.push(centerLine(titleText));
     lines.push('------------------------------------------');
 
-    lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo));
+    const metaLine = (lbl: string, val?: string) => {
+      if (!val) return '';
+      return `${lbl.padEnd(14, ' ')}: ${val}`;
+    };
+
+    lines.push(metaLine('Invoice No', printableReceipt.invoiceNo));
     let dateStr = receiptDateStr;
     let timeStr = receiptTimeStr;
     const rawDt = printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`;
@@ -554,35 +559,37 @@ export const ThermalBillModal: React.FC = () => {
       }
     }
     lines.push(line2Col(`Date : ${dateStr}`, `Time: ${timeStr}`));
-    lines.push(line2Col('Table & Z :', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`));
+    lines.push(metaLine('Table & Zone', `${printableReceipt.tableName}${printableReceipt.tableZone ? ` (${printableReceipt.tableZone})` : ''}`));
     if (printableReceipt.channelOrAgent) {
-      lines.push(line2Col('Channel    :', printableReceipt.channelOrAgent));
+      lines.push(metaLine('Channel', printableReceipt.channelOrAgent));
     }
     const waiterText = (printableReceipt.waiter && printableReceipt.waiter !== 'N/A' && printableReceipt.waiter !== 'Staff')
       ? printableReceipt.waiter
       : (printableReceipt.waiter || 'Staff');
-    lines.push(line2Col('Waiter     :', waiterText));
+    if (activeTemplate?.showWaiter !== false) {
+      lines.push(metaLine('Waiter', waiterText));
+    }
     if (printableReceipt.orderTakenBy && printableReceipt.orderTakenBy !== printableReceipt.waiter) {
-      lines.push(line2Col('Order Taken By :', printableReceipt.orderTakenBy));
+      lines.push(metaLine('Order Taken By', printableReceipt.orderTakenBy));
     }
     if (printableReceipt.isSettled) {
-      lines.push(line2Col('Bill Settled By :', printableReceipt.settleBillRole || 'Cashier'));
+      lines.push(metaLine('Bill Settled By', printableReceipt.settleBillRole || 'Cashier'));
     }
     if (printableReceipt.customer && printableReceipt.customer !== 'Walk-in Customer') {
-      lines.push(line2Col('Customer   :', printableReceipt.customer));
+      lines.push(metaLine('Customer', printableReceipt.customer));
     }
     lines.push('------------------------------------------');
 
-    // Column Header (Exact 42 columns: 19 + 1 + 3 + 1 + 8 + 1 + 9 = 42)
+    // Column Header (Exact 42 columns: 19 + 1 + 4 + 1 + 8 + 1 + 8 = 42)
     const colItemH = 'ITEM'.padEnd(19, ' ');
-    const colQtyH = 'QTY'.padStart(3, ' ');
-    const colPriceH = 'PRICE'.padStart(8, ' ');
-    const colTotalH = 'TOTAL'.padStart(9, ' ');
+    const colQtyH = ' QTY';
+    const colPriceH = '   PRICE';
+    const colTotalH = '   TOTAL';
     lines.push(`${colItemH} ${colQtyH} ${colPriceH} ${colTotalH}`);
     lines.push('------------------------------------------');
 
     for (const item of displayedItems) {
-      let firstLineName = item.name.trim();
+      let firstLineName = (item.name || '').trim();
       let remainder = '';
       if (firstLineName.length > 19) {
         const lastSpace = firstLineName.lastIndexOf(' ', 19);
@@ -595,9 +602,9 @@ export const ThermalBillModal: React.FC = () => {
         }
       }
       const colItem = firstLineName.padEnd(19, ' ');
-      const colQty = String(item.qty).padStart(3, ' ');
+      const colQty = (' ' + item.qty + ' ').padStart(4, ' ');
       const colPrice = Number(item.price).toFixed(2).padStart(8, ' ');
-      const colTotal = Number(item.price * item.qty).toFixed(2).padStart(9, ' ');
+      const colTotal = Number(item.price * item.qty).toFixed(2).padStart(8, ' ');
 
       lines.push(`${colItem} ${colQty} ${colPrice} ${colTotal}`);
       if (remainder) lines.push(`  ${remainder}`);

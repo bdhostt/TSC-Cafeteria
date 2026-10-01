@@ -543,7 +543,12 @@ function buildBillEscPosBuffer(bill) {
 
   // 4. Left Align: Invoice Metadata
   pushBytes([0x1B, 0x61, 0x00]);
-  pushStr(line2Col('Invoice No :', bill.invoiceNo || 'INV-0000'));
+  const metaLine = (lbl, val) => {
+    if (!val) return '';
+    return lbl.padEnd(14, ' ') + ': ' + val + '\n';
+  };
+
+  pushStr(metaLine('Invoice No', bill.invoiceNo || 'INV-0000'));
 
   let dateStr = '';
   let timeStr = '';
@@ -562,36 +567,38 @@ function buildBillEscPosBuffer(bill) {
       timeStr = new Date().toLocaleTimeString('en-US');
     }
   }
-  pushStr(line2Col('Date :  ' + dateStr, 'Time: ' + timeStr));
-  pushStr(line2Col('Table & Z  :', (bill.tableName || 'Takeaway') + (bill.tableZone ? ' (' + bill.tableZone + ')' : '')));
-  if (bill.channelOrAgent) pushStr(line2Col('Channel    :', bill.channelOrAgent));
-  pushStr(line2Col('Waiter     :', bill.waiter || 'Staff'));
+  pushStr(line2Col('Date : ' + dateStr, 'Time: ' + timeStr));
+  pushStr(metaLine('Table & Zone', (bill.tableName || 'Takeaway') + (bill.tableZone ? ' (' + bill.tableZone + ')' : '')));
+  if (bill.channelOrAgent) pushStr(metaLine('Channel', bill.channelOrAgent));
+  if (bill.showWaiter !== false) {
+    pushStr(metaLine('Waiter', bill.waiter && bill.waiter !== 'N/A' && bill.waiter !== 'Staff' ? bill.waiter : (bill.waiter || 'Staff')));
+  }
   const orderTaker = bill.orderTakenBy || bill.orderCreatedBy || bill.waiter || 'Staff';
   if (orderTaker && orderTaker !== (bill.waiter || 'Staff')) {
-    pushStr(line2Col('Order Taken By :', orderTaker));
+    pushStr(metaLine('Order Taken By', orderTaker));
   }
   if (bill.isSettled) {
     const settleRole = bill.settleBillRole || bill.cashierRole || 'Cashier';
-    pushStr(line2Col('Bill Settled By :', settleRole));
+    pushStr(metaLine('Bill Settled By', settleRole));
   }
   if (bill.customer && bill.customer !== 'Walk-in Customer') {
-    pushStr(line2Col('Customer   :', bill.customer));
+    pushStr(metaLine('Customer', bill.customer));
   }
   pushStr('------------------------------------------\n');
 
-  // 5. Column Headers (Exact 42 character columns)
+  // 5. Column Headers (Exact 42 character columns: 19 + 1 + 4 + 1 + 8 + 1 + 8 = 42)
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for headers
   const colItemH = 'ITEM'.padEnd(19, ' ');
-  const colQtyH = 'QTY'.padStart(3, ' ');
-  const colPriceH = 'PRICE'.padStart(8, ' ');
-  const colTotalH = 'TOTAL'.padStart(9, ' ');
+  const colQtyH = ' QTY';
+  const colPriceH = '   PRICE';
+  const colTotalH = '   TOTAL';
   pushStr(colItemH + ' ' + colQtyH + ' ' + colPriceH + ' ' + colTotalH + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
   pushStr('------------------------------------------\n');
 
   // 6. Food Items (Crisp & High Legibility)
   for (const item of (bill.items || [])) {
-    let firstLineName = item.name.trim();
+    let firstLineName = (item.name || '').trim();
     let remainder = '';
     if (firstLineName.length > 19) {
       const lastSpace = firstLineName.lastIndexOf(' ', 19);
@@ -604,9 +611,9 @@ function buildBillEscPosBuffer(bill) {
       }
     }
     const colItem = firstLineName.padEnd(19, ' ');
-    const colQty = String(item.qty).padStart(3, ' ');
+    const colQty = (' ' + item.qty + ' ').padStart(4, ' ');
     const colPrice = Number(item.price).toFixed(2).padStart(8, ' ');
-    const colTotal = Number(item.price * item.qty).toFixed(2).padStart(9, ' ');
+    const colTotal = Number(item.price * item.qty).toFixed(2).padStart(8, ' ');
 
     pushStr(colItem + ' ' + colQty + ' ' + colPrice + ' ' + colTotal + '\n');
     if (remainder) pushStr('  ' + remainder + '\n');
@@ -617,7 +624,7 @@ function buildBillEscPosBuffer(bill) {
 
   pushStr('------------------------------------------\n');
 
-  // 7. Financial Totals
+  // 7. Financial Totals (Right-aligned matching the TOTAL column at column 42)
   pushStr(line2Col('Subtotal:', Number(bill.subtotal || 0).toFixed(2)));
   if (bill.discountDeduction > 0) {
     const discLbl = bill.discountType === 'percent' && bill.discountVal 
