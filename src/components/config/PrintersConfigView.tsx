@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { PrinterConfig, PrinterType, PrinterConnectionType, ThermalPaperWidth } from '../../types';
 import { 

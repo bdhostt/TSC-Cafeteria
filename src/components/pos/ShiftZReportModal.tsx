@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRestaurant, DEFAULT_USERS } from '../../context/RestaurantContext';
 import { Printer, X, Lock } from 'lucide-react';
 import { dispatchHardwarePrint } from '../../utils/hardwarePrint';
