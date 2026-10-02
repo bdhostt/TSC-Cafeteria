@@ -3388,6 +3388,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const releaseTable = (tableId: string, reason?: string, authorizedBy?: string, refundMethod: string = 'CASH') => {
+    lastLocalEditTimeRef.current = Date.now();
     const table = data.tables.find(t => t.id === tableId);
     if (!table) return;
 
@@ -3497,6 +3498,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const cancelPosOrder = (tableId: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     const table = data.tables.find(t => t.id === tableId);
     if (!table) {
       setPosView('floor');
