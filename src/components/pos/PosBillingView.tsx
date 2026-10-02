@@ -83,6 +83,7 @@ export const PosBillingView: React.FC = () => {
     removeCartItem,
     voidCartItem,
     releaseTable,
+    cancelPosOrder,
     clearCart,
     setTableDiscount,
     setTableWaiter,
@@ -1496,23 +1497,31 @@ export const PosBillingView: React.FC = () => {
               item => !item.kotPrinted || item.qty > (item.kotPrintedQty || 0)
             );
 
-            const cancelBtn = (fullWidth = false) => (
-              <button
-                id="btn-cancel-pos-order"
-                type="button"
-                onClick={() => {
-                  if (activeTable) {
-                    releaseTable(activeTable.id, 'Cancelled from POS Cart', currentUser?.name);
-                  }
-                  setPosView('floor');
-                }}
-                className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] sm:text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
-                title="Cancel, clear items, and release table"
-              >
-                <X className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span className="truncate">Cancel</span>
-              </button>
-            );
+            const cancelBtn = (fullWidth = false) => {
+              const hasSubmittedKotItems = Boolean(
+                activeTable?.cart?.some(item => item.kotPrinted && (item.kotPrintedQty || 0) > 0)
+              );
+              const isTableOccupied = (activeTable?.status !== 'free') || hasSubmittedKotItems;
+
+              return (
+                <button
+                  id="btn-cancel-pos-order"
+                  type="button"
+                  onClick={() => {
+                    if (activeTable) {
+                      cancelPosOrder(activeTable.id);
+                    } else {
+                      setPosView('floor');
+                    }
+                  }}
+                  className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] sm:text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
+                  title={isTableOccupied ? "Back to Table Floor Plan" : "Cancel, clear items, and release table"}
+                >
+                  <X className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span className="truncate">Cancel</span>
+                </button>
+              );
+            };
 
             const submitKotBtn = (
               <button

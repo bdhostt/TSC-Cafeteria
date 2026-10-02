@@ -1121,6 +1121,7 @@ interface RestaurantContextType {
     authorizedBy?: string,
     refundMethod?: string
   ) => void;
+  cancelPosOrder: (tableId: string) => void;
   openPrintCancelKot: (
     tableId: string,
     cancelledItems: { name: string; qty: number; price: number; department?: string; reason?: string }[],
@@ -3493,6 +3494,49 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } : t)
       };
     });
+  };
+
+  const cancelPosOrder = (tableId: string) => {
+    const table = data.tables.find(t => t.id === tableId);
+    if (!table) {
+      setPosView('floor');
+      return;
+    }
+
+    const hasSubmittedKotItems = table.cart.some(
+      item => item.kotPrinted && (item.kotPrintedQty || 0) > 0
+    );
+
+    // If order has already been submitted to KOT or table is active/occupied,
+    // revert any unsent items added in this session and return to floor plan without releasing the table.
+    if (hasSubmittedKotItems || table.status !== 'free') {
+      lastLocalEditTimeRef.current = Date.now();
+      setData(prev => ({
+        ...prev,
+        tables: prev.tables.map(t => {
+          if (t.id !== tableId) return t;
+
+          // Revert cart to only KOT-printed items with their confirmed printed quantities
+          const revertedCart = t.cart
+            .filter(item => (item.kotPrintedQty || 0) > 0)
+            .map(item => ({
+              ...item,
+              qty: item.kotPrintedQty || item.qty
+            }));
+
+          return {
+            ...t,
+            cart: revertedCart,
+            status: t.status === 'billed' ? 'billed' : 'hold'
+          };
+        })
+      }));
+    } else {
+      // If table is a new draft order with no submitted KOT items, release the table back to free
+      releaseTable(tableId, 'Cancelled from POS Cart', currentUser?.name);
+    }
+
+    setPosView('floor');
   };
 
   const openPrintCancelKot = (
@@ -6041,6 +6085,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       removeCartItem,
       voidCartItem,
       releaseTable,
+      cancelPosOrder,
       openPrintCancelKot,
       clearCart,
       setTableDiscount,
