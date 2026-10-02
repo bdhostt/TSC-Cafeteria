@@ -3503,13 +3503,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return;
     }
 
-    const hasSubmittedKotItems = table.cart.some(
-      item => item.kotPrinted && (item.kotPrintedQty || 0) > 0
+    const confirmedKotItems = table.cart.filter(
+      item => (item.kotPrintedQty || 0) > 0
     );
 
-    // If order has already been submitted to KOT or table is active/occupied,
-    // revert any unsent items added in this session and return to floor plan without releasing the table.
-    if (hasSubmittedKotItems || table.status !== 'free') {
+    // If order has confirmed KOT items already submitted to kitchen,
+    // revert any unsent extra items and keep submitted items intact on table.
+    if (confirmedKotItems.length > 0) {
       lastLocalEditTimeRef.current = Date.now();
       setData(prev => ({
         ...prev,
@@ -3532,7 +3532,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         })
       }));
     } else {
-      // If table is a new draft order with no submitted KOT items, release the table back to free
+      // If table has NO confirmed KOT items (e.g. 0 items selected, or unsubmitted draft items),
+      // completely release the table back to free (green)
       releaseTable(tableId, 'Cancelled from POS Cart', currentUser?.name);
     }
 

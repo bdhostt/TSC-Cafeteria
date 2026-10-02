@@ -1499,9 +1499,9 @@ export const PosBillingView: React.FC = () => {
 
             const cancelBtn = (fullWidth = false) => {
               const hasSubmittedKotItems = Boolean(
-                activeTable?.cart?.some(item => item.kotPrinted && (item.kotPrintedQty || 0) > 0)
+                activeTable?.cart?.some(item => (item.kotPrintedQty || 0) > 0)
               );
-              const isTableOccupied = (activeTable?.status !== 'free') || hasSubmittedKotItems;
+              const isTableOccupied = hasSubmittedKotItems;
 
               return (
                 <button
