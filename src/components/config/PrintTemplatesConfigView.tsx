@@ -260,12 +260,32 @@ export const PrintTemplatesConfigView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => primaryKotTemplate ? handleOpenEdit(primaryKotTemplate) : handleOpenAdd('KOT')}
+            className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Configure Active Primary Kitchen KOT Slip"
+          >
+            <ChefHat className="w-4 h-4" />
+            <span>Configure KOT Slip</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => primaryBillTemplate ? handleOpenEdit(primaryBillTemplate) : handleOpenAdd('BILL')}
+            className="px-3.5 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Configure Active Primary Customer Bill Slip"
+          >
+            <ReceiptText className="w-4 h-4" />
+            <span>Configure Bill Slip</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => handleOpenAdd('KOT')}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center gap-1 cursor-pointer"
             title="Add a new custom template for a specific kitchen counter or station"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ New Custom</span>
+            <span>New Custom</span>
           </button>
         </div>
       </div>
@@ -343,16 +363,6 @@ export const PrintTemplatesConfigView: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => primaryKotTemplate ? handleOpenEdit(primaryKotTemplate) : handleOpenAdd('KOT')}
-              className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Configure Kitchen KOT Slip (KOT সেটিংস পরিবর্তন করুন)</span>
-            </button>
-          </div>
         </div>
 
         {/* Card 2: Customer Bill Slip */}
@@ -401,16 +411,6 @@ export const PrintTemplatesConfigView: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => primaryBillTemplate ? handleOpenEdit(primaryBillTemplate) : handleOpenAdd('BILL')}
-              className="w-full py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Configure Customer Bill Slip (বিল মেমো সেটিংস পরিবর্তন করুন)</span>
-            </button>
-          </div>
         </div>
       </div>
 
