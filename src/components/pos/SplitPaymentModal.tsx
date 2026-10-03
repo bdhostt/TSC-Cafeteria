@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
+import { PaymentMethodConfig } from '../../types';
 import { 
   X, 
   CheckCircle2, 
@@ -9,17 +10,20 @@ import {
   UserX, 
   UserCheck,
   Coins, 
-  Zap 
+  Zap,
+  Building
 } from 'lucide-react';
 
 export const SplitPaymentModal: React.FC = () => {
   const { activeSettlingTable, closeSettleModal, settlePayment, data, setTableCustomer, setTableWaiter } = useRestaurant();
 
-  const [cash, setCash] = useState<number>(0);
-  const [card, setCard] = useState<number>(0);
-  const [bkash, setBkash] = useState<number>(0);
-  const [nagad, setNagad] = useState<number>(0);
-  const [due, setDue] = useState<number>(0);
+  const paymentMethods: PaymentMethodConfig[] = (
+    data.paymentMethods && data.paymentMethods.length > 0 
+      ? data.paymentMethods 
+      : DEFAULT_PAYMENT_METHODS
+  ).filter(m => m.isActive !== false);
+
+  const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
   const [selectedWaiter, setSelectedWaiter] = useState<string>(
     activeSettlingTable?.waiter && activeSettlingTable.waiter !== 'Staff' && activeSettlingTable.waiter !== 'N/A'
       ? activeSettlingTable.waiter
@@ -33,55 +37,31 @@ export const SplitPaymentModal: React.FC = () => {
 
   if (!activeSettlingTable) return null;
 
+  const getMethodAmt = (mId: string): number => splitAmounts[mId] || 0;
+  const setMethodAmt = (mId: string, val: number) => {
+    setSplitAmounts(prev => ({ ...prev, [mId]: val }));
+  };
+
   const subtotal = activeSettlingTable.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const discDeduction = activeSettlingTable.discountType === 'percent' 
     ? (subtotal * activeSettlingTable.discountVal) / 100 
     : activeSettlingTable.discountVal;
   const netTotal = Math.round(Math.max(0, subtotal - discDeduction));
 
-  const totalEntered = Number(cash || 0) + Number(card || 0) + Number(bkash || 0) + Number(nagad || 0) + Number(due || 0);
+  const totalEntered = paymentMethods.reduce((sum, m) => sum + (Number(splitAmounts[m.id]) || 0), 0);
   const remaining = Math.max(0, netTotal - totalEntered);
   const changeReturn = Math.max(0, totalEntered - netTotal);
 
-  const handleFillAllCash = () => {
-    setCash(netTotal);
-    setCard(0);
-    setBkash(0);
-    setNagad(0);
-    setDue(0);
+  const handleFillAll = (mId: string) => {
+    const next: Record<string, number> = {};
+    paymentMethods.forEach(m => {
+      next[m.id] = m.id === mId ? netTotal : 0;
+    });
+    setSplitAmounts(next);
   };
 
-  const handleFillAllBkash = () => {
-    setBkash(netTotal);
-    setCash(0);
-    setCard(0);
-    setNagad(0);
-    setDue(0);
-  };
-
-  const handleFillAllCard = () => {
-    setCard(netTotal);
-    setCash(0);
-    setBkash(0);
-    setNagad(0);
-    setDue(0);
-  };
-
-  const handleFillAllNagad = () => {
-    setNagad(netTotal);
-    setCash(0);
-    setCard(0);
-    setBkash(0);
-    setDue(0);
-  };
-
-  const handleFillAllDue = () => {
-    setDue(netTotal);
-    setCash(0);
-    setCard(0);
-    setBkash(0);
-    setNagad(0);
-  };
+  const creditMethod = paymentMethods.find(m => m.type === 'CREDIT');
+  const creditEntered = creditMethod ? (splitAmounts[creditMethod.id] || 0) : 0;
 
   const handleSettle = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +75,7 @@ export const SplitPaymentModal: React.FC = () => {
       setTableWaiter(activeSettlingTable.id, finalWaiter);
     }
 
-    if (due > 0) {
+    if (creditEntered > 0) {
       const finalCustomer = selectedCustomer.trim() || activeSettlingTable.customer;
       if (!finalCustomer || finalCustomer.toLowerCase().includes('walk-in')) {
         alert('Please select or specify a registered customer name for due/credit sales!');
@@ -105,12 +85,34 @@ export const SplitPaymentModal: React.FC = () => {
     }
 
     settlePayment(activeSettlingTable.id, {
-      cash: Number(cash || 0),
-      card: Number(card || 0),
-      bkash: Number(bkash || 0),
-      nagad: Number(nagad || 0),
-      due: Number(due || 0)
+      byMethod: splitAmounts
     }, finalWaiter);
+  };
+
+  const getMethodIcon = (m: PaymentMethodConfig) => {
+    const nameLower = (m.name + ' ' + (m.providerName || '')).toLowerCase();
+    if (m.type === 'CASH') return <Banknote className="w-4 h-4 text-emerald-600" />;
+    if (m.type === 'MFS') {
+      if (nameLower.includes('nagad')) return <Smartphone className="w-4 h-4 text-orange-600" />;
+      return <Smartphone className="w-4 h-4 text-pink-600" />;
+    }
+    if (m.type === 'CARD') return <CreditCard className="w-4 h-4 text-blue-600" />;
+    if (m.type === 'BANK') return <Building className="w-4 h-4 text-indigo-600" />;
+    if (m.type === 'CREDIT') return <UserX className="w-4 h-4 text-amber-600" />;
+    return <Zap className="w-4 h-4 text-cyan-600" />;
+  };
+
+  const getMethodButtonColor = (m: PaymentMethodConfig) => {
+    const nameLower = (m.name + ' ' + (m.providerName || '')).toLowerCase();
+    if (m.type === 'CASH') return 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-800';
+    if (m.type === 'MFS') {
+      if (nameLower.includes('nagad')) return 'bg-orange-50 hover:bg-orange-100 border-orange-300 text-orange-800';
+      return 'bg-pink-50 hover:bg-pink-100 border-pink-300 text-pink-800';
+    }
+    if (m.type === 'CARD') return 'bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-800';
+    if (m.type === 'BANK') return 'bg-indigo-50 hover:bg-indigo-100 border-indigo-300 text-indigo-800';
+    if (m.type === 'CREDIT') return 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-800';
+    return 'bg-cyan-50 hover:bg-cyan-100 border-cyan-300 text-cyan-800';
   };
 
   const currentWaiterDisplay = selectedWaiter || activeSettlingTable.waiter;
@@ -209,151 +211,59 @@ export const SplitPaymentModal: React.FC = () => {
             <Zap className="w-3.5 h-3.5 text-[#004b9b]" />
             <span>1-Click Full Payment Shortcut</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            <button
-              type="button"
-              id="preset-all-cash"
-              onClick={handleFillAllCash}
-              className="py-2 px-1 text-center bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <Banknote className="w-4 h-4 text-emerald-600" />
-              <span>Full Cash</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-bkash"
-              onClick={handleFillAllBkash}
-              className="py-2 px-1 text-center bg-pink-50 hover:bg-pink-100 border border-pink-300 text-pink-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <Smartphone className="w-4 h-4 text-pink-600" />
-              <span>Full bKash</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-nagad"
-              onClick={handleFillAllNagad}
-              className="py-2 px-1 text-center bg-orange-50 hover:bg-orange-100 border border-orange-300 text-orange-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <Smartphone className="w-4 h-4 text-orange-600" />
-              <span>Full Nagad</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-card"
-              onClick={handleFillAllCard}
-              className="py-2 px-1 text-center bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <CreditCard className="w-4 h-4 text-blue-600" />
-              <span>Full Card</span>
-            </button>
-            <button
-              type="button"
-              id="preset-all-due"
-              onClick={handleFillAllDue}
-              className="py-2 px-1 text-center bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer"
-            >
-              <UserX className="w-4 h-4 text-amber-600" />
-              <span>Full Due</span>
-            </button>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            {paymentMethods.map(m => {
+              const colorCls = getMethodButtonColor(m);
+              const icon = getMethodIcon(m);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  id={`preset-all-${m.id}`}
+                  onClick={() => handleFillAll(m.id)}
+                  className={`py-2 px-1 text-center border rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer ${colorCls}`}
+                >
+                  {icon}
+                  <span className="truncate max-w-full">Full {m.name}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Multi-Split Payment Form */}
         <form onSubmit={handleSettle} className="space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {/* Cash */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <Banknote className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Cash</span>
-              </label>
-              <input
-                type="number"
-                id="input-pay-cash"
-                min="0"
-                step="1"
-                value={cash === 0 ? '' : cash}
-                onChange={e => setCash(parseFloat(e.target.value) || 0)}
-                placeholder="0"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-base font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#004b9b] focus:outline-none"
-              />
-            </div>
-
-            {/* Card */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-                <span>Card</span>
-              </label>
-              <input
-                type="number"
-                id="input-pay-card"
-                min="0"
-                step="1"
-                value={card === 0 ? '' : card}
-                onChange={e => setCard(parseFloat(e.target.value) || 0)}
-                placeholder="0"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-base font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#004b9b] focus:outline-none"
-              />
-            </div>
-
-            {/* bKash */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5 text-pink-600" />
-                <span>bKash</span>
-              </label>
-              <input
-                type="number"
-                id="input-pay-bkash"
-                min="0"
-                step="1"
-                value={bkash === 0 ? '' : bkash}
-                onChange={e => setBkash(parseFloat(e.target.value) || 0)}
-                placeholder="0"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-base font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#004b9b] focus:outline-none"
-              />
-            </div>
-
-            {/* Nagad */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <Smartphone className="w-3.5 h-3.5 text-orange-600" />
-                <span>Nagad</span>
-              </label>
-              <input
-                type="number"
-                id="input-pay-nagad"
-                min="0"
-                step="1"
-                value={nagad === 0 ? '' : nagad}
-                onChange={e => setNagad(parseFloat(e.target.value) || 0)}
-                placeholder="0"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-base font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#004b9b] focus:outline-none"
-              />
-            </div>
-
-            {/* Due (Receivable) */}
-            <div className="col-span-2 sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <UserX className="w-3.5 h-3.5 text-amber-600" />
-                <span>Due / Customer Credit {selectedCustomer ? `(${selectedCustomer})` : `(${activeSettlingTable.customer})`}</span>
-              </label>
-              <input
-                type="number"
-                id="input-pay-due"
-                min="0"
-                step="1"
-                value={due === 0 ? '' : due}
-                onChange={e => setDue(parseFloat(e.target.value) || 0)}
-                placeholder="0"
-                className="w-full px-3 py-2 bg-amber-50/60 border border-amber-300 rounded-lg text-base font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
+            {paymentMethods.map(m => {
+              const val = getMethodAmt(m.id);
+              const isCredit = m.type === 'CREDIT';
+              return (
+                <div key={m.id} className={isCredit ? 'col-span-2 sm:col-span-2' : ''}>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    {getMethodIcon(m)}
+                    <span className="truncate">{m.name} {isCredit && (selectedCustomer ? `(${selectedCustomer})` : `(${activeSettlingTable.customer})`)}</span>
+                  </label>
+                  <input
+                    type="number"
+                    id={`input-pay-${m.id}`}
+                    min="0"
+                    step="1"
+                    value={val === 0 ? '' : val}
+                    onChange={e => setMethodAmt(m.id, parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className={`w-full px-3 py-2 border rounded-lg text-base font-bold text-slate-900 focus:bg-white focus:ring-2 focus:outline-none ${
+                      isCredit
+                        ? 'bg-amber-50/60 border-amber-300 focus:ring-amber-500'
+                        : 'bg-slate-50 border-slate-300 focus:ring-[#004b9b]'
+                    }`}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* Customer Selection for Credit/Due Sales */}
-          {due > 0 && (
+          {creditEntered > 0 && (
             <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl space-y-2 animate-in fade-in">
               <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5">
                 <UserX className="w-3.5 h-3.5 text-amber-700" />

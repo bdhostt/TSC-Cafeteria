@@ -180,6 +180,7 @@ export const SalesLedgerView: React.FC = () => {
         bkash: sale.bkash || 0,
         nagad: sale.nagad || 0,
         due: sale.dueGiven || 0,
+        byMethod: sale.paymentBreakdown
       },
       changeReturn: sale.change || 0,
       isSettled: false,
@@ -302,6 +303,7 @@ export const SalesLedgerView: React.FC = () => {
         bkash: sale.bkash || 0,
         nagad: sale.nagad || 0,
         due: sale.dueGiven || 0,
+        byMethod: sale.paymentBreakdown
       },
       changeReturn: sale.change || 0,
       isSettled: true,
@@ -324,12 +326,24 @@ export const SalesLedgerView: React.FC = () => {
 
     const rowsHtml = filteredSales.map((s, idx) => {
       const active = isSaleActive(s);
-      const payments = [
-        s.cash ? `Cash: ৳${s.cash.toLocaleString()}` : '',
-        s.card ? `Card: ৳${s.card.toLocaleString()}` : '',
-        s.bkash ? `bKash: ৳${s.bkash.toLocaleString()}` : '',
-        s.nagad ? `Nagad: ৳${s.nagad.toLocaleString()}` : '',
-      ].filter(Boolean).join(', ');
+      let payments = '';
+      if (s.paymentBreakdown && Object.keys(s.paymentBreakdown).length > 0) {
+        payments = Object.entries(s.paymentBreakdown)
+          .filter(([_, amt]) => Number(amt) > 0)
+          .map(([mKey, amt]) => {
+            const mObj = (data.paymentMethods || []).find(m => m.id === mKey || m.name.toLowerCase() === mKey.toLowerCase());
+            return `${mObj?.name || mKey}: ৳${Number(amt).toLocaleString()}`;
+          })
+          .join(', ');
+      }
+      if (!payments) {
+        payments = [
+          s.cash ? `Cash: ৳${s.cash.toLocaleString()}` : '',
+          s.card ? `Card: ৳${s.card.toLocaleString()}` : '',
+          s.bkash ? `bKash: ৳${s.bkash.toLocaleString()}` : '',
+          s.nagad ? `Nagad: ৳${s.nagad.toLocaleString()}` : '',
+        ].filter(Boolean).join(', ');
+      }
 
       if (!active) {
         return `
@@ -639,12 +653,30 @@ export const SalesLedgerView: React.FC = () => {
                 </tr>
               ) : (
                 filteredSales.map(sale => {
-                  const paymentItems = [
-                    sale.cash ? { label: 'Cash', amt: sale.cash, color: 'text-emerald-700' } : null,
-                    sale.card ? { label: 'Card', amt: sale.card, color: 'text-blue-700' } : null,
-                    sale.bkash ? { label: 'bKash', amt: sale.bkash, color: 'text-pink-700' } : null,
-                    sale.nagad ? { label: 'Nagad', amt: sale.nagad, color: 'text-orange-700' } : null,
-                  ].filter(Boolean);
+                  let paymentItems: { label: string; amt: number; color: string }[] = [];
+                  if (sale.paymentBreakdown && Object.keys(sale.paymentBreakdown).length > 0) {
+                    paymentItems = Object.entries(sale.paymentBreakdown)
+                      .filter(([_, amt]) => Number(amt) > 0)
+                      .map(([mKey, amt]) => {
+                        const mObj = (data.paymentMethods || []).find(m => m.id === mKey || m.name.toLowerCase() === mKey.toLowerCase());
+                        const label = mObj?.name || mKey;
+                        let color = 'text-slate-800';
+                        if (mObj?.type === 'CASH') color = 'text-emerald-700';
+                        else if (mObj?.type === 'CARD') color = 'text-blue-700';
+                        else if (mObj?.type === 'MFS') color = label.toLowerCase().includes('nagad') ? 'text-orange-700' : 'text-pink-700';
+                        else if (mObj?.type === 'BANK') color = 'text-indigo-700';
+                        else if (mObj?.type === 'CREDIT') color = 'text-amber-700';
+                        return { label, amt: Number(amt), color };
+                      });
+                  }
+                  if (paymentItems.length === 0) {
+                    paymentItems = [
+                      sale.cash ? { label: 'Cash', amt: sale.cash, color: 'text-emerald-700' } : null,
+                      sale.card ? { label: 'Card', amt: sale.card, color: 'text-blue-700' } : null,
+                      sale.bkash ? { label: 'bKash', amt: sale.bkash, color: 'text-pink-700' } : null,
+                      sale.nagad ? { label: 'Nagad', amt: sale.nagad, color: 'text-orange-700' } : null,
+                    ].filter(Boolean) as any;
+                  }
 
                   const active = isSaleActive(sale);
 
@@ -1316,12 +1348,23 @@ export const SalesLedgerView: React.FC = () => {
                       ) : (
                         filteredSales.map((sale, idx) => {
                           const active = isSaleActive(sale);
-                          const payments = [
-                            sale.cash ? `Cash: ৳${sale.cash.toLocaleString()}` : '',
-                            sale.card ? `Card: ৳${sale.card.toLocaleString()}` : '',
-                            sale.bkash ? `bKash: ৳${sale.bkash.toLocaleString()}` : '',
-                            sale.nagad ? `Nagad: ৳${sale.nagad.toLocaleString()}` : '',
-                          ].filter(Boolean);
+                          let payments: string[] = [];
+                          if (sale.paymentBreakdown && Object.keys(sale.paymentBreakdown).length > 0) {
+                            payments = Object.entries(sale.paymentBreakdown)
+                              .filter(([_, amt]) => Number(amt) > 0)
+                              .map(([mKey, amt]) => {
+                                const mObj = (data.paymentMethods || []).find(m => m.id === mKey || m.name.toLowerCase() === mKey.toLowerCase());
+                                return `${mObj?.name || mKey}: ৳${Number(amt).toLocaleString()}`;
+                              });
+                          }
+                          if (payments.length === 0) {
+                            payments = [
+                              sale.cash ? `Cash: ৳${sale.cash.toLocaleString()}` : '',
+                              sale.card ? `Card: ৳${sale.card.toLocaleString()}` : '',
+                              sale.bkash ? `bKash: ৳${sale.bkash.toLocaleString()}` : '',
+                              sale.nagad ? `Nagad: ৳${sale.nagad.toLocaleString()}` : '',
+                            ].filter(Boolean);
+                          }
 
                           return (
                             <tr key={sale.id} className={active ? "hover:bg-slate-50/80" : "bg-rose-50/40 text-slate-500 hover:bg-rose-100/40"}>

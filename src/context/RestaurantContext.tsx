@@ -1307,9 +1307,17 @@ interface RestaurantContextType {
   closeSettleModal: () => void;
   settlePayment: (
     tableId: string, 
-    payments: { cash: number; card: number; bkash: number; nagad: number; due: number },
+    payments: { 
+      cash?: number; 
+      card?: number; 
+      bkash?: number; 
+      nagad?: number; 
+      due?: number; 
+      byMethod?: Record<string, number>; 
+    },
     waiterOverride?: string
   ) => void;
+  getMethodCollection: (method: PaymentMethodConfig | string) => number;
   
   printableReceipt: PrintableReceipt | null;
   setPrintableReceipt: (receipt: PrintableReceipt | null) => void;
@@ -3909,7 +3917,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const settlePayment = (
     tableId: string, 
-    payments: { cash: number; card: number; bkash: number; nagad: number; due: number },
+    payments: { 
+      cash?: number; 
+      card?: number; 
+      bkash?: number; 
+      nagad?: number; 
+      due?: number;
+      byMethod?: Record<string, number>;
+    },
     waiterOverride?: string
   ) => {
     if (!data.session || !data.session.isActive) {
@@ -3934,7 +3949,63 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const commissionAmount = agent ? Math.round((subtotal * commissionPercent) / 100) : 0;
     const netRestaurantRevenue = Math.max(0, netTotal - commissionAmount);
 
-    const totalEntered = payments.cash + payments.card + payments.bkash + payments.nagad + payments.due;
+    const methodList = (data.paymentMethods && data.paymentMethods.length > 0)
+      ? data.paymentMethods
+      : DEFAULT_PAYMENT_METHODS;
+
+    const paymentBreakdown: Record<string, number> = {};
+    let computedCash = 0;
+    let computedCard = 0;
+    let computedBkash = 0;
+    let computedNagad = 0;
+    let computedDue = 0;
+
+    if (payments.byMethod && Object.keys(payments.byMethod).length > 0) {
+      Object.entries(payments.byMethod).forEach(([mId, amt]) => {
+        const val = Number(amt) || 0;
+        if (val <= 0) return;
+        paymentBreakdown[mId] = val;
+        const targetMethod = methodList.find(m => m.id === mId || m.name.toLowerCase() === mId.toLowerCase());
+        if (targetMethod) {
+          paymentBreakdown[targetMethod.name] = val;
+          const norm = `${targetMethod.id} ${targetMethod.name} ${targetMethod.providerName || ''}`.toLowerCase();
+          if (targetMethod.type === 'CASH') {
+            computedCash += val;
+          } else if (targetMethod.type === 'CREDIT') {
+            computedDue += val;
+          } else if (targetMethod.type === 'CARD') {
+            computedCard += val;
+          } else if (targetMethod.type === 'MFS') {
+            if (norm.includes('nagad')) computedNagad += val;
+            else if (norm.includes('bkash')) computedBkash += val;
+            else computedBkash += val;
+          } else {
+            computedCard += val;
+          }
+        } else {
+          const norm = mId.toLowerCase();
+          if (norm.includes('cash')) computedCash += val;
+          else if (norm.includes('card')) computedCard += val;
+          else if (norm.includes('bkash')) computedBkash += val;
+          else if (norm.includes('nagad')) computedNagad += val;
+          else if (norm.includes('due')) computedDue += val;
+          else computedCard += val;
+        }
+      });
+    } else {
+      computedCash = Number(payments.cash) || 0;
+      computedCard = Number(payments.card) || 0;
+      computedBkash = Number(payments.bkash) || 0;
+      computedNagad = Number(payments.nagad) || 0;
+      computedDue = Number(payments.due) || 0;
+      paymentBreakdown['cash'] = computedCash;
+      paymentBreakdown['card'] = computedCard;
+      paymentBreakdown['bkash'] = computedBkash;
+      paymentBreakdown['nagad'] = computedNagad;
+      paymentBreakdown['due'] = computedDue;
+    }
+
+    const totalEntered = computedCash + computedCard + computedBkash + computedNagad + computedDue;
     if (totalEntered < netTotal) {
       alert(`Payment is incomplete! Remaining balance: ৳ ${(netTotal - totalEntered).toLocaleString()}`);
       return;
@@ -3947,7 +4018,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     const changeReturn = Math.max(0, totalEntered - netTotal);
-    const cashRetained = Math.max(0, payments.cash - changeReturn);
+    const cashRetained = Math.max(0, computedCash - changeReturn);
     const invoiceNo = 'POS-' + Date.now().toString().slice(-6);
     const today = (data.businessDay?.isOpen && data.businessDay.date) ? data.businessDay.date : (data.session?.startDate || new Date().toISOString().split('T')[0]);
     const itemSummary = table.cart.map(i => `${i.name} (${i.qty})`).join(', ');
@@ -3968,12 +4039,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       details: `${table.name} [Zone: ${table.zone || 'Floor 1'}] (W: ${assignedWaiter || 'N/A'}${agent ? `, Ch: ${agent.name}` : ''}): ${itemSummary}`,
       items: JSON.parse(JSON.stringify(table.cart)),
       cash: cashRetained,
-      card: payments.card,
-      bkash: payments.bkash,
-      nagad: payments.nagad,
-      dueGiven: payments.due,
-      dueCustomer: payments.due > 0 ? table.customer : '',
+      card: computedCard,
+      bkash: computedBkash,
+      nagad: computedNagad,
+      dueGiven: computedDue,
+      dueCustomer: computedDue > 0 ? table.customer : '',
       dueCollected: 0,
+      paymentBreakdown,
       change: changeReturn,
       total: netTotal,
       channelOrAgent: agent ? `${agent.name} (${agent.commissionPercent}%)` : (table.channelOrAgentId !== 'dine_in' ? table.channelOrAgentId : undefined),
@@ -4048,11 +4120,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       discountVal: table.discountVal,
       netTotal,
       paymentBreakdown: {
-        cash: payments.cash,
-        card: payments.card,
-        bkash: payments.bkash,
-        nagad: payments.nagad,
-        due: payments.due
+        cash: cashRetained,
+        card: computedCard,
+        bkash: computedBkash,
+        nagad: computedNagad,
+        due: computedDue,
+        byMethod: paymentBreakdown
       },
       changeReturn,
       isSettled: true,
@@ -6053,6 +6126,53 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return opening + journalEffect;
   };
 
+  const getMethodCollection = (methodOrId: PaymentMethodConfig | string): number => {
+    const methodList = (data.paymentMethods && data.paymentMethods.length > 0)
+      ? data.paymentMethods
+      : DEFAULT_PAYMENT_METHODS;
+
+    const methodObj = typeof methodOrId === 'string'
+      ? methodList.find(m => m.id === methodOrId || m.name.toLowerCase() === methodOrId.toLowerCase())
+      : methodOrId;
+    
+    const mId = typeof methodOrId === 'string' ? methodOrId : methodOrId.id;
+    const mName = methodObj?.name || mId;
+    const mType = methodObj?.type || 'OTHER';
+
+    return activeSalesList.reduce((sum, s) => {
+      // 1. Explicit dynamic paymentBreakdown entry
+      if (s.paymentBreakdown) {
+        if (s.paymentBreakdown[mId] !== undefined) {
+          return sum + (s.paymentBreakdown[mId] || 0);
+        }
+        if (s.paymentBreakdown[mName] !== undefined) {
+          return sum + (s.paymentBreakdown[mName] || 0);
+        }
+      }
+
+      // 2. Fallback matching for legacy sales records
+      const norm = `${mId} ${mName} ${methodObj?.providerName || ''}`.toLowerCase();
+      if (mType === 'CASH') {
+        return sum + (s.cash || 0);
+      }
+      if (mType === 'CREDIT') {
+        return sum + (s.dueGiven || 0);
+      }
+      if (mType === 'CARD') {
+        return sum + (s.card || 0);
+      }
+      if (mType === 'MFS') {
+        if (norm.includes('nagad')) return sum + (s.nagad || 0);
+        if (norm.includes('bkash')) return sum + (s.bkash || 0);
+        return sum + (s.bkash || 0) + (s.nagad || 0);
+      }
+      if (mType === 'BANK') {
+        return sum + (s.card || 0);
+      }
+      return sum;
+    }, 0);
+  };
+
   // Customer Advance Handlers
   const saveCustomerAdvance = (advance: Omit<CustomerAdvance, 'id'> & { id?: number }) => {
     setData(prev => {
@@ -6440,6 +6560,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       openSettleModal,
       closeSettleModal,
       settlePayment,
+      getMethodCollection,
       printableReceipt,
       setPrintableReceipt,
       openPrintBill,

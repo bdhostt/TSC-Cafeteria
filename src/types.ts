@@ -442,6 +442,7 @@ export interface SaleRecord {
   dueCustomer?: string;
   dueCollected: number;
   dueCollectedFrom?: string;
+  paymentBreakdown?: Record<string, number>;
   change: number;
   total: number;
   sessionId?: string;
@@ -734,6 +735,7 @@ export interface PrintableReceipt {
     bkash?: number;
     nagad?: number;
     due?: number;
+    byMethod?: Record<string, number>;
   };
   changeReturn?: number;
   isSettled: boolean;

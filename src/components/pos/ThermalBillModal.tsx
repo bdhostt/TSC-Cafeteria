@@ -724,11 +724,21 @@ export const ThermalBillModal: React.FC = () => {
     const pb = printableReceipt.paymentBreakdown;
     if (pb && activeTemplate?.showPaymentBreakdown !== false) {
       lines.push(divider);
-      if (pb.cash > 0) lines.push(line2Col('Cash Paid:', Number(pb.cash).toFixed(2), width));
-      if (pb.card > 0) lines.push(line2Col('Card Paid:', Number(pb.card).toFixed(2), width));
-      if (pb.bkash > 0) lines.push(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2), width));
-      if (pb.nagad > 0) lines.push(line2Col('Nagad Paid:', Number(pb.nagad).toFixed(2), width));
-      if (pb.due > 0) lines.push(line2Col('Due / Credit:', Number(pb.due).toFixed(2), width));
+      if (pb.byMethod && Object.keys(pb.byMethod).length > 0) {
+        Object.entries(pb.byMethod).forEach(([mKey, amt]) => {
+          if (Number(amt) > 0) {
+            const methodObj = (data?.paymentMethods || []).find(m => m.id === mKey || m.name.toLowerCase() === mKey.toLowerCase());
+            const mName = methodObj?.name || mKey;
+            lines.push(line2Col(`${mName} Paid:`, Number(amt).toFixed(2), width));
+          }
+        });
+      } else {
+        if (pb.cash > 0) lines.push(line2Col('Cash Paid:', Number(pb.cash).toFixed(2), width));
+        if (pb.card > 0) lines.push(line2Col('Card Paid:', Number(pb.card).toFixed(2), width));
+        if (pb.bkash > 0) lines.push(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2), width));
+        if (pb.nagad > 0) lines.push(line2Col('Nagad Paid:', Number(pb.nagad).toFixed(2), width));
+        if (pb.due > 0) lines.push(line2Col('Due / Credit:', Number(pb.due).toFixed(2), width));
+      }
       if (printableReceipt.changeReturn && printableReceipt.changeReturn > 0) {
         lines.push(line2Col('Change Return:', Number(printableReceipt.changeReturn).toFixed(2), width));
       }
@@ -1370,36 +1380,53 @@ export const ThermalBillModal: React.FC = () => {
               {activeTemplate?.showPaymentBreakdown !== false && printableReceipt.paymentBreakdown && (
                 <div className="py-2 text-[11px] border-b border-dashed border-slate-300 space-y-1">
                   <div className="text-slate-500 font-semibold mb-1">Payment Method Details:</div>
-                  {printableReceipt.paymentBreakdown.cash ? (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">Cash Received:</span>
-                      <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.cash).toFixed(2)}</span>
-                    </div>
-                  ) : null}
-                  {printableReceipt.paymentBreakdown.card ? (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">Card:</span>
-                      <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.card).toFixed(2)}</span>
-                    </div>
-                  ) : null}
-                  {printableReceipt.paymentBreakdown.bkash ? (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">bKash:</span>
-                      <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.bkash).toFixed(2)}</span>
-                    </div>
-                  ) : null}
-                  {printableReceipt.paymentBreakdown.nagad ? (
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">Nagad:</span>
-                      <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.nagad).toFixed(2)}</span>
-                    </div>
-                  ) : null}
-                  {printableReceipt.paymentBreakdown.due ? (
-                    <div className="flex justify-between items-center text-amber-800 font-bold">
-                      <span>Customer Due:</span>
-                      <span className="font-mono font-bold">৳{Number(printableReceipt.paymentBreakdown.due).toFixed(2)}</span>
-                    </div>
-                  ) : null}
+                  {printableReceipt.paymentBreakdown.byMethod && Object.keys(printableReceipt.paymentBreakdown.byMethod).length > 0 ? (
+                    Object.entries(printableReceipt.paymentBreakdown.byMethod).map(([mKey, amt]) => {
+                      if (!amt || Number(amt) <= 0) return null;
+                      const methodObj = (data?.paymentMethods || []).find(m => m.id === mKey || m.name.toLowerCase() === mKey.toLowerCase());
+                      const mName = methodObj?.name || mKey;
+                      const isDue = methodObj?.type === 'CREDIT' || mName.toLowerCase().includes('due');
+                      return (
+                        <div key={mKey} className={`flex justify-between items-center ${isDue ? 'text-amber-800 font-bold' : ''}`}>
+                          <span className={isDue ? '' : 'text-slate-600'}>{mName}:</span>
+                          <span className="font-mono font-semibold text-slate-800">৳{Number(amt).toFixed(2)}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <>
+                      {printableReceipt.paymentBreakdown.cash ? (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600">Cash Received:</span>
+                          <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.cash).toFixed(2)}</span>
+                        </div>
+                      ) : null}
+                      {printableReceipt.paymentBreakdown.card ? (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600">Card:</span>
+                          <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.card).toFixed(2)}</span>
+                        </div>
+                      ) : null}
+                      {printableReceipt.paymentBreakdown.bkash ? (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600">bKash:</span>
+                          <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.bkash).toFixed(2)}</span>
+                        </div>
+                      ) : null}
+                      {printableReceipt.paymentBreakdown.nagad ? (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600">Nagad:</span>
+                          <span className="font-mono font-semibold text-slate-800">৳{Number(printableReceipt.paymentBreakdown.nagad).toFixed(2)}</span>
+                        </div>
+                      ) : null}
+                      {printableReceipt.paymentBreakdown.due ? (
+                        <div className="flex justify-between items-center text-amber-800 font-bold">
+                          <span>Customer Due:</span>
+                          <span className="font-mono font-bold">৳{Number(printableReceipt.paymentBreakdown.due).toFixed(2)}</span>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
                   {printableReceipt.changeReturn !== undefined && printableReceipt.changeReturn > 0 && (
                     <div className="flex justify-between items-center font-bold text-emerald-800 pt-1 border-t border-slate-200">
                       <span>Change Given:</span>

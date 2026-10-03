@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { 
   ShoppingCart, 
   Receipt, 
@@ -18,7 +18,13 @@ import {
 } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
-  const { data, metrics, setActiveTab, setPosView, setIsStartSessionModalOpen } = useRestaurant();
+  const { data, metrics, setActiveTab, setPosView, setIsStartSessionModalOpen, getMethodCollection } = useRestaurant();
+
+  const activePaymentMethods = (
+    data.paymentMethods && data.paymentMethods.length > 0
+      ? data.paymentMethods
+      : DEFAULT_PAYMENT_METHODS
+  ).filter(m => m.isActive !== false);
 
   // Format today's date nicely
   const todayFormatted = new Date().toLocaleDateString('en-US', {
@@ -327,43 +333,54 @@ export const DashboardView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Payment Method Collection Breakdown */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
-          <h3 className="font-extrabold text-slate-900 text-xs flex items-center gap-2 mb-4">
-            <CreditCard className="w-4 h-4 text-emerald-600" />
-            <span>Payment Method Breakdown</span>
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-extrabold text-slate-900 text-xs flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-emerald-600" />
+              <span>Payment Method Breakdown</span>
+            </h3>
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+              {activePaymentMethods.length} Methods
+            </span>
+          </div>
 
-          <div className="space-y-2.5">
-            <div className="p-2.5 rounded-lg bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-700 font-medium flex items-center gap-1.5">
-                <span>💵</span>
-                <span>Cash Collection:</span>
-              </span>
-              <span className="font-extrabold text-slate-900">৳ {metrics.payCash.toLocaleString()}</span>
-            </div>
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {activePaymentMethods.map(m => {
+              const amount = getMethodCollection ? getMethodCollection(m) : 0;
+              const nameLower = (m.name + ' ' + (m.providerName || '')).toLowerCase();
+              let icon = '⚡';
+              let badgeColor = 'text-slate-900';
+              if (m.type === 'CASH') {
+                icon = '💵';
+                badgeColor = 'text-emerald-700';
+              } else if (m.type === 'CARD') {
+                icon = '💳';
+                badgeColor = 'text-blue-700';
+              } else if (m.type === 'MFS') {
+                if (nameLower.includes('nagad')) {
+                  icon = '👛';
+                  badgeColor = 'text-orange-700';
+                } else {
+                  icon = '📱';
+                  badgeColor = 'text-pink-700';
+                }
+              } else if (m.type === 'BANK') {
+                icon = '🏛️';
+                badgeColor = 'text-indigo-700';
+              } else if (m.type === 'CREDIT') {
+                icon = '⏳';
+                badgeColor = 'text-amber-700';
+              }
 
-            <div className="p-2.5 rounded-lg bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-700 font-medium flex items-center gap-1.5">
-                <span>💳</span>
-                <span>Card Collection:</span>
-              </span>
-              <span className="font-extrabold text-blue-900">৳ {metrics.payCard.toLocaleString()}</span>
-            </div>
-
-            <div className="p-2.5 rounded-lg bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-700 font-medium flex items-center gap-1.5">
-                <span>📱</span>
-                <span>bKash Collection:</span>
-              </span>
-              <span className="font-extrabold text-pink-900">৳ {metrics.payBkash.toLocaleString()}</span>
-            </div>
-
-            <div className="p-2.5 rounded-lg bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-700 font-medium flex items-center gap-1.5">
-                <span>👛</span>
-                <span>Nagad Collection:</span>
-              </span>
-              <span className="font-extrabold text-slate-900">৳ {metrics.payNagad.toLocaleString()}</span>
-            </div>
+              return (
+                <div key={m.id} className="p-2.5 rounded-lg bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs hover:bg-slate-100/60 transition">
+                  <span className="text-slate-700 font-medium flex items-center gap-1.5 truncate">
+                    <span>{icon}</span>
+                    <span className="truncate">{m.name} Collection:</span>
+                  </span>
+                  <span className={`font-extrabold ${badgeColor} shrink-0`}>৳ {amount.toLocaleString()}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
