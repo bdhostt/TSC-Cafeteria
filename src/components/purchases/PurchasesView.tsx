@@ -103,6 +103,7 @@ export const PurchasesView: React.FC = () => {
 
   // --- Supplier Return Modal States ---
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [viewingReturn, setViewingReturn] = useState<PurchaseReturn | null>(null);
   const [returnNo, setReturnNo] = useState('');
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
   const [returnVendor, setReturnVendor] = useState(data.vendors[0] || 'Kader Meat Supply');
@@ -1023,7 +1024,12 @@ export const PurchasesView: React.FC = () => {
                     const due = Math.max(0, voucher.total - paid - billAdjustedReturn);
 
                     return (
-                      <tr key={voucher.id} className="hover:bg-slate-50 transition">
+                      <tr 
+                        key={voucher.id} 
+                        onDoubleClick={() => setViewingVoucher(voucher)}
+                        title="Double-click to view Voucher Memo"
+                        className="hover:bg-slate-50 transition cursor-pointer select-none"
+                      >
                         <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{voucher.date}</td>
                         <td className="py-3 px-4 font-mono font-bold text-slate-900">{voucher.billNo}</td>
                         <td className="py-3 px-4 font-extrabold text-slate-900">{voucher.vendor}</td>
@@ -1139,7 +1145,12 @@ export const PurchasesView: React.FC = () => {
                     </tr>
                   ) : (
                     filteredPOs.map(po => (
-                      <tr key={po.id} className="hover:bg-slate-50 transition">
+                      <tr 
+                        key={po.id} 
+                        onDoubleClick={() => setViewingPo(po)}
+                        title="Double-click to view PO Memo"
+                        className="hover:bg-slate-50 transition cursor-pointer select-none"
+                      >
                         <td className="py-3 px-4 font-mono font-extrabold text-blue-700">{po.poNo}</td>
                         <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{po.date}</td>
                         <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{po.expectedDate || 'N/A'}</td>
@@ -1232,7 +1243,12 @@ export const PurchasesView: React.FC = () => {
                   </tr>
                 ) : (
                   filteredReturns.map(ret => (
-                    <tr key={ret.id} className="hover:bg-slate-50 transition">
+                    <tr 
+                      key={ret.id} 
+                      onDoubleClick={() => setViewingReturn(ret)}
+                      title="Double-click to view Return Note"
+                      className="hover:bg-slate-50 transition cursor-pointer select-none group"
+                    >
                       <td className="py-3 px-4 font-mono font-extrabold text-rose-700">{ret.returnNo}</td>
                       <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{ret.date}</td>
                       <td className="py-3 px-4 font-extrabold text-slate-900">{ret.vendor}</td>
@@ -1255,13 +1271,22 @@ export const PurchasesView: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => deletePurchaseReturn(ret.id)}
-                          className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
-                          title="Delete Return Record"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => setViewingReturn(ret)}
+                            className="p-1.5 text-blue-600 hover:text-blue-800 rounded hover:bg-blue-50 cursor-pointer"
+                            title="View Return Note"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deletePurchaseReturn(ret.id)}
+                            className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
+                            title="Delete Return Record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -2907,6 +2932,158 @@ export const PurchasesView: React.FC = () => {
                 className="w-full py-2 bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: VIEW SUPPLIER RETURN DEBIT NOTE ================= */}
+      {viewingReturn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-rose-100 text-rose-700 rounded-2xl shadow-2xs">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base leading-tight">
+                    Supplier Return Memo / Debit Note
+                  </h3>
+                  <span className="font-mono font-bold text-xs text-rose-600">
+                    {viewingReturn.returnNo}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => window.print()}
+                  className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer transition"
+                  title="Print Debit Note"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewingReturn(null)}
+                  className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="py-4 space-y-3.5 text-xs">
+              {/* Meta Grid */}
+              <div className="grid grid-cols-2 gap-2.5 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                <div>
+                  <span className="text-[10px] text-slate-500 font-bold block">Return Date</span>
+                  <strong className="text-slate-900 font-extrabold">{viewingReturn.date}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 font-bold block">Vendor / Supplier</span>
+                  <strong className="text-slate-900 font-black">{viewingReturn.vendor}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 font-bold block">Original Bill / Invoice</span>
+                  <strong className="text-slate-900 font-mono font-bold">{viewingReturn.billNo || 'Direct / None'}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 font-bold block">Settlement Status</span>
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide ${
+                    viewingReturn.refundStatus === 'REFUNDED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                    viewingReturn.refundStatus === 'ADJUSTED' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                    'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {viewingReturn.refundStatus}
+                  </span>
+                </div>
+              </div>
+
+              {/* Returned Material Detail Table */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-3 font-bold">Returned Item</th>
+                      <th className="py-2.5 px-2 font-bold text-center">Quantity</th>
+                      <th className="py-2.5 px-2 font-bold text-right">Unit Rate</th>
+                      <th className="py-2.5 px-3 font-bold text-right">Total (৳)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-3 font-extrabold text-slate-900">
+                        {viewingReturn.item}
+                      </td>
+                      <td className="py-3 px-2 text-center font-bold text-slate-700">
+                        {viewingReturn.qty} {viewingReturn.uom}
+                      </td>
+                      <td className="py-3 px-2 text-right text-slate-600 font-semibold">
+                        ৳ {viewingReturn.rate.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-3 text-right font-black text-rose-600 text-sm">
+                        ৳ {viewingReturn.total.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Return Reason */}
+              <div className="p-3 bg-rose-50/70 rounded-2xl border border-rose-200">
+                <span className="text-[10px] text-rose-800 font-extrabold uppercase tracking-wider block mb-1">
+                  Reason for Return
+                </span>
+                <p className="text-slate-800 font-medium text-xs leading-relaxed">
+                  {viewingReturn.reason || 'Returned to supplier'}
+                </p>
+              </div>
+
+              {/* Status Explanation */}
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
+                {viewingReturn.refundStatus === 'ADJUSTED' && (
+                  <p>
+                    ℹ️ <strong>Auto-Adjusted:</strong> ৳{viewingReturn.total.toLocaleString()} has been automatically adjusted against <strong>{viewingReturn.vendor}</strong>'s bill and deducted from the payable ledger.
+                  </p>
+                )}
+                {viewingReturn.refundStatus === 'REFUNDED' && (
+                  <p>
+                    ℹ️ <strong>Cash/Bank Refund:</strong> A direct refund of ৳{viewingReturn.total.toLocaleString()} was received from <strong>{viewingReturn.vendor}</strong>.
+                  </p>
+                )}
+                {viewingReturn.refundStatus === 'PENDING' && (
+                  <p>
+                    ℹ️ <strong>Pending Claim:</strong> Awaiting supplier credit note confirmation or replacement goods.
+                  </p>
+                )}
+              </div>
+
+              {/* Grand Total */}
+              <div className="p-3.5 bg-slate-900 text-white rounded-2xl flex items-center justify-between shadow-xs">
+                <span className="text-xs font-bold text-slate-300">Total Return Credit Amount:</span>
+                <span className="text-lg font-black text-rose-400">
+                  ৳ {viewingReturn.total.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 flex gap-3">
+              <button
+                onClick={() => window.print()}
+                className="py-2.5 px-4 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 flex items-center justify-center gap-1.5 cursor-pointer transition"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Slip</span>
+              </button>
+              <button
+                onClick={() => setViewingReturn(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-xs transition"
+              >
+                Close Memo
               </button>
             </div>
           </div>
