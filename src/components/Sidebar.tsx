@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRestaurant, getModuleForTab } from '../context/RestaurantContext';
+import { useRestaurant, getModuleForTab, DEFAULT_PAYMENT_METHODS } from '../context/RestaurantContext';
 import { ActiveTab } from '../types';
 import { 
   LayoutDashboard, 
@@ -343,6 +343,26 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
           icon: Scale,
           badge: (data.journalEntries || []).length,
           badgeColor: 'bg-purple-500/20 text-purple-300'
+        },
+        {
+          id: 'acc-chart-of-accounts',
+          tabId: 'heads',
+          subNav: 'coa',
+          label: 'Chart of Accounts (COA)',
+          subLabel: 'General Ledger Heads & Assets',
+          icon: BookOpen,
+          badge: (data.chartOfAccounts || []).length || 17,
+          badgeColor: 'bg-emerald-500/20 text-emerald-300'
+        },
+        {
+          id: 'acc-payment-methods',
+          tabId: 'heads',
+          subNav: 'payments',
+          label: 'Payment Methods (3)',
+          subLabel: 'Cash, MFS, Cards & QR Gateways',
+          icon: CreditCard,
+          badge: (data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS).filter(m => m.isActive !== false).length,
+          badgeColor: 'bg-amber-500/20 text-amber-300'
         },
         {
           id: 'gen-ledger-rep',
@@ -702,6 +722,9 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
               if (i.tabId === 'reports') {
                 return activeTab === 'reports' && !activeSubNav;
               }
+              if (i.tabId === 'heads') {
+                return activeTab === 'heads' && (!activeSubNav || activeSubNav === 'profile' || activeSubNav === 'heads');
+              }
               return activeTab === i.tabId;
             });
 
@@ -756,7 +779,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
                       const ItemIcon = item.icon;
                       const isItemActive = item.subNav 
                         ? (activeTab === item.tabId && activeSubNav === item.subNav)
-                        : (activeTab === item.tabId && (!activeSubNav || activeTab !== 'reports'));
+                        : (activeTab === item.tabId && (item.tabId === 'heads' ? (!activeSubNav || activeSubNav === 'profile' || activeSubNav === 'heads') : (!activeSubNav || activeTab !== 'reports')));
 
                       return (
                         <button

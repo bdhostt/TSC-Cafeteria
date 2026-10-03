@@ -68,11 +68,44 @@ export const HeadsConfigView: React.FC = () => {
     addCommissionAgent,
     updateCommissionAgent,
     deleteCommissionAgent,
+    activeSubNav,
+    setActiveSubNav,
     language,
     t
   } = useRestaurant();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments'>(() => {
+    if (activeSubNav === 'coa' || activeSubNav === 'chart-of-accounts') return 'coa';
+    if (activeSubNav === 'payments' || activeSubNav === 'payment-methods') return 'payments';
+    if (activeSubNav === 'heads') return 'heads';
+    if (activeSubNav === 'agents') return 'agents';
+    if (activeSubNav === 'printers') return 'printers';
+    if (activeSubNav === 'templates') return 'templates';
+    return 'profile';
+  });
+
+  React.useEffect(() => {
+    if (activeSubNav === 'coa' || activeSubNav === 'chart-of-accounts') {
+      setActiveTab('coa');
+    } else if (activeSubNav === 'payments' || activeSubNav === 'payment-methods') {
+      setActiveTab('payments');
+    } else if (activeSubNav === 'profile') {
+      setActiveTab('profile');
+    } else if (activeSubNav === 'heads') {
+      setActiveTab('heads');
+    } else if (activeSubNav === 'agents') {
+      setActiveTab('agents');
+    } else if (activeSubNav === 'printers') {
+      setActiveTab('printers');
+    } else if (activeSubNav === 'templates') {
+      setActiveTab('templates');
+    }
+  }, [activeSubNav]);
+
+  const switchTab = (tab: 'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments') => {
+    setActiveTab(tab);
+    setActiveSubNav(tab);
+  };
 
   // Commission Agent Modal State
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
@@ -507,7 +540,7 @@ export const HeadsConfigView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
           <button
             type="button"
-            onClick={() => setActiveTab('profile')}
+            onClick={() => switchTab('profile')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'profile'
                 ? 'bg-[#004b9b] text-white shadow-xs'
@@ -519,7 +552,7 @@ export const HeadsConfigView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('heads')}
+            onClick={() => switchTab('heads')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'heads'
                 ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
@@ -531,7 +564,7 @@ export const HeadsConfigView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('coa')}
+            onClick={() => switchTab('coa')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'coa'
                 ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
@@ -543,7 +576,7 @@ export const HeadsConfigView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('agents')}
+            onClick={() => switchTab('agents')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'agents'
                 ? 'bg-[#004b9b] text-white font-black shadow-xs'
@@ -555,7 +588,7 @@ export const HeadsConfigView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('printers')}
+            onClick={() => switchTab('printers')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'printers'
                 ? 'bg-slate-900 text-amber-400 shadow-xs'
@@ -567,7 +600,7 @@ export const HeadsConfigView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('templates')}
+            onClick={() => switchTab('templates')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'templates'
                 ? 'bg-slate-900 text-amber-400 shadow-xs'
@@ -579,7 +612,7 @@ export const HeadsConfigView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('payments')}
+            onClick={() => switchTab('payments')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
               activeTab === 'payments'
                 ? 'bg-slate-900 text-amber-400 shadow-xs'
