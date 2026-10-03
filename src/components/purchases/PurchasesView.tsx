@@ -31,8 +31,17 @@ import {
   CreditCard,
   Phone,
   Tag,
-  Receipt
+  Receipt,
+  Pencil
 } from 'lucide-react';
+
+const SUPPLIER_CONTACTS_KEY = 'tsc_supplier_contacts_v1';
+
+interface SupplierContactInfo {
+  phone?: string;
+  contactPerson?: string;
+  address?: string;
+}
 
 export const PurchasesView: React.FC = () => {
   const { 
@@ -46,6 +55,7 @@ export const PurchasesView: React.FC = () => {
     savePurchaseReturn,
     deletePurchaseReturn,
     addConfigItem,
+    editConfigItem,
     settlePurchaseBill,
     currentUser
   } = useRestaurant();
@@ -103,9 +113,54 @@ export const PurchasesView: React.FC = () => {
   const [returnReason, setReturnReason] = useState('Damaged packaging or quality mismatch on delivery');
   const [refundStatus, setRefundStatus] = useState<'REFUNDED' | 'ADJUSTED' | 'PENDING'>('ADJUSTED');
 
-  // --- Vendor Add Modal State ---
+  // --- Vendor Contacts & Directory States ---
+  const [supplierContacts, setSupplierContacts] = useState<Record<string, SupplierContactInfo>>(() => {
+    try {
+      const saved = localStorage.getItem(SUPPLIER_CONTACTS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return {};
+  });
+
+  const saveSupplierContact = (vendorName: string, info: SupplierContactInfo, oldVendorName?: string) => {
+    setSupplierContacts(prev => {
+      const next = { ...prev };
+      if (oldVendorName && oldVendorName !== vendorName) {
+        delete next[oldVendorName];
+      }
+      next[vendorName] = { ...next[vendorName], ...info };
+      try {
+        localStorage.setItem(SUPPLIER_CONTACTS_KEY, JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
+
+  const getSupplierPhone = (vendorName: string, idx: number) => {
+    if (supplierContacts[vendorName]?.phone) {
+      return supplierContacts[vendorName].phone!;
+    }
+    return `017${(56007600 + idx * 111111).toString().slice(0, 8)}`;
+  };
+
+  // --- Vendor Add & Edit Modal States ---
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorPhone, setNewVendorPhone] = useState('');
+  const [newVendorContactPerson, setNewVendorContactPerson] = useState('');
+  const [newVendorAddress, setNewVendorAddress] = useState('');
+
+  const [editingVendor, setEditingVendor] = useState<{
+    originalName: string;
+    name: string;
+    phone: string;
+    contactPerson: string;
+    address: string;
+  } | null>(null);
 
   // --- SUPPLIER LEDGER & BILL-WISE PAYMENT MODAL STATES ---
   const [selectedSupplierLedger, setSelectedSupplierLedger] = useState<string | null>(null);
@@ -538,9 +593,54 @@ export const PurchasesView: React.FC = () => {
   const handleAddVendor = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVendorName.trim()) return;
-    addConfigItem('vendors', newVendorName.trim());
+    const trimmed = newVendorName.trim();
+    addConfigItem('vendors', trimmed);
+    if (newVendorPhone.trim() || newVendorContactPerson.trim() || newVendorAddress.trim()) {
+      saveSupplierContact(trimmed, {
+        phone: newVendorPhone.trim(),
+        contactPerson: newVendorContactPerson.trim(),
+        address: newVendorAddress.trim()
+      });
+    }
     setNewVendorName('');
+    setNewVendorPhone('');
+    setNewVendorContactPerson('');
+    setNewVendorAddress('');
     setIsVendorModalOpen(false);
+  };
+
+  const handleOpenEditVendor = (vendorName: string, defaultPhone: string) => {
+    const contact = supplierContacts[vendorName];
+    setEditingVendor({
+      originalName: vendorName,
+      name: vendorName,
+      phone: contact?.phone || defaultPhone,
+      contactPerson: contact?.contactPerson || '',
+      address: contact?.address || ''
+    });
+  };
+
+  const handleSaveEditVendor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor || !editingVendor.name.trim()) return;
+
+    const trimmedName = editingVendor.name.trim();
+    const vendorIndex = data.vendors.indexOf(editingVendor.originalName);
+
+    if (vendorIndex >= 0 && trimmedName !== editingVendor.originalName) {
+      editConfigItem('vendors', vendorIndex, trimmedName);
+      if (selectedSupplierLedger === editingVendor.originalName) {
+        setSelectedSupplierLedger(trimmedName);
+      }
+    }
+
+    saveSupplierContact(trimmedName, {
+      phone: editingVendor.phone.trim(),
+      contactPerson: editingVendor.contactPerson.trim(),
+      address: editingVendor.address.trim()
+    }, editingVendor.originalName);
+
+    setEditingVendor(null);
   };
 
   const handleSettleVendorPayment = (e: React.FormEvent) => {
@@ -579,6 +679,14 @@ export const PurchasesView: React.FC = () => {
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
     return r.returnNo.toLowerCase().includes(q) || r.vendor.toLowerCase().includes(q) || r.item.toLowerCase().includes(q);
+  });
+
+  const filteredVendors = data.vendors.filter((v, idx) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    const phone = getSupplierPhone(v, idx);
+    const contactPerson = supplierContacts[v]?.contactPerson || '';
+    return v.toLowerCase().includes(q) || phone.toLowerCase().includes(q) || contactPerson.toLowerCase().includes(q);
   });
 
   // Calculate Ledger Data for Selected Supplier (matching screenshot)
@@ -1147,9 +1255,15 @@ export const PurchasesView: React.FC = () => {
 
       {/* ================= TAB 4: SUPPLIERS DIRECTORY ================= */}
       {activeTab === 'vendors' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.vendors.map((v, idx) => {
+        <div className="space-y-3">
+          {filteredVendors.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400">
+              No suppliers found matching "{search}".
+            </div>
+          ) : (
+            filteredVendors.map((v) => {
+              const originalIndex = data.vendors.indexOf(v);
+              const idx = originalIndex >= 0 ? originalIndex : 0;
               const vendorBills = data.purchases.filter(p => p.vendor === v);
               const vendorPos = (data.purchaseOrders || []).filter(p => p.vendor === v && p.status === 'PENDING');
 
@@ -1157,67 +1271,93 @@ export const PurchasesView: React.FC = () => {
               const vendorPaid = vendorBills.reduce((sum, b) => sum + (b.paid !== undefined ? b.paid : (b.paymentType === 'CASH' ? b.total : 0)), 0);
               const vendorAdjustedReturns = (data.purchaseReturns || []).filter(r => r.vendor === v && r.refundStatus === 'ADJUSTED').reduce((sum, r) => sum + r.total, 0);
               const vendorDues = Math.max(0, totalVendorPurchase - vendorPaid - vendorAdjustedReturns);
-              const phoneMock = `017${(56007600 + idx * 111111).toString().slice(0, 8)}`;
+              const phoneMock = getSupplierPhone(v, idx);
+              const contactInfo = supplierContacts[v];
 
               return (
-                <div key={v} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3 flex flex-col justify-between hover:shadow-md transition">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-blue-600 text-white rounded-2xl font-bold shadow-xs">
-                          <Building2 className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-extrabold text-base text-slate-900">{v}</h4>
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-extrabold rounded-full border border-blue-200">
-                              Raw Materials Supplier
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-1">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{phoneMock}</span>
-                          </div>
-                        </div>
-                      </div>
+                <div
+                  key={v}
+                  className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                >
+                  {/* Left Column: Supplier Identity & Contact */}
+                  <div className="flex items-center gap-3.5 min-w-[280px]">
+                    <div className="p-3 bg-blue-600 text-white rounded-2xl font-bold shadow-xs shrink-0">
+                      <Building2 className="w-6 h-6" />
                     </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200">
-                      <div>
-                        <span className="text-[10px] text-slate-500 font-bold block">Received Bills</span>
-                        <strong className="text-slate-900">{vendorBills.length} Invoices</strong>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-extrabold text-base text-slate-900">{v}</h4>
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-extrabold rounded-full border border-blue-200">
+                          Raw Materials Supplier
+                        </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 font-bold block">Pending Orders</span>
-                        <strong className="text-amber-700">{vendorPos.length} POs</strong>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="font-semibold text-slate-700">{phoneMock}</span>
+                        </div>
+                        {contactInfo?.contactPerson && (
+                          <span className="text-slate-500 font-medium">• Contact: {contactInfo.contactPerson}</span>
+                        )}
+                        {contactInfo?.address && (
+                          <span className="text-slate-400 hidden xl:inline">• {contactInfo.address}</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  {/* Middle Column: Operational Stats */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 text-xs bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 min-w-[290px] lg:max-w-md w-full lg:w-auto">
                     <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Received Bills</span>
+                      <strong className="text-slate-900 font-extrabold">{vendorBills.length} Invoices</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Pending Orders</span>
+                      <strong className="text-amber-700 font-extrabold">{vendorPos.length} POs</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Total Purchases</span>
+                      <strong className="text-blue-700 font-extrabold">৳ {totalVendorPurchase.toLocaleString()}</strong>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Payable Balance & Actions */}
+                  <div className="flex items-center justify-between lg:justify-end gap-3 sm:gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                    <div className="text-left lg:text-right min-w-[125px]">
                       <span className="text-[10px] font-bold text-slate-500 block">Balance Payable Due</span>
-                      <strong className={`text-base font-extrabold ${vendorDues > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      <strong className={`text-base font-black ${vendorDues > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                         ৳ {vendorDues.toLocaleString()}
                       </strong>
                     </div>
 
-                    <button
-                      id={`btn-view-ledger-${v.replace(/\s+/g, '-').toLowerCase()}`}
-                      onClick={() => {
-                        setSelectedSupplierLedger(v);
-                        setLedgerFilter('ALL');
-                      }}
-                      className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Receipt className="w-4 h-4" />
-                      <span>View Bills & Ledger</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenEditVendor(v, phoneMock)}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center gap-1.5 cursor-pointer shadow-2xs hover:border-slate-400"
+                        title="Edit Supplier Details"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        id={`btn-view-ledger-${v.replace(/\s+/g, '-').toLowerCase()}`}
+                        onClick={() => {
+                          setSelectedSupplierLedger(v);
+                          setLedgerFilter('ALL');
+                        }}
+                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                      >
+                        <Receipt className="w-4 h-4" />
+                        <span>View Bills & Ledger</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
-            })}
-          </div>
+            })
+          )}
         </div>
       )}
 
@@ -2435,7 +2575,10 @@ export const PurchasesView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 text-sm">Add New Registered Supplier</h3>
+              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-emerald-600" />
+                <span>Add New Registered Supplier</span>
+              </h3>
               <button onClick={() => setIsVendorModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
@@ -2449,8 +2592,41 @@ export const PurchasesView: React.FC = () => {
                   required
                   value={newVendorName}
                   onChange={e => setNewVendorName(e.target.value)}
-                  placeholder="e.g. Ali / Bengal Meat / Dhaka Poultry"
+                  placeholder="e.g. Haji And Sons / Bengal Meat"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Contact Phone Number</label>
+                <input
+                  type="text"
+                  value={newVendorPhone}
+                  onChange={e => setNewVendorPhone(e.target.value)}
+                  placeholder="e.g. 01756007600"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Contact Person (Optional)</label>
+                <input
+                  type="text"
+                  value={newVendorContactPerson}
+                  onChange={e => setNewVendorContactPerson(e.target.value)}
+                  placeholder="e.g. Md. Rafiqul Islam"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Address / Note (Optional)</label>
+                <input
+                  type="text"
+                  value={newVendorAddress}
+                  onChange={e => setNewVendorAddress(e.target.value)}
+                  placeholder="e.g. Kawran Bazar, Dhaka"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
                 />
               </div>
 
@@ -2464,9 +2640,91 @@ export const PurchasesView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer"
+                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs"
                 >
                   Add Supplier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT REGISTERED SUPPLIER ================= */}
+      {editingVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-blue-600" />
+                <span>Edit Supplier Details</span>
+              </h3>
+              <button onClick={() => setEditingVendor(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditVendor} className="py-3 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Supplier / Vendor Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingVendor.name}
+                  onChange={e => setEditingVendor(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Note: Renaming will automatically update all matching purchase bills, orders, and returns.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Contact Phone Number</label>
+                <input
+                  type="text"
+                  value={editingVendor.phone}
+                  onChange={e => setEditingVendor(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                  placeholder="e.g. 01756007600"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Contact Person (Optional)</label>
+                <input
+                  type="text"
+                  value={editingVendor.contactPerson}
+                  onChange={e => setEditingVendor(prev => prev ? { ...prev, contactPerson: e.target.value } : null)}
+                  placeholder="e.g. Md. Rafiqul Islam"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Address / Note (Optional)</label>
+                <input
+                  type="text"
+                  value={editingVendor.address}
+                  onChange={e => setEditingVendor(prev => prev ? { ...prev, address: e.target.value } : null)}
+                  placeholder="e.g. Kawran Bazar, Dhaka"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingVendor(null)}
+                  className="flex-1 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>

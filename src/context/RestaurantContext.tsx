@@ -5580,6 +5580,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         let updatedMenu = prev.menuItems;
         let updatedMaster = prev.masterItems;
         let updatedPurchases = prev.purchases;
+        let updatedPurchaseOrders = prev.purchaseOrders;
+        let updatedPurchaseReturns = prev.purchaseReturns;
+        let updatedPayments = prev.payments;
 
         if (type === 'departments') {
           updatedMenu = prev.menuItems.map(m => m.department === oldVal ? { ...m, department: trimmed } : m);
@@ -5590,6 +5593,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } else if (type === 'vendors') {
           updatedMaster = prev.masterItems.map(m => m.vendor === oldVal ? { ...m, vendor: trimmed } : m);
           updatedPurchases = prev.purchases.map(p => p.vendor === oldVal ? { ...p, vendor: trimmed } : p);
+          updatedPurchaseOrders = (prev.purchaseOrders || []).map(po => po.vendor === oldVal ? { ...po, vendor: trimmed } : po);
+          updatedPurchaseReturns = (prev.purchaseReturns || []).map(pr => pr.vendor === oldVal ? { ...pr, vendor: trimmed } : pr);
+          updatedPayments = (prev.payments || []).map(pay => pay.vendor === oldVal ? { ...pay, vendor: trimmed } : pay);
         }
 
         return {
@@ -5597,7 +5603,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           [type]: list,
           menuItems: updatedMenu,
           masterItems: updatedMaster,
-          purchases: updatedPurchases
+          purchases: updatedPurchases,
+          purchaseOrders: updatedPurchaseOrders,
+          purchaseReturns: updatedPurchaseReturns,
+          payments: updatedPayments
         };
       });
     }
