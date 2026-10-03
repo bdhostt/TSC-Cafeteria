@@ -6113,11 +6113,80 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const deliverySales = activeSalesList.filter(s => s.channelOrAgent && s.channelOrAgent !== 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
       return opening + deliverySales + journalEffect;
     }
+    if (code === '4030') {
+      const bevSales = activeSalesList.filter(s => 
+        (s.items || []).some(i => (i.department || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('coffee'))
+      ).reduce((sum, s) => sum + (s.total || 0), 0);
+      return opening + bevSales + journalEffect;
+    }
     if (acc.type === 'EXPENSE') {
-      const headExpenses = data.expenses.filter(e => 
-        e.head.toLowerCase().includes(acc.name.toLowerCase().split(' ')[0]) || 
-        acc.name.toLowerCase().includes(e.head.toLowerCase())
-      ).reduce((sum, e) => sum + (e.amount || 0), 0);
+      const isCogs = (code && code.startsWith('50')) || 
+        (acc.category || '').toLowerCase().includes('cost of goods') || 
+        (acc.category || '').toLowerCase().includes('bom') ||
+        (acc.name || '').toLowerCase().includes('cogs');
+
+      if (isCogs) {
+        if (code === '6050' || (acc.name || '').toLowerCase().includes('manual')) {
+          return opening + totalManualUsedCostVal + journalEffect;
+        }
+        if (code === '5010') {
+          return opening + Math.round(totalBomCostVal * 0.65) + journalEffect;
+        }
+        if (code === '5020') {
+          return opening + Math.round(totalBomCostVal * 0.35) + journalEffect;
+        }
+        return opening + totalBomCostVal + journalEffect;
+      }
+
+      // Operating Expenses Matching
+      const headExpenses = data.expenses.filter(e => {
+        const eHead = (e.head || '').toLowerCase().trim();
+        const eCat = (e.category || '').toLowerCase().trim();
+        const aName = (acc.name || '').toLowerCase().trim();
+        const aCode = acc.code;
+
+        // Direct exact or substring match
+        if (eHead && (aName.includes(eHead) || eHead.includes(aName))) return true;
+
+        // Specific standard head mappings
+        if (aCode === '6010' || aName.includes('salary') || aName.includes('salaries') || aName.includes('staff')) {
+          if (eHead.includes('salary') || eHead.includes('staff') || eHead.includes('waiter') || eHead.includes('labor') || eHead.includes('wage') || eHead.includes('chef') || eHead.includes('casual')) {
+            return true;
+          }
+        }
+        if (aCode === '6030' || aName.includes('electric') || aName.includes('gas') || aName.includes('power')) {
+          if (eHead.includes('electric') || eHead.includes('gas') || eHead.includes('power') || eHead.includes('desco') || eHead.includes('dpdc') || eHead.includes('titas') || eHead.includes('wasa') || eHead.includes('water') || eHead.includes('utility') || eHead.includes('bill')) {
+            return true;
+          }
+        }
+        if (aCode === '6040' || aName.includes('clean') || aName.includes('consumable')) {
+          if (eHead.includes('clean') || eHead.includes('wash') || eHead.includes('consumable') || eHead.includes('soap') || eHead.includes('tissue') || eHead.includes('packaging')) {
+            return true;
+          }
+        }
+        if (aCode === '6020' || aName.includes('rent') || aName.includes('utilities') || aName.includes('overhead')) {
+          if (eHead.includes('rent') || eHead.includes('lease') || eHead.includes('conveyance') || eHead.includes('transport') || eHead.includes('travel') || eHead.includes('fare') || eHead.includes('maintenance') || eHead.includes('repair')) {
+            return true;
+          }
+        }
+
+        // Tokenized word matching (words with length >= 3)
+        const eWords = eHead.split(/\s+/).filter(w => w.length >= 3);
+        const aWords = aName.split(/\s+/).filter(w => w.length >= 3);
+        const hasWordMatch = eWords.some(ew => aWords.some(aw => ew.includes(aw) || aw.includes(ew)));
+        if (hasWordMatch) return true;
+
+        // Fallback for general OpEx when it doesn't match other specific heads
+        if (aCode === '6020') {
+          const isSalary = eHead.includes('salary') || eHead.includes('staff') || eHead.includes('waiter') || eHead.includes('labor') || eHead.includes('wage');
+          const isElectric = eHead.includes('electric') || eHead.includes('gas') || eHead.includes('power') || eHead.includes('desco');
+          const isClean = eHead.includes('clean') || eHead.includes('wash') || eHead.includes('soap');
+          if (!isSalary && !isElectric && !isClean) return true;
+        }
+
+        return false;
+      }).reduce((sum, e) => sum + (e.amount || 0), 0);
+
       return opening + headExpenses + journalEffect;
     }
     if (acc.type === 'REVENUE') {
