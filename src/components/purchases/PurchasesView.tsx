@@ -1299,109 +1299,138 @@ export const PurchasesView: React.FC = () => {
 
       {/* ================= TAB 4: SUPPLIERS DIRECTORY ================= */}
       {activeTab === 'vendors' && (
-        <div className="space-y-3">
-          {filteredVendors.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400">
-              No suppliers found matching "{search}".
-            </div>
-          ) : (
-            filteredVendors.map((v) => {
-              const originalIndex = data.vendors.indexOf(v);
-              const idx = originalIndex >= 0 ? originalIndex : 0;
-              const vendorBills = data.purchases.filter(p => p.vendor === v);
-              const vendorPos = (data.purchaseOrders || []).filter(p => p.vendor === v && p.status === 'PENDING');
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-900 text-slate-300 border-b border-slate-800">
+                <tr>
+                  <th className="py-3 px-4 font-bold">Supplier / Company</th>
+                  <th className="py-3 px-4 font-bold">Contact Phone</th>
+                  <th className="py-3 px-4 font-bold text-center">Received Bills</th>
+                  <th className="py-3 px-4 font-bold text-center">Pending Orders</th>
+                  <th className="py-3 px-4 font-bold text-right">Total Purchases (৳)</th>
+                  <th className="py-3 px-4 font-bold text-right">Balance Payable Due (৳)</th>
+                  <th className="py-3 px-4 font-bold text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredVendors.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      No suppliers found matching "{search}".
+                    </td>
+                  </tr>
+                ) : (
+                  filteredVendors.map((v) => {
+                    const originalIndex = data.vendors.indexOf(v);
+                    const idx = originalIndex >= 0 ? originalIndex : 0;
+                    const vendorBills = data.purchases.filter(p => p.vendor === v);
+                    const vendorPos = (data.purchaseOrders || []).filter(p => p.vendor === v && p.status === 'PENDING');
 
-              const totalVendorPurchase = vendorBills.reduce((sum, b) => sum + b.total, 0);
-              const vendorPaid = vendorBills.reduce((sum, b) => sum + (b.paid !== undefined ? b.paid : (b.paymentType === 'CASH' ? b.total : 0)), 0);
-              const vendorAdjustedReturns = (data.purchaseReturns || []).filter(r => r.vendor === v && r.refundStatus === 'ADJUSTED').reduce((sum, r) => sum + r.total, 0);
-              const vendorDues = Math.max(0, totalVendorPurchase - vendorPaid - vendorAdjustedReturns);
-              const phoneMock = getSupplierPhone(v, idx);
-              const contactInfo = supplierContacts[v];
+                    const totalVendorPurchase = vendorBills.reduce((sum, b) => sum + b.total, 0);
+                    const vendorPaid = vendorBills.reduce((sum, b) => sum + (b.paid !== undefined ? b.paid : (b.paymentType === 'CASH' ? b.total : 0)), 0);
+                    const vendorAdjustedReturns = (data.purchaseReturns || []).filter(r => r.vendor === v && r.refundStatus === 'ADJUSTED').reduce((sum, r) => sum + r.total, 0);
+                    const vendorDues = Math.max(0, totalVendorPurchase - vendorPaid - vendorAdjustedReturns);
+                    const phoneMock = getSupplierPhone(v, idx);
+                    const contactInfo = supplierContacts[v];
 
-              return (
-                <div
-                  key={v}
-                  className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
-                >
-                  {/* Left Column: Supplier Identity & Contact */}
-                  <div className="flex items-center gap-3.5 min-w-[280px]">
-                    <div className="p-3 bg-blue-600 text-white rounded-2xl font-bold shadow-xs shrink-0">
-                      <Building2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-extrabold text-base text-slate-900">{v}</h4>
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-extrabold rounded-full border border-blue-200">
-                          Raw Materials Supplier
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
-                        <div className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="font-semibold text-slate-700">{phoneMock}</span>
-                        </div>
-                        {contactInfo?.contactPerson && (
-                          <span className="text-slate-500 font-medium">• Contact: {contactInfo.contactPerson}</span>
-                        )}
-                        {contactInfo?.address && (
-                          <span className="text-slate-400 hidden xl:inline">• {contactInfo.address}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Middle Column: Operational Stats */}
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3 text-xs bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 min-w-[290px] lg:max-w-md w-full lg:w-auto">
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold block">Received Bills</span>
-                      <strong className="text-slate-900 font-extrabold">{vendorBills.length} Invoices</strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold block">Pending Orders</span>
-                      <strong className="text-amber-700 font-extrabold">{vendorPos.length} POs</strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold block">Total Purchases</span>
-                      <strong className="text-blue-700 font-extrabold">৳ {totalVendorPurchase.toLocaleString()}</strong>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Payable Balance & Actions */}
-                  <div className="flex items-center justify-between lg:justify-end gap-3 sm:gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                    <div className="text-left lg:text-right min-w-[125px]">
-                      <span className="text-[10px] font-bold text-slate-500 block">Balance Payable Due</span>
-                      <strong className={`text-base font-black ${vendorDues > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                        ৳ {vendorDues.toLocaleString()}
-                      </strong>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleOpenEditVendor(v, phoneMock)}
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center gap-1.5 cursor-pointer shadow-2xs hover:border-slate-400"
-                        title="Edit Supplier Details"
-                      >
-                        <Pencil className="w-3.5 h-3.5 text-slate-600" />
-                        <span>Edit</span>
-                      </button>
-
-                      <button
-                        id={`btn-view-ledger-${v.replace(/\s+/g, '-').toLowerCase()}`}
-                        onClick={() => {
+                    return (
+                      <tr
+                        key={v}
+                        onDoubleClick={() => {
                           setSelectedSupplierLedger(v);
                           setLedgerFilter('ALL');
                         }}
-                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        title="Double-click to view Bills & Ledger"
+                        className="hover:bg-slate-50 transition cursor-pointer select-none"
                       >
-                        <Receipt className="w-4 h-4" />
-                        <span>View Bills & Ledger</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+                        {/* Supplier / Company */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg font-bold shrink-0">
+                              <Building2 className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="font-extrabold text-slate-900 text-xs">{v}</span>
+                              <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                                Raw Materials Supplier
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Contact Phone & Person */}
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-600">
+                          <div className="flex items-center gap-1.5 font-mono font-semibold text-xs text-slate-800">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{phoneMock}</span>
+                          </div>
+                          {contactInfo?.contactPerson && (
+                            <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                              {contactInfo.contactPerson}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Received Bills */}
+                        <td className="py-3 px-4 text-center font-bold text-slate-800 whitespace-nowrap">
+                          {vendorBills.length} Invoices
+                        </td>
+
+                        {/* Pending Orders */}
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                            vendorPos.length > 0 ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'text-slate-400'
+                          }`}>
+                            {vendorPos.length} POs
+                          </span>
+                        </td>
+
+                        {/* Total Purchases */}
+                        <td className="py-3 px-4 text-right font-extrabold text-blue-700 whitespace-nowrap">
+                          ৳ {totalVendorPurchase.toLocaleString()}
+                        </td>
+
+                        {/* Balance Payable Due */}
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <span className={`font-black text-sm ${vendorDues > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            ৳ {vendorDues.toLocaleString()}
+                          </span>
+                        </td>
+
+                        {/* Action Buttons */}
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleOpenEditVendor(v, phoneMock)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-300 transition flex items-center gap-1 cursor-pointer"
+                              title="Edit Supplier Details"
+                            >
+                              <Pencil className="w-3 h-3 text-slate-600" />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              id={`btn-view-ledger-${v.replace(/\s+/g, '-').toLowerCase()}`}
+                              onClick={() => {
+                                setSelectedSupplierLedger(v);
+                                setLedgerFilter('ALL');
+                              }}
+                              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-[11px] rounded-lg shadow-2xs transition flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                              title="View Supplier Bills & Ledger"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              <span>View Ledger</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
