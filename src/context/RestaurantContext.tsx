@@ -34,6 +34,7 @@ import {
   RestaurantProfile,
   PrinterConfig,
   PrintTemplate,
+  PaymentMethodConfig,
   Employee,
   AttendanceRecord,
   LeaveApplication,
@@ -579,6 +580,76 @@ export const DEFAULT_PRINT_TEMPLATES: PrintTemplate[] = [
   }
 ];
 
+export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
+  {
+    id: "cash",
+    name: "Cash in Hand",
+    type: "CASH",
+    providerName: "Drawer Cash",
+    isDefault: true,
+    isActive: true,
+    notes: "Default cash drawer currency payments",
+    ledgerAccountId: "1001"
+  },
+  {
+    id: "card_pos",
+    name: "Card (POS Terminal)",
+    type: "CARD",
+    providerName: "Visa / Mastercard / Amex",
+    chargePercent: 0,
+    isDefault: false,
+    isActive: true,
+    notes: "Debit & credit cards swipe/tap terminal",
+    ledgerAccountId: "1002"
+  },
+  {
+    id: "bkash_merchant",
+    name: "bKash Merchant",
+    type: "MFS",
+    providerName: "bKash",
+    accountNumber: "01846100900",
+    chargePercent: 0,
+    isDefault: false,
+    isActive: true,
+    notes: "Merchant QR Code & direct digital payment",
+    ledgerAccountId: "1003"
+  },
+  {
+    id: "nagad_merchant",
+    name: "Nagad Merchant",
+    type: "MFS",
+    providerName: "Nagad",
+    accountNumber: "01846100900",
+    chargePercent: 0,
+    isDefault: false,
+    isActive: true,
+    notes: "Nagad digital wallet / QR payment",
+    ledgerAccountId: "1004"
+  },
+  {
+    id: "due_credit",
+    name: "Customer Credit / Due",
+    type: "CREDIT",
+    providerName: "Accounts Receivable",
+    isDefault: false,
+    isActive: true,
+    notes: "Credit dining billed to registered customer ledger",
+    ledgerAccountId: "1005"
+  },
+  {
+    id: "bank_transfer",
+    name: "Bank Wire Transfer",
+    type: "BANK",
+    providerName: "City Bank / DBBL",
+    accountNumber: "150-120-987654",
+    chargePercent: 0,
+    isDefault: false,
+    isActive: true,
+    notes: "Direct BEFTN / NPSB / RTGS account transfer",
+    ledgerAccountId: "1002"
+  }
+];
+
 export const DEFAULT_RESTAURANT_PROFILE: RestaurantProfile = {
   name: "BD HOSTT POS",
   tagline: "Restaurant POS & Recipe BOM ERP",
@@ -788,6 +859,7 @@ const DEFAULT_DATA: AppData = {
   commissionAgents: DEFAULT_COMMISSION_AGENTS,
   printers: DEFAULT_PRINTERS,
   printTemplates: DEFAULT_PRINT_TEMPLATES,
+  paymentMethods: DEFAULT_PAYMENT_METHODS,
   posSessions: DEFAULT_POS_SESSIONS,
   chefShifts: [],
   activeChefShift: null,
@@ -1156,6 +1228,12 @@ interface RestaurantContextType {
   setDefaultPrintTemplate: (id: string) => void;
   setAllKotShowPrices: (show: boolean) => void;
   
+  // Payment Methods
+  addPaymentMethod: (method: Omit<PaymentMethodConfig, 'id'> & { id?: string }) => void;
+  updatePaymentMethod: (id: string, updates: Partial<PaymentMethodConfig>) => void;
+  deletePaymentMethod: (id: string) => void;
+  setDefaultPaymentMethod: (id: string) => void;
+
   // Session & Shift Management
   businessDay: BusinessDay;
   startBusinessDay: (openingCash: number, cashierName?: string, notes?: string) => void;
@@ -2554,6 +2632,52 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ...prev,
       printTemplates: [...(prev.printTemplates || DEFAULT_PRINT_TEMPLATES), duplicated]
     }));
+  };
+
+  // Payment Methods Configuration & Management
+  const addPaymentMethod = (method: Omit<PaymentMethodConfig, 'id'> & { id?: string }) => {
+    lastLocalEditTimeRef.current = Date.now();
+    const id = method.id || method.name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString().slice(-4);
+    const newMethod: PaymentMethodConfig = {
+      ...method,
+      id,
+      isActive: method.isActive !== undefined ? method.isActive : true
+    };
+    setData(prev => ({
+      ...prev,
+      paymentMethods: [...(prev.paymentMethods || DEFAULT_PAYMENT_METHODS), newMethod]
+    }));
+  };
+
+  const updatePaymentMethod = (id: string, updates: Partial<PaymentMethodConfig>) => {
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => {
+      const currentList = prev.paymentMethods || DEFAULT_PAYMENT_METHODS;
+      return {
+        ...prev,
+        paymentMethods: currentList.map(m => {
+          if (m.id === id) {
+            return { ...m, ...updates };
+          }
+          if (updates.isDefault) {
+            return { ...m, isDefault: false };
+          }
+          return m;
+        })
+      };
+    });
+  };
+
+  const deletePaymentMethod = (id: string) => {
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => ({
+      ...prev,
+      paymentMethods: (prev.paymentMethods || DEFAULT_PAYMENT_METHODS).filter(m => m.id !== id)
+    }));
+  };
+
+  const setDefaultPaymentMethod = (id: string) => {
+    updatePaymentMethod(id, { isDefault: true });
   };
 
   const setTableChannel = (tableId: string, channelOrAgentId: string) => {
@@ -6158,6 +6282,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       duplicatePrintTemplate,
       setDefaultPrintTemplate,
       setAllKotShowPrices,
+      addPaymentMethod,
+      updatePaymentMethod,
+      deletePaymentMethod,
+      setDefaultPaymentMethod,
       businessDay: data.businessDay || {
         date: new Date().toISOString().split('T')[0],
         isOpen: true,

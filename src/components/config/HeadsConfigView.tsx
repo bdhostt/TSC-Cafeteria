@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { AccountHead, AccountType, RestaurantProfile, CommissionAgent } from '../../types';
 import { PrintersConfigView } from './PrintersConfigView';
 import { PrintTemplatesConfigView } from './PrintTemplatesConfigView';
+import { PaymentMethodsConfigView } from './PaymentMethodsConfigView';
 import { 
+  CreditCard,
   Settings, 
   Plus, 
   Trash2, 
@@ -68,7 +70,7 @@ export const HeadsConfigView: React.FC = () => {
     t
   } = useRestaurant();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments'>('profile');
 
   // Commission Agent Modal State
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
@@ -572,6 +574,18 @@ export const HeadsConfigView: React.FC = () => {
           >
             <Receipt className="w-3.5 h-3.5" />
             <span>Bill & KOT Templates ({(data.printTemplates || []).length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('payments')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'payments'
+                ? 'bg-slate-900 text-amber-400 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Payment Methods ({(data.paymentMethods || DEFAULT_PAYMENT_METHODS).length})</span>
           </button>
         </div>
       </div>
@@ -1460,6 +1474,13 @@ export const HeadsConfigView: React.FC = () => {
       {activeTab === 'templates' && (
         <div className="animate-in fade-in">
           <PrintTemplatesConfigView />
+        </div>
+      )}
+
+      {/* Payment Methods Configuration Tab */}
+      {activeTab === 'payments' && (
+        <div className="animate-in fade-in">
+          <PaymentMethodsConfigView />
         </div>
       )}
 

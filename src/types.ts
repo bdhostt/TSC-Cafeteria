@@ -114,6 +114,21 @@ export interface PrintTemplate {
   isActive: boolean;
 }
 
+export type PaymentMethodType = 'CASH' | 'CARD' | 'MFS' | 'BANK' | 'CREDIT' | 'OTHER';
+
+export interface PaymentMethodConfig {
+  id: string;
+  name: string;
+  type: PaymentMethodType;
+  accountNumber?: string;
+  providerName?: string;
+  chargePercent?: number;
+  isDefault?: boolean;
+  isActive: boolean;
+  notes?: string;
+  ledgerAccountId?: string;
+}
+
 export type TableStatus = 'free' | 'hold' | 'billed';
 export type DiscountType = 'taka' | 'percent';
 
@@ -659,6 +674,7 @@ export interface AppData {
   commissionAgents?: CommissionAgent[];
   printers?: PrinterConfig[];
   printTemplates?: PrintTemplate[];
+  paymentMethods?: PaymentMethodConfig[];
   tables: Table[];
   tableZones?: string[];
   tableDimensions?: { width: number; height: number };
