@@ -175,8 +175,22 @@ export const PurchasesView: React.FC = () => {
     isAllDues?: boolean;
   } | null>(null);
   const [payAmount, setPayAmount] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<'CASH' | 'BANK' | 'BKASH'>('CASH');
+  const [payMethod, setPayMethod] = useState<'CASH' | 'BANK' | 'BKASH' | 'NAGAD'>('CASH');
   const [payNote, setPayNote] = useState('');
+
+  // Payment Account Balances
+  const { cashDrawer = 0, bankTransfer = 0, cheque = 0, bkashMerchant = 0, nagadMerchant = 0 } = metrics?.paymentAccountBalances || {
+    cashDrawer: 0,
+    bankTransfer: 0,
+    cheque: 0,
+    bkashMerchant: 0,
+    nagadMerchant: 0
+  };
+
+  const selectedMethodBalance = 
+    payMethod === 'CASH' ? cashDrawer :
+    payMethod === 'BANK' ? bankTransfer :
+    payMethod === 'BKASH' ? bkashMerchant : nagadMerchant;
 
   // ================= HANDLERS ================= //
 
@@ -647,11 +661,16 @@ export const PurchasesView: React.FC = () => {
     e.preventDefault();
     if (!payBillTarget || payAmount <= 0) return;
 
+    const methodLabel = 
+      payMethod === 'CASH' ? 'Cash Drawer' :
+      payMethod === 'BANK' ? 'Bank Account Transfer' :
+      payMethod === 'BKASH' ? 'bKash Merchant' : 'Nagad Merchant';
+
     settlePurchaseBill(
       payBillTarget.billNo || '',
       payBillTarget.vendor,
       payAmount,
-      payMethod,
+      methodLabel,
       payNote || (payBillTarget.isAllDues ? 'Full Vendor Dues Settlement' : `Payment for Bill ${payBillTarget.billNo}`)
     );
 
@@ -1761,16 +1780,36 @@ export const PurchasesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Method *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">Payment Method *</label>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Channel Balances
+                  </span>
+                </div>
                 <select
                   value={payMethod}
                   onChange={e => setPayMethod(e.target.value as any)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
                 >
-                  <option value="CASH">Cash Drawer</option>
-                  <option value="BANK">Bank Account Transfer</option>
-                  <option value="BKASH">bKash Merchant</option>
+                  <option value="CASH">💵 Cash Drawer (Available: ৳ {cashDrawer.toLocaleString()})</option>
+                  <option value="BANK">🏦 Bank Account Transfer (Available: ৳ {bankTransfer.toLocaleString()})</option>
+                  <option value="BKASH">📱 bKash Merchant (Available: ৳ {bkashMerchant.toLocaleString()})</option>
+                  <option value="NAGAD">📱 Nagad Merchant (Available: ৳ {nagadMerchant.toLocaleString()})</option>
                 </select>
+
+                <div className="mt-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                  <span className="text-slate-600 font-semibold">Available In Selected Channel:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`font-black text-sm ${selectedMethodBalance < payAmount ? 'text-rose-600' : 'text-emerald-700'}`}>
+                      ৳ {selectedMethodBalance.toLocaleString()}
+                    </span>
+                    {selectedMethodBalance < payAmount && (
+                      <span className="text-[10px] font-extrabold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                        Low Balance
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div>
