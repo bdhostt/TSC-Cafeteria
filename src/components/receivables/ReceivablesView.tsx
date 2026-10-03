@@ -146,6 +146,16 @@ export const ReceivablesView: React.FC = () => {
 
   const totalAdvanceHeld = metrics.totalCustomerAdvances || 0;
 
+  const getMethodBalance = (method: string): number => {
+    const m = (method || '').toUpperCase();
+    if (m === 'CASH') return metrics.paymentAccountBalances?.cashDrawer ?? 0;
+    if (m === 'BKASH') return metrics.paymentAccountBalances?.bkashMerchant ?? 0;
+    if (m === 'NAGAD') return metrics.paymentAccountBalances?.nagadMerchant ?? 0;
+    if (m === 'CARD') return metrics.payCard ?? 0;
+    if (m === 'BANK') return metrics.paymentAccountBalances?.bankTransfer ?? 0;
+    return 0;
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
@@ -460,17 +470,36 @@ export const ReceivablesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Payment Method</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">Payment Method (বাকি আদায়ের মাধ্যম)</label>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    বর্তমান ব্যালেন্স: <span className="font-mono font-black text-emerald-700">৳ {getMethodBalance(collectMethod).toLocaleString()}</span>
+                  </span>
+                </div>
                 <select
                   value={collectMethod}
                   onChange={e => setCollectMethod(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-cyan-600"
                 >
-                  <option value="CASH">Cash (Cash Drawer)</option>
-                  <option value="CARD">Card</option>
-                  <option value="BKASH">bKash</option>
-                  <option value="NAGAD">Nagad</option>
+                  <option value="CASH">Cash (Cash Drawer) — (ব্যালেন্স: ৳ {(metrics.paymentAccountBalances?.cashDrawer ?? 0).toLocaleString()})</option>
+                  <option value="CARD">Card — (ব্যালেন্স: ৳ {(metrics.payCard ?? 0).toLocaleString()})</option>
+                  <option value="BKASH">bKash — (ব্যালেন্স: ৳ {(metrics.paymentAccountBalances?.bkashMerchant ?? 0).toLocaleString()})</option>
+                  <option value="NAGAD">Nagad — (ব্যালেন্স: ৳ {(metrics.paymentAccountBalances?.nagadMerchant ?? 0).toLocaleString()})</option>
                 </select>
+
+                <div className="mt-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-slate-600">নির্বাচিত মাধ্যমের তহবিল ব্যালেন্স:</span>
+                  <div className="text-right">
+                    <span className="font-mono font-black text-emerald-700 text-xs">
+                      ৳ {getMethodBalance(collectMethod).toLocaleString()}
+                    </span>
+                    {collectAmount > 0 && (
+                      <span className="text-slate-500 font-bold ml-1.5 text-[10px]">
+                        (+৳{collectAmount.toLocaleString()} আদায় হয়ে হবে: ৳{(getMethodBalance(collectMethod) + collectAmount).toLocaleString()})
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="pt-3 flex gap-3">
@@ -549,18 +578,37 @@ export const ReceivablesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Payment Method</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">Payment Method (অগ্রিম জমার মাধ্যম)</label>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    বর্তমান ব্যালেন্স: <span className="font-mono font-black text-emerald-700">৳ {getMethodBalance(advanceMethod).toLocaleString()}</span>
+                  </span>
+                </div>
                 <select
                   value={advanceMethod}
                   onChange={e => setAdvanceMethod(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#004b9b]"
                 >
-                  <option value="BKASH">bKash (Merchant / Personal)</option>
-                  <option value="NAGAD">Nagad</option>
-                  <option value="CASH">Cash (Cash Drawer)</option>
-                  <option value="CARD">Bank Card / POS</option>
-                  <option value="BANK">Direct Bank Transfer</option>
+                  <option value="BKASH">bKash (Merchant / Personal) — (ব্যালেন্স: ৳ {(metrics.paymentAccountBalances?.bkashMerchant ?? 0).toLocaleString()})</option>
+                  <option value="NAGAD">Nagad — (ব্যালেন্স: ৳ {(metrics.paymentAccountBalances?.nagadMerchant ?? 0).toLocaleString()})</option>
+                  <option value="CASH">Cash (Cash Drawer) — (ব্যালেন্স: ৳ {(metrics.paymentAccountBalances?.cashDrawer ?? 0).toLocaleString()})</option>
+                  <option value="CARD">Bank Card / POS — (ব্যালেন্স: ৳ {(metrics.payCard ?? 0).toLocaleString()})</option>
+                  <option value="BANK">Direct Bank Transfer — (ব্যালেন্স: ৳ {(metrics.paymentAccountBalances?.bankTransfer ?? 0).toLocaleString()})</option>
                 </select>
+
+                <div className="mt-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-slate-600">নির্বাচিত মাধ্যমের তহবিল ব্যালেন্স:</span>
+                  <div className="text-right">
+                    <span className="font-mono font-black text-emerald-700 text-xs">
+                      ৳ {getMethodBalance(advanceMethod).toLocaleString()}
+                    </span>
+                    {advanceAmount > 0 && (
+                      <span className="text-slate-500 font-bold ml-1.5 text-[10px]">
+                        (+৳{advanceAmount.toLocaleString()} জমা হয়ে হবে: ৳{(getMethodBalance(advanceMethod) + advanceAmount).toLocaleString()})
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div>

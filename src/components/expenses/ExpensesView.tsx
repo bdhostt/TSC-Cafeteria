@@ -316,7 +316,7 @@ export const ExpensesView: React.FC = () => {
       {/* Add Expense Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <h3 className="font-extrabold text-slate-900 text-lg mb-1">Record New Expense</h3>
             <p className="text-xs text-slate-500 mb-4">Record restaurant operational or sundry expenses with payment medium</p>
 
@@ -353,36 +353,6 @@ export const ExpensesView: React.FC = () => {
                   <span className="text-[11px] font-bold text-slate-500">
                     উপলব্ধ ব্যালেন্স: <span className="font-mono font-black text-emerald-700">৳ {selectedBalance.toLocaleString()}</span>
                   </span>
-                </div>
-
-                {/* Quick Selection Medium Cards Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2.5">
-                  {paymentMediumOptions.map(opt => {
-                    const isSelected = paymentMethod === opt.value;
-                    const Icon = opt.icon;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setPaymentMethod(opt.value)}
-                        className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? 'bg-blue-50/90 border-[#004b9b] ring-2 ring-[#004b9b]/25 shadow-xs'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#004b9b]' : 'text-slate-500'}`} />
-                          <span className={`text-[10px] font-bold truncate ${isSelected ? 'text-[#004b9b]' : 'text-slate-700'}`}>
-                            {opt.shortName}
-                          </span>
-                        </div>
-                        <div className="font-mono font-black text-xs text-slate-900">
-                          ৳ {opt.balance.toLocaleString()}
-                        </div>
-                      </button>
-                    );
-                  })}
                 </div>
 
                 {/* Dropdown Select with amounts */}
