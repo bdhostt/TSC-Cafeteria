@@ -109,7 +109,7 @@ export const PurchasesView: React.FC = () => {
 
   // --- SUPPLIER LEDGER & BILL-WISE PAYMENT MODAL STATES ---
   const [selectedSupplierLedger, setSelectedSupplierLedger] = useState<string | null>(null);
-  const [ledgerFilter, setLedgerFilter] = useState<'ALL' | 'RECEIVED' | 'PENDING'>('ALL');
+  const [ledgerFilter, setLedgerFilter] = useState<'ALL' | 'RECEIVED' | 'PENDING' | 'RETURNS'>('ALL');
   
   // Specific Pay Bill Popup inside Ledger
   const [payBillTarget, setPayBillTarget] = useState<{
@@ -220,6 +220,7 @@ export const PurchasesView: React.FC = () => {
       paymentType: voucherPaymentType,
       status: voucherStatus,
       total: totalVoucherAmount,
+      paid: voucherPaymentType === 'CASH' ? totalVoucherAmount : 0,
       items: JSON.parse(JSON.stringify(voucherItems))
     };
 
@@ -416,10 +417,11 @@ export const PurchasesView: React.FC = () => {
   const handleOpenNewReturn = () => {
     setReturnNo('RET-' + new Date().getFullYear().toString().slice(-2) + '-' + Math.floor(10 + Math.random() * 90));
     setReturnDate(new Date().toISOString().split('T')[0]);
-    setReturnVendor(data.vendors[0] || 'Kader Meat Supply');
-    setReturnBillNo('INV-9901');
+    const defaultVendor = data.vendors[0] || 'Kader Meat Supply';
+    setReturnVendor(defaultVendor);
+    setReturnBillNo('');
     if (data.masterItems.length > 0) {
-      setReturnItemId(data.masterItems[0].id);
+      setReturnItemId(Number(data.masterItems[0].id));
       setReturnRate(data.masterItems[0].defaultRate);
     }
     setReturnQty(1);
@@ -429,17 +431,22 @@ export const PurchasesView: React.FC = () => {
   };
 
   const handleReturnItemSelect = (rawId: number) => {
-    const raw = data.masterItems.find(m => m.id === rawId);
+    const raw = data.masterItems.find(m => Number(m.id) === Number(rawId));
     if (!raw) return;
-    setReturnItemId(raw.id);
+    setReturnItemId(Number(raw.id));
     setReturnRate(raw.defaultRate);
   };
 
   const handleSubmitReturn = (e: React.FormEvent) => {
     e.preventDefault();
-    const raw = data.masterItems.find(m => m.id === returnItemId);
+    const raw = data.masterItems.find(m => Number(m.id) === Number(returnItemId));
     if (!raw) {
-      alert('Selected item not found!');
+      alert('Selected item not found in master inventory!');
+      return;
+    }
+
+    if (returnQty <= 0) {
+      alert('Return quantity must be greater than 0!');
       return;
     }
 
@@ -457,7 +464,7 @@ export const PurchasesView: React.FC = () => {
       uom: raw.uom,
       rate: returnRate,
       total: totalRetAmount,
-      reason: returnReason,
+      reason: returnReason.trim() || 'Returned to supplier',
       refundStatus
     };
 
@@ -516,10 +523,19 @@ export const PurchasesView: React.FC = () => {
   const getSupplierLedgerDetails = (supplierName: string) => {
     const vouchers = data.purchases.filter(p => p.vendor === supplierName);
     const pos = (data.purchaseOrders || []).filter(p => p.vendor === supplierName && p.status === 'PENDING');
+    const returns = (data.purchaseReturns || []).filter(p => p.vendor === supplierName);
 
     let totalBillsVal = 0;
     let totalPaidVal = 0;
     let totalDueVal = 0;
+
+    const adjustedReturnsVal = returns
+      .filter(r => r.refundStatus === 'ADJUSTED')
+      .reduce((sum, r) => sum + r.total, 0);
+
+    const refundedReturnsVal = returns
+      .filter(r => r.refundStatus === 'REFUNDED')
+      .reduce((sum, r) => sum + r.total, 0);
 
     const billRows: {
       id: string | number;
@@ -530,15 +546,19 @@ export const PurchasesView: React.FC = () => {
       total: number;
       paid: number;
       due: number;
-      status: 'PENDING_UNRECEIVED' | 'DUE' | 'PAID';
-      type: 'BILL' | 'PO';
+      status: 'PENDING_UNRECEIVED' | 'DUE' | 'PAID' | 'RETURN_ADJUSTED' | 'RETURN_REFUNDED' | 'RETURN_PENDING';
+      type: 'BILL' | 'PO' | 'RETURN';
       poObject?: PurchaseOrder;
+      returnObject?: PurchaseReturn;
     }[] = [];
 
     // Add Received Purchase Bills
     vouchers.forEach(v => {
       const paid = v.paid !== undefined ? v.paid : (v.paymentType === 'CASH' ? v.total : 0);
-      const due = Math.max(0, v.total - paid);
+      const billReturns = returns
+        .filter(r => r.refundStatus === 'ADJUSTED' && r.billNo && (r.billNo.toLowerCase() === v.billNo.toLowerCase() || r.billNo.replace(/\s+/g, '-').toLowerCase() === v.billNo.replace(/\s+/g, '-').toLowerCase()))
+        .reduce((sum, r) => sum + r.total, 0);
+      const due = Math.max(0, v.total - paid - billReturns);
 
       totalBillsVal += v.total;
       totalPaidVal += paid;
@@ -549,12 +569,29 @@ export const PurchasesView: React.FC = () => {
         poNoOrBillNo: v.billNo,
         date: v.date,
         itemsSummary: v.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', '),
-        destination: 'Main Kitchen',
+        destination: billReturns > 0 ? `Main Kitchen (Adj -৳${billReturns})` : 'Main Kitchen',
         total: v.total,
         paid,
         due,
         status: due > 0 ? 'DUE' : 'PAID',
         type: 'BILL'
+      });
+    });
+
+    // Add Supplier Returns
+    returns.forEach(r => {
+      billRows.push({
+        id: `RET-${r.id}`,
+        poNoOrBillNo: r.returnNo,
+        date: r.date,
+        itemsSummary: `[Return Claim] ${r.item} (${r.qty} ${r.uom}) — Reason: ${r.reason}`,
+        destination: `Supplier Return (${r.refundStatus})`,
+        total: r.total,
+        paid: r.refundStatus === 'REFUNDED' ? r.total : 0,
+        due: 0,
+        status: r.refundStatus === 'ADJUSTED' ? 'RETURN_ADJUSTED' : (r.refundStatus === 'REFUNDED' ? 'RETURN_REFUNDED' : 'RETURN_PENDING'),
+        type: 'RETURN',
+        returnObject: r
       });
     });
 
@@ -579,12 +616,21 @@ export const PurchasesView: React.FC = () => {
       });
     });
 
+    // Deduct unlinked general adjusted returns from overall supplier due if any
+    const unlinkedAdjustedReturns = returns
+      .filter(r => r.refundStatus === 'ADJUSTED' && (!r.billNo || !vouchers.some(v => v.billNo.toLowerCase() === r.billNo?.toLowerCase() || v.billNo.replace(/\s+/g, '-').toLowerCase() === r.billNo?.replace(/\s+/g, '-').toLowerCase())))
+      .reduce((sum, r) => sum + r.total, 0);
+    const finalTotalDue = Math.max(0, totalDueVal - unlinkedAdjustedReturns);
+
     return {
       totalBillsVal,
       totalPaidVal,
-      totalDueVal,
+      totalDueVal: finalTotalDue,
+      adjustedReturnsVal,
+      refundedReturnsVal,
       receivedBillsCount: vouchers.length,
       pendingOrdersCount: pos.length,
+      returnsCount: returns.length,
       pendingOrdersVal,
       billRows
     };
@@ -778,7 +824,14 @@ export const PurchasesView: React.FC = () => {
                 ) : (
                   filteredVouchers.map(voucher => {
                     const paid = voucher.paid !== undefined ? voucher.paid : (voucher.paymentType === 'CASH' ? voucher.total : 0);
-                    const due = Math.max(0, voucher.total - paid);
+                    const matchingReturns = purchaseReturns.filter(r => 
+                      r.refundStatus === 'ADJUSTED' && 
+                      r.vendor === voucher.vendor && 
+                      r.billNo && 
+                      (r.billNo.toLowerCase() === voucher.billNo.toLowerCase() || r.billNo.replace(/\s+/g, '-').toLowerCase() === voucher.billNo.replace(/\s+/g, '-').toLowerCase())
+                    );
+                    const billAdjustedReturn = matchingReturns.reduce((sum, r) => sum + r.total, 0);
+                    const due = Math.max(0, voucher.total - paid - billAdjustedReturn);
 
                     return (
                       <tr key={voucher.id} className="hover:bg-slate-50 transition">
@@ -787,9 +840,13 @@ export const PurchasesView: React.FC = () => {
                         <td className="py-3 px-4 font-extrabold text-slate-900">{voucher.vendor}</td>
                         <td className="py-3 px-4">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                            voucher.paymentType === 'CREDIT' ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'
+                            voucher.paymentType === 'CREDIT' 
+                              ? (due === 0 ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900') 
+                              : 'bg-emerald-100 text-emerald-900'
                           }`}>
-                            {voucher.paymentType === 'CREDIT' ? 'Credit (Due)' : 'Cash Paid'}
+                            {voucher.paymentType === 'CREDIT' 
+                              ? (due === 0 ? 'Credit (Settled)' : 'Credit (Due)') 
+                              : 'Cash Paid'}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -802,8 +859,13 @@ export const PurchasesView: React.FC = () => {
                         <td className="py-3 px-4 max-w-xs truncate text-slate-600 font-medium">
                           {voucher.items.map(i => `${i.item} (${i.qty} ${i.uom})`).join(', ')}
                         </td>
-                        <td className="py-3 px-4 text-right font-extrabold text-blue-700 text-sm whitespace-nowrap">
-                          ৳ {voucher.total.toLocaleString()}
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="font-extrabold text-blue-700 text-sm">৳ {voucher.total.toLocaleString()}</div>
+                          {billAdjustedReturn > 0 && (
+                            <div className="text-[10px] text-rose-600 font-extrabold" title={`Adjusted return for bill #${voucher.billNo}`}>
+                              Ret Adj: -৳{billAdjustedReturn.toLocaleString()}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
@@ -1031,7 +1093,8 @@ export const PurchasesView: React.FC = () => {
 
               const totalVendorPurchase = vendorBills.reduce((sum, b) => sum + b.total, 0);
               const vendorPaid = vendorBills.reduce((sum, b) => sum + (b.paid !== undefined ? b.paid : (b.paymentType === 'CASH' ? b.total : 0)), 0);
-              const vendorDues = Math.max(0, totalVendorPurchase - vendorPaid);
+              const vendorAdjustedReturns = (data.purchaseReturns || []).filter(r => r.vendor === v && r.refundStatus === 'ADJUSTED').reduce((sum, r) => sum + r.total, 0);
+              const vendorDues = Math.max(0, totalVendorPurchase - vendorPaid - vendorAdjustedReturns);
               const phoneMock = `017${(56007600 + idx * 111111).toString().slice(0, 8)}`;
 
               return (
@@ -1105,6 +1168,7 @@ export const PurchasesView: React.FC = () => {
         const filteredRows = ledgerData.billRows.filter(row => {
           if (ledgerFilter === 'RECEIVED') return row.type === 'BILL';
           if (ledgerFilter === 'PENDING') return row.type === 'PO';
+          if (ledgerFilter === 'RETURNS') return row.type === 'RETURN';
           return true;
         });
 
@@ -1158,19 +1222,22 @@ export const PurchasesView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Card 2: TOTAL PAID */}
+                  {/* Card 2: TOTAL PAID & ADJUSTMENTS */}
                   <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200 shadow-2xs flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                        <span>TOTAL PAID</span>
+                        <span>TOTAL PAID & ADJUSTED</span>
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                       </div>
                       <div className="text-2xl font-black text-emerald-700 mt-2">
-                        ৳ {ledgerData.totalPaidVal.toLocaleString()}
+                        ৳ {(ledgerData.totalPaidVal + ledgerData.adjustedReturnsVal).toLocaleString()}
                       </div>
                     </div>
-                    <div className="text-xs text-emerald-700 font-semibold mt-3">
-                      Paid to vendor
+                    <div className="text-xs text-emerald-700 font-semibold mt-3 flex items-center justify-between">
+                      <span>Paid: ৳{ledgerData.totalPaidVal.toLocaleString()}</span>
+                      {ledgerData.adjustedReturnsVal > 0 && (
+                        <span className="text-rose-700 font-bold">• Ret Adj: ৳{ledgerData.adjustedReturnsVal.toLocaleString()}</span>
+                      )}
                     </div>
                   </div>
 
@@ -1218,9 +1285,9 @@ export const PurchasesView: React.FC = () => {
                 {/* Section Header & Filter Pills */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                   <div>
-                    <h4 className="text-base font-extrabold text-slate-900">Individual Purchase Bills</h4>
+                    <h4 className="text-base font-extrabold text-slate-900">Individual Purchase Bills & Adjustments</h4>
                     <p className="text-xs text-slate-500 font-medium">
-                      Bills are due upon receiving and can be paid individually.
+                      Bills are due upon receiving and adjusted against returns.
                     </p>
                   </div>
 
@@ -1256,6 +1323,18 @@ export const PurchasesView: React.FC = () => {
                     >
                       {ledgerData.pendingOrdersCount} Pending
                     </button>
+                    {ledgerData.returnsCount > 0 && (
+                      <button
+                        onClick={() => setLedgerFilter('RETURNS')}
+                        className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition cursor-pointer ${
+                          ledgerFilter === 'RETURNS'
+                            ? 'bg-rose-700 text-white'
+                            : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+                        }`}
+                      >
+                        {ledgerData.returnsCount} Returns
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1302,18 +1381,32 @@ export const PurchasesView: React.FC = () => {
                               </td>
 
                               {/* TOTAL BILL */}
-                              <td className="py-3.5 px-4 text-right font-black text-slate-900 text-xs">
-                                ৳{row.total.toLocaleString()}
+                              <td className="py-3.5 px-4 text-right font-black text-xs">
+                                {row.type === 'RETURN' ? (
+                                  <span className="text-rose-600">-৳{row.total.toLocaleString()}</span>
+                                ) : (
+                                  <span className="text-slate-900">৳{row.total.toLocaleString()}</span>
+                                )}
                               </td>
 
                               {/* PAID */}
-                              <td className="py-3.5 px-4 text-right font-bold text-emerald-700 text-xs">
-                                ৳{row.paid.toLocaleString()}
+                              <td className="py-3.5 px-4 text-right font-bold text-xs">
+                                {row.type === 'RETURN' ? (
+                                  row.paid > 0 ? (
+                                    <span className="text-emerald-700">৳{row.paid.toLocaleString()}</span>
+                                  ) : (
+                                    <span className="text-slate-400">—</span>
+                                  )
+                                ) : (
+                                  <span className="text-emerald-700">৳{row.paid.toLocaleString()}</span>
+                                )}
                               </td>
 
                               {/* DUE */}
                               <td className="py-3.5 px-4 text-right">
-                                {row.status === 'PENDING_UNRECEIVED' ? (
+                                {row.type === 'RETURN' ? (
+                                  <span className="text-slate-400 font-medium text-xs">—</span>
+                                ) : row.status === 'PENDING_UNRECEIVED' ? (
                                   <span className="text-slate-400 font-medium text-xs">— (Pending)</span>
                                 ) : (
                                   <span className={`font-black text-xs ${row.due > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
@@ -1342,10 +1435,34 @@ export const PurchasesView: React.FC = () => {
                                     ✓ Paid
                                   </span>
                                 )}
+
+                                {row.status === 'RETURN_ADJUSTED' && (
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-800 border border-blue-200">
+                                    Adjusted (Due)
+                                  </span>
+                                )}
+
+                                {row.status === 'RETURN_REFUNDED' && (
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    Cash Refunded
+                                  </span>
+                                )}
+
+                                {row.status === 'RETURN_PENDING' && (
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
+                                    Claim Pending
+                                  </span>
+                                )}
                               </td>
 
                               {/* ACTION */}
                               <td className="py-3.5 px-4 text-center">
+                                {row.type === 'RETURN' && (
+                                  <span className="text-[10px] text-rose-600 font-extrabold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                    Return Entry
+                                  </span>
+                                )}
+
                                 {row.status === 'PENDING_UNRECEIVED' && row.poObject && (
                                   <button
                                     onClick={() => handleOpenReceiveModal(row.poObject!)}
@@ -1355,7 +1472,6 @@ export const PurchasesView: React.FC = () => {
                                     <span>Receive</span>
                                   </button>
                                 )}
-
                                 {row.status === 'DUE' && (
                                   <button
                                     onClick={() => {
@@ -1370,7 +1486,7 @@ export const PurchasesView: React.FC = () => {
                                     className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-black text-xs rounded-xl shadow-2xs transition flex items-center gap-1 mx-auto cursor-pointer"
                                   >
                                     <CreditCard className="w-3.5 h-3.5" />
-                                    <span>Pay Bill</span>
+                                    <span>Pay Due</span>
                                   </button>
                                 )}
 
@@ -1479,6 +1595,212 @@ export const PurchasesView: React.FC = () => {
                   className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md transition cursor-pointer"
                 >
                   Confirm Payment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: RECORD NEW DIRECT PURCHASE BILL / VOUCHER ================= */}
+      {isVoucherModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-amber-500" />
+                  <span>Record Direct Purchase Bill / Inward Voucher</span>
+                </h3>
+                <p className="text-xs text-slate-500">Directly inward raw materials received from vendor without prior PO</p>
+              </div>
+              <button onClick={() => setIsVoucherModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitVoucher} className="flex-1 overflow-y-auto my-4 pr-1 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Voucher / Bill No *</label>
+                  <input
+                    type="text"
+                    required
+                    value={voucherBillNo}
+                    onChange={e => setVoucherBillNo(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-blue-700 font-mono"
+                    placeholder="e.g. BILL-6264"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Vendor / Supplier *</label>
+                  <select
+                    value={voucherVendor}
+                    onChange={e => setVoucherVendor(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
+                  >
+                    {data.vendors.map(v => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Purchase Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={voucherDate}
+                    onChange={e => setVoucherDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Payment Type *</label>
+                  <select
+                    value={voucherPaymentType}
+                    onChange={e => setVoucherPaymentType(e.target.value as any)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
+                  >
+                    <option value="CREDIT">Credit (Accounts Due)</option>
+                    <option value="CASH">Cash Paid (Immediate)</option>
+                    <option value="BANK">Bank / Digital Paid</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Status Radio / Badge */}
+              <div className="flex flex-wrap items-center gap-4 px-1 text-xs font-bold">
+                <span className="text-slate-600">Stock Inward Status:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="voucherStatus"
+                    value="FINAL"
+                    checked={voucherStatus === 'FINAL'}
+                    onChange={() => setVoucherStatus('FINAL')}
+                    className="text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-emerald-700 font-extrabold">✓ Final (Add stock to inventory immediately)</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="voucherStatus"
+                    value="DRAFT"
+                    checked={voucherStatus === 'DRAFT'}
+                    onChange={() => setVoucherStatus('DRAFT')}
+                    className="text-slate-600 focus:ring-slate-500"
+                  />
+                  <span className="text-slate-600">Draft (Pending verification)</span>
+                </label>
+              </div>
+
+              {/* Items Table */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-extrabold text-xs text-slate-900 uppercase tracking-wide">
+                    Received Raw Materials & Items
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleAddVoucherRow}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-xs rounded-lg transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Line Item</span>
+                  </button>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                      <tr>
+                        <th className="py-2 px-3 font-semibold">Raw Material Item</th>
+                        <th className="py-2 px-2 font-semibold text-center">UOM</th>
+                        <th className="py-2 px-2 font-semibold text-center">Received Qty</th>
+                        <th className="py-2 px-2 font-semibold text-right">Rate (৳)</th>
+                        <th className="py-2 px-3 font-semibold text-right">Total (৳)</th>
+                        <th className="py-2 px-2 text-center font-semibold">Remove</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {voucherItems.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-2 px-2">
+                            <select
+                              value={row.itemId}
+                              onChange={e => handleVoucherItemChange(idx, parseInt(e.target.value))}
+                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
+                            >
+                              {data.masterItems.map(m => (
+                                <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2 px-2 text-center font-bold text-slate-600">
+                            {row.uom}
+                          </td>
+                          <td className="py-2 px-2 text-center w-24">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              required
+                              value={row.qty}
+                              onChange={e => handleVoucherQtyRateChange(idx, parseFloat(e.target.value) || 0, row.rate)}
+                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-center text-xs font-extrabold text-blue-800"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right w-28">
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              value={row.rate}
+                              onChange={e => handleVoucherQtyRateChange(idx, row.qty, parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-right text-xs font-bold"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-right font-extrabold text-slate-900">
+                            ৳ {row.total.toLocaleString()}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVoucherRow(idx)}
+                              className="p-1 text-rose-500 hover:text-rose-700 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-400">Total Purchase Bill Amount:</div>
+                  <div className="text-xl font-extrabold text-amber-400">৳ {totalVoucherAmount.toLocaleString()}</div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsVoucherModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-sm hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-sm shadow-md transition cursor-pointer"
+                >
+                  Save & Inward Purchase Bill
                 </button>
               </div>
             </form>
@@ -1853,7 +2175,10 @@ export const PurchasesView: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 mb-1">Vendor / Supplier *</label>
                   <select
                     value={returnVendor}
-                    onChange={e => setReturnVendor(e.target.value)}
+                    onChange={e => {
+                      setReturnVendor(e.target.value);
+                      setReturnBillNo('');
+                    }}
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
                   >
                     {data.vendors.map(v => (
@@ -1866,11 +2191,27 @@ export const PurchasesView: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 mb-1">Original Bill / Invoice No</label>
                   <input
                     type="text"
+                    list="return-bill-datalist"
                     value={returnBillNo}
-                    onChange={e => setReturnBillNo(e.target.value)}
-                    placeholder="INV-9901"
+                    onChange={e => {
+                      const val = e.target.value;
+                      setReturnBillNo(val);
+                      const matchedBill = data.purchases.find(p => p.vendor === returnVendor && p.billNo.toLowerCase() === val.toLowerCase().trim());
+                      if (matchedBill && matchedBill.items.length > 0) {
+                        const firstItem = matchedBill.items[0];
+                        setReturnItemId(Number(firstItem.itemId));
+                        setReturnRate(firstItem.rate);
+                        setReturnQty(Math.min(returnQty, firstItem.qty));
+                      }
+                    }}
+                    placeholder="Select or enter bill e.g. INV-6865"
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
                   />
+                  <datalist id="return-bill-datalist">
+                    {data.purchases.filter(p => p.vendor === returnVendor).map(b => (
+                      <option key={b.id} value={b.billNo}>{b.billNo} — ৳{b.total.toLocaleString()} ({b.date})</option>
+                    ))}
+                  </datalist>
                 </div>
               </div>
 
@@ -1882,7 +2223,7 @@ export const PurchasesView: React.FC = () => {
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
                 >
                   {data.masterItems.map(m => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
+                    <option key={m.id} value={m.id}>{m.name} ({m.category}) - ৳{m.defaultRate}/{m.uom}</option>
                   ))}
                 </select>
               </div>
@@ -1914,6 +2255,19 @@ export const PurchasesView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Total Return Amount preview */}
+              <div className="p-3 bg-rose-50/80 border border-rose-200 rounded-xl flex items-center justify-between text-xs">
+                <div>
+                  <span className="font-extrabold text-slate-700 block">Total Return Value:</span>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    ({returnQty} {data.masterItems.find(m => Number(m.id) === Number(returnItemId))?.uom || 'Unit'} × ৳{returnRate})
+                  </span>
+                </div>
+                <div className="text-lg font-black text-rose-700">
+                  ৳ {Math.round((returnQty || 0) * (returnRate || 0)).toLocaleString()}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Reason for Return *</label>
                 <input
@@ -1937,6 +2291,21 @@ export const PurchasesView: React.FC = () => {
                   <option value="REFUNDED">REFUNDED (Cash / Bank cash refund received)</option>
                   <option value="PENDING">PENDING (Awaiting supplier decision)</option>
                 </select>
+                {refundStatus === 'ADJUSTED' && (
+                  <p className="text-[11px] text-blue-700 bg-blue-50/90 p-2 rounded-lg border border-blue-200 mt-1 font-medium">
+                    ℹ️ <strong>Auto-Adjust:</strong> ৳{Math.round((returnQty || 0) * (returnRate || 0)).toLocaleString()} will be automatically deducted from <strong>{returnVendor}</strong>'s payable due and supplier ledger.
+                  </p>
+                )}
+                {refundStatus === 'REFUNDED' && (
+                  <p className="text-[11px] text-emerald-700 bg-emerald-50/90 p-2 rounded-lg border border-emerald-200 mt-1 font-medium">
+                    ℹ️ <strong>Cash Refund:</strong> Cash or bank refund was directly received from the vendor for this return.
+                  </p>
+                )}
+                {refundStatus === 'PENDING' && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50/90 p-2 rounded-lg border border-amber-200 mt-1 font-medium">
+                    ℹ️ <strong>Pending Claim:</strong> Claim logged; awaiting vendor approval or replacement goods.
+                  </p>
+                )}
               </div>
 
               <div className="pt-3 flex gap-3">

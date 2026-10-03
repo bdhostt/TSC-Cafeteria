@@ -2145,22 +2145,28 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   // Vendor Payables
-  const vMap: Record<string, { credit: number; paid: number }> = {};
-  data.vendors.forEach(v => { vMap[v] = { credit: 0, paid: 0 }; });
+  const vMap: Record<string, { credit: number; paid: number; adjustedReturns: number }> = {};
+  data.vendors.forEach(v => { vMap[v] = { credit: 0, paid: 0, adjustedReturns: 0 }; });
   data.purchases.forEach(p => {
     if (p.status === 'DRAFT') return;
-    if (!vMap[p.vendor]) vMap[p.vendor] = { credit: 0, paid: 0 };
+    if (!vMap[p.vendor]) vMap[p.vendor] = { credit: 0, paid: 0, adjustedReturns: 0 };
     if ((p.paymentType || 'CREDIT') === 'CREDIT') {
       vMap[p.vendor].credit += (p.total || 0);
     }
   });
   data.payments.forEach(pay => {
-    if (!vMap[pay.vendor]) vMap[pay.vendor] = { credit: 0, paid: 0 };
+    if (!vMap[pay.vendor]) vMap[pay.vendor] = { credit: 0, paid: 0, adjustedReturns: 0 };
     vMap[pay.vendor].paid += pay.amount;
+  });
+  (data.purchaseReturns || []).forEach(ret => {
+    if (ret.refundStatus === 'ADJUSTED') {
+      if (!vMap[ret.vendor]) vMap[ret.vendor] = { credit: 0, paid: 0, adjustedReturns: 0 };
+      vMap[ret.vendor].adjustedReturns += (ret.total || 0);
+    }
   });
   let totalVendorDue = 0;
   Object.keys(vMap).forEach(v => {
-    const bal = vMap[v].credit - vMap[v].paid;
+    const bal = vMap[v].credit - vMap[v].paid - vMap[v].adjustedReturns;
     if (bal > 0) totalVendorDue += bal;
   });
 
@@ -5213,16 +5219,20 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const list = prev.purchaseReturns || DEFAULT_PURCHASE_RETURNS;
       let updatedReturns: PurchaseReturn[];
       let targetRet: PurchaseReturn;
+      let qtyDiff = 0;
 
       if (returnRecord.id) {
         const index = list.findIndex(pr => pr.id === returnRecord.id);
         if (index >= 0) {
-          targetRet = { ...list[index], ...returnRecord } as PurchaseReturn;
+          const oldRet = list[index];
+          targetRet = { ...oldRet, ...returnRecord } as PurchaseReturn;
           updatedReturns = [...list];
           updatedReturns[index] = targetRet;
+          qtyDiff = (targetRet.qty || 0) - (oldRet.qty || 0);
         } else {
           targetRet = returnRecord as PurchaseReturn;
           updatedReturns = [targetRet, ...list];
+          qtyDiff = targetRet.qty || 0;
         }
       } else {
         targetRet = {
@@ -5241,20 +5251,31 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           refundStatus: returnRecord.refundStatus || 'ADJUSTED'
         };
         updatedReturns = [targetRet, ...list];
+        qtyDiff = targetRet.qty || 0;
       }
 
       // Deduct returned stock from inventory
       let updatedInventory = prev.inventory || [];
       if (targetRet.itemId) {
+        let found = false;
         updatedInventory = updatedInventory.map(inv => {
           if (inv.id === targetRet.itemId) {
+            found = true;
             return {
               ...inv,
-              open: Math.max(0, inv.open - targetRet.qty)
+              open: Math.max(0, inv.open - qtyDiff)
             };
           }
           return inv;
         });
+        if (!found && qtyDiff > 0) {
+          updatedInventory = [...updatedInventory, {
+            id: targetRet.itemId,
+            open: 0,
+            used: 0,
+            rate: targetRet.rate || 0
+          }];
+        }
       }
 
       return {
@@ -5266,10 +5287,27 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const deletePurchaseReturn = (id: number) => {
-    setData(prev => ({
-      ...prev,
-      purchaseReturns: (prev.purchaseReturns || DEFAULT_PURCHASE_RETURNS).filter(pr => pr.id !== id)
-    }));
+    setData(prev => {
+      const list = prev.purchaseReturns || DEFAULT_PURCHASE_RETURNS;
+      const target = list.find(pr => pr.id === id);
+      let updatedInventory = prev.inventory || [];
+      if (target && target.itemId) {
+        updatedInventory = updatedInventory.map(inv => {
+          if (inv.id === target.itemId) {
+            return {
+              ...inv,
+              open: inv.open + (target.qty || 0)
+            };
+          }
+          return inv;
+        });
+      }
+      return {
+        ...prev,
+        purchaseReturns: list.filter(pr => pr.id !== id),
+        inventory: updatedInventory
+      };
+    });
   };
 
   const saveExpense = (expense: Omit<ExpenseRecord, 'id'> & { id?: number }) => {
