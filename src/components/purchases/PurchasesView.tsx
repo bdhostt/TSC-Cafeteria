@@ -97,7 +97,7 @@ export const PurchasesView: React.FC = () => {
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
   const [returnVendor, setReturnVendor] = useState(data.vendors[0] || 'Kader Meat Supply');
   const [returnBillNo, setReturnBillNo] = useState('');
-  const [returnItemId, setReturnItemId] = useState<number>(data.masterItems[0]?.id || 1);
+  const [returnItemId, setReturnItemId] = useState<number | string>(data.masterItems[0]?.id || 1);
   const [returnQty, setReturnQty] = useState<number>(1);
   const [returnRate, setReturnRate] = useState<number>(data.masterItems[0]?.defaultRate || 0);
   const [returnReason, setReturnReason] = useState('Damaged packaging or quality mismatch on delivery');
@@ -421,8 +421,11 @@ export const PurchasesView: React.FC = () => {
     setReturnVendor(defaultVendor);
     setReturnBillNo('');
     if (data.masterItems.length > 0) {
-      setReturnItemId(Number(data.masterItems[0].id));
-      setReturnRate(data.masterItems[0].defaultRate);
+      setReturnItemId(data.masterItems[0].id);
+      setReturnRate(data.masterItems[0].defaultRate || 0);
+    } else {
+      setReturnItemId(1);
+      setReturnRate(0);
     }
     setReturnQty(1);
     setReturnReason('Damaged packaging / seal broken upon delivery');
@@ -430,23 +433,82 @@ export const PurchasesView: React.FC = () => {
     setIsReturnModalOpen(true);
   };
 
-  const handleReturnItemSelect = (rawId: number) => {
-    const raw = data.masterItems.find(m => Number(m.id) === Number(rawId));
-    if (!raw) return;
-    setReturnItemId(Number(raw.id));
-    setReturnRate(raw.defaultRate);
+  const handleReturnItemSelect = (selectedKey: string | number) => {
+    // 1. Check if user selected an item from the matched bill
+    const matchedBill = data.purchases.find(
+      p => p.vendor === returnVendor && p.billNo.toLowerCase() === returnBillNo.toLowerCase().trim()
+    );
+    if (matchedBill && matchedBill.items) {
+      const billItem = matchedBill.items.find(
+        i => String(i.itemId) === String(selectedKey) || i.item === String(selectedKey)
+      );
+      if (billItem) {
+        const masterMatch = data.masterItems.find(
+          m => (billItem.itemId && String(m.id) === String(billItem.itemId)) ||
+               (billItem.item && m.name.trim().toLowerCase() === billItem.item.trim().toLowerCase())
+        );
+        setReturnItemId(masterMatch ? masterMatch.id : (billItem.itemId || billItem.item));
+        setReturnRate(billItem.rate || 0);
+        setReturnQty(Math.min(returnQty || 1, billItem.qty || 1));
+        return;
+      }
+    }
+
+    // 2. Check in master inventory by ID or name
+    const raw = data.masterItems.find(m => String(m.id) === String(selectedKey) || m.name.toLowerCase() === String(selectedKey).toLowerCase());
+    if (raw) {
+      setReturnItemId(raw.id);
+      setReturnRate(raw.defaultRate);
+      return;
+    }
+
+    setReturnItemId(selectedKey);
   };
 
   const handleSubmitReturn = (e: React.FormEvent) => {
     e.preventDefault();
-    const raw = data.masterItems.find(m => Number(m.id) === Number(returnItemId));
-    if (!raw) {
-      alert('Selected item not found in master inventory!');
-      return;
-    }
 
     if (returnQty <= 0) {
       alert('Return quantity must be greater than 0!');
+      return;
+    }
+
+    // Match raw material from master items by ID or name
+    let raw = data.masterItems.find(m => String(m.id) === String(returnItemId));
+    if (!raw) {
+      raw = data.masterItems.find(
+        m => m.name.trim().toLowerCase() === String(returnItemId).trim().toLowerCase()
+      );
+    }
+
+    // If not found in masterItems, check in the matched bill
+    const matchedBill = data.purchases.find(
+      p => p.billNo.toLowerCase() === returnBillNo.toLowerCase().trim()
+    );
+    const billItem = matchedBill?.items.find(
+      i => String(i.itemId) === String(returnItemId) ||
+           i.item.trim().toLowerCase() === String(returnItemId).trim().toLowerCase()
+    ) || matchedBill?.items[0];
+
+    let finalItemId: number;
+    let finalItemName: string;
+    let finalUom: string;
+
+    if (raw) {
+      finalItemId = Number(raw.id) || Date.now();
+      finalItemName = raw.name;
+      finalUom = raw.uom;
+    } else if (billItem) {
+      finalItemId = Number(billItem.itemId) || (data.masterItems[0]?.id ? Number(data.masterItems[0].id) : Date.now());
+      finalItemName = billItem.item;
+      finalUom = billItem.uom || 'Unit';
+    } else if (data.masterItems.length > 0) {
+      const firstMaster = data.masterItems[0];
+      finalItemId = Number(firstMaster.id);
+      finalItemName = firstMaster.name;
+      finalUom = firstMaster.uom;
+    } else {
+      alert('Selected item not found in master inventory!');
       return;
     }
 
@@ -458,10 +520,10 @@ export const PurchasesView: React.FC = () => {
       date: returnDate,
       vendor: returnVendor,
       billNo: returnBillNo.trim(),
-      itemId: raw.id,
-      item: raw.name,
+      itemId: finalItemId,
+      item: finalItemName,
       qty: returnQty,
-      uom: raw.uom,
+      uom: finalUom,
       rate: returnRate,
       total: totalRetAmount,
       reason: returnReason.trim() || 'Returned to supplier',
@@ -2196,12 +2258,23 @@ export const PurchasesView: React.FC = () => {
                     onChange={e => {
                       const val = e.target.value;
                       setReturnBillNo(val);
-                      const matchedBill = data.purchases.find(p => p.vendor === returnVendor && p.billNo.toLowerCase() === val.toLowerCase().trim());
-                      if (matchedBill && matchedBill.items.length > 0) {
+                      const matchedBill = data.purchases.find(
+                        p => p.vendor === returnVendor && p.billNo.toLowerCase() === val.toLowerCase().trim()
+                      );
+                      if (matchedBill && matchedBill.items && matchedBill.items.length > 0) {
                         const firstItem = matchedBill.items[0];
-                        setReturnItemId(Number(firstItem.itemId));
-                        setReturnRate(firstItem.rate);
-                        setReturnQty(Math.min(returnQty, firstItem.qty));
+                        const masterMatch = data.masterItems.find(
+                          m => (firstItem.itemId && String(m.id) === String(firstItem.itemId)) ||
+                               (firstItem.item && m.name.trim().toLowerCase() === firstItem.item.trim().toLowerCase())
+                        );
+                        if (masterMatch) {
+                          setReturnItemId(masterMatch.id);
+                          setReturnRate(firstItem.rate || masterMatch.defaultRate);
+                        } else {
+                          setReturnItemId(firstItem.itemId || firstItem.item);
+                          setReturnRate(firstItem.rate || 0);
+                        }
+                        setReturnQty(Math.min(returnQty || 1, firstItem.qty || 1));
                       }
                     }}
                     placeholder="Select or enter bill e.g. INV-6865"
@@ -2218,13 +2291,36 @@ export const PurchasesView: React.FC = () => {
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Returned Raw Material *</label>
                 <select
-                  value={returnItemId}
-                  onChange={e => handleReturnItemSelect(parseInt(e.target.value))}
+                  value={String(returnItemId)}
+                  onChange={e => handleReturnItemSelect(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
                 >
-                  {data.masterItems.map(m => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.category}) - ৳{m.defaultRate}/{m.uom}</option>
-                  ))}
+                  {(() => {
+                    const matchedBill = data.purchases.find(
+                      p => p.vendor === returnVendor && p.billNo.toLowerCase() === returnBillNo.toLowerCase().trim()
+                    );
+                    const billItems = matchedBill ? matchedBill.items : [];
+                    return (
+                      <>
+                        {billItems.length > 0 && (
+                          <optgroup label={`Items from Bill ${returnBillNo}`}>
+                            {billItems.map((bi, idx) => (
+                              <option key={`bill-${idx}-${bi.itemId || bi.item}`} value={String(bi.itemId || bi.item)}>
+                                ★ {bi.item} ({bi.category || 'Bill Item'}) - ৳{bi.rate}/{bi.uom} (Purchased: {bi.qty})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        <optgroup label="All Master Raw Materials">
+                          {data.masterItems.map(m => (
+                            <option key={m.id} value={String(m.id)}>
+                              {m.name} ({m.category}) - ৳{m.defaultRate}/{m.uom}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </>
+                    );
+                  })()}
                 </select>
               </div>
 
@@ -2260,7 +2356,13 @@ export const PurchasesView: React.FC = () => {
                 <div>
                   <span className="font-extrabold text-slate-700 block">Total Return Value:</span>
                   <span className="text-[10px] text-slate-500 font-medium">
-                    ({returnQty} {data.masterItems.find(m => Number(m.id) === Number(returnItemId))?.uom || 'Unit'} × ৳{returnRate})
+                    ({returnQty} {(() => {
+                      const mItem = data.masterItems.find(m => String(m.id) === String(returnItemId) || m.name.toLowerCase() === String(returnItemId).toLowerCase());
+                      if (mItem) return mItem.uom;
+                      const matchedBill = data.purchases.find(p => p.vendor === returnVendor && p.billNo.toLowerCase() === returnBillNo.toLowerCase().trim());
+                      const bItem = matchedBill?.items.find(i => String(i.itemId) === String(returnItemId) || i.item.toLowerCase() === String(returnItemId).toLowerCase());
+                      return bItem?.uom || 'Unit';
+                    })()} × ৳{returnRate})
                   </span>
                 </div>
                 <div className="text-lg font-black text-rose-700">
