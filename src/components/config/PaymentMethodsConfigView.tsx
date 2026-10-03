@@ -24,6 +24,8 @@ import {
 export const PaymentMethodsConfigView: React.FC = () => {
   const {
     data,
+    metrics,
+    getLiveAccountBalance,
     addPaymentMethod,
     updatePaymentMethod,
     deletePaymentMethod,
@@ -66,7 +68,7 @@ export const PaymentMethodsConfigView: React.FC = () => {
     setFormProvider('bKash');
     setFormAccountNumber('');
     setFormChargePercent(0);
-    setFormLedgerAccountId('1003');
+    setFormLedgerAccountId('1040');
     setFormNotes('');
     setFormIsActive(true);
     setFormIsDefault(false);
@@ -180,6 +182,44 @@ export const PaymentMethodsConfigView: React.FC = () => {
 
   const chartAccounts = data.chartOfAccounts || [];
 
+  const getMethodLiveAmount = (m: PaymentMethodConfig): number => {
+    // If explicitly mapped to a Chart of Accounts ledger code
+    if (m.ledgerAccountId) {
+      const head = chartAccounts.find(a => a.code === m.ledgerAccountId);
+      if (head) {
+        return getLiveAccountBalance(head);
+      }
+    }
+
+    // Fallback logic based on payment method type and name
+    const nameLower = `${m.name} ${m.providerName || ''}`.toLowerCase();
+    if (m.type === 'CASH') {
+      if (nameLower.includes('petty')) {
+        return metrics.paymentAccountBalances.pettyCash || 0;
+      }
+      return metrics.paymentAccountBalances.cashDrawer || 0;
+    }
+    if (m.type === 'MFS') {
+      if (nameLower.includes('nagad')) {
+        return metrics.paymentAccountBalances.nagadMerchant || 0;
+      }
+      if (nameLower.includes('bkash')) {
+        return metrics.paymentAccountBalances.bkashMerchant || 0;
+      }
+      return (metrics.paymentAccountBalances.bkashMerchant || 0) + (metrics.paymentAccountBalances.nagadMerchant || 0);
+    }
+    if (m.type === 'CARD') {
+      return metrics.payCard || 0;
+    }
+    if (m.type === 'BANK') {
+      return metrics.paymentAccountBalances.bankTransfer || 0;
+    }
+    if (m.type === 'CREDIT') {
+      return metrics.totalCustomerDue || 0;
+    }
+    return 0;
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* Toast Alert */}
@@ -230,25 +270,25 @@ export const PaymentMethodsConfigView: React.FC = () => {
         <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
           <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total Methods</div>
           <div className="text-2xl font-black text-slate-900">{totalCount}</div>
-          <div className="text-[10px] text-slate-500 mt-1">Configured in system</div>
+          <div className="text-[10px] text-slate-500 mt-1">{activeCount} Active in POS Checkout</div>
         </div>
 
         <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl shadow-xs">
-          <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Active in POS</div>
-          <div className="text-2xl font-black text-emerald-800">{activeCount}</div>
-          <div className="text-[10px] text-emerald-600 mt-1">Available at checkout</div>
+          <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Cash Drawer (Live)</div>
+          <div className="text-2xl font-black text-emerald-800">৳ {metrics.paymentAccountBalances.cashDrawer.toLocaleString()}</div>
+          <div className="text-[10px] text-emerald-600 mt-1">Available in register cash drawer</div>
         </div>
 
-        <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl shadow-xs">
-          <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1">Default Method</div>
-          <div className="text-base font-black text-amber-900 truncate">{defaultMethod?.name || 'Cash'}</div>
-          <div className="text-[10px] text-amber-700 mt-1">1-click fast settlement</div>
+        <div className="p-4 bg-pink-50/70 border border-pink-200 rounded-2xl shadow-xs">
+          <div className="text-[11px] font-bold text-pink-700 uppercase tracking-wider mb-1">MFS Inflow (bKash/Nagad)</div>
+          <div className="text-2xl font-black text-pink-900">৳ {(metrics.paymentAccountBalances.bkashMerchant + metrics.paymentAccountBalances.nagadMerchant).toLocaleString()}</div>
+          <div className="text-[10px] text-pink-600 mt-1">bKash ৳{metrics.paymentAccountBalances.bkashMerchant.toLocaleString()} | Nagad ৳{metrics.paymentAccountBalances.nagadMerchant.toLocaleString()}</div>
         </div>
 
         <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl shadow-xs">
-          <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-1">MFS & Card Terminals</div>
-          <div className="text-2xl font-black text-blue-900">{mfsCardCount}</div>
-          <div className="text-[10px] text-blue-600 mt-1">Digital payment channels</div>
+          <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-1">Bank & POS Card Sales</div>
+          <div className="text-2xl font-black text-blue-900">৳ {(metrics.paymentAccountBalances.bankTransfer + metrics.payCard).toLocaleString()}</div>
+          <div className="text-[10px] text-blue-600 mt-1">Bank ৳{metrics.paymentAccountBalances.bankTransfer.toLocaleString()} | Card ৳{metrics.payCard.toLocaleString()}</div>
         </div>
       </div>
 
@@ -299,6 +339,8 @@ export const PaymentMethodsConfigView: React.FC = () => {
                 <th className="py-3 px-4 font-bold">Type</th>
                 <th className="py-3 px-4 font-bold">Provider / Terminal</th>
                 <th className="py-3 px-4 font-bold">Account / Mobile No.</th>
+                <th className="py-3 px-4 font-bold">Ledger Link</th>
+                <th className="py-3 px-4 font-bold text-right">Live Balance / Collected (৳)</th>
                 <th className="py-3 px-4 font-bold text-center">Service Fee</th>
                 <th className="py-3 px-4 font-bold text-center">Status</th>
                 <th className="py-3 px-4 font-bold text-center">Default</th>
@@ -308,12 +350,14 @@ export const PaymentMethodsConfigView: React.FC = () => {
             <tbody className="divide-y divide-slate-200">
               {filteredMethods.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={10} className="py-8 text-center text-slate-400">
                     No payment methods found matching "{search}".
                   </td>
                 </tr>
               ) : (
                 filteredMethods.map(m => {
+                  const liveAmt = getMethodLiveAmount(m);
+                  const linkedHead = m.ledgerAccountId ? chartAccounts.find(a => a.code === m.ledgerAccountId) : null;
                   return (
                     <tr
                       key={m.id}
@@ -363,6 +407,30 @@ export const PaymentMethodsConfigView: React.FC = () => {
                         ) : (
                           <span className="text-slate-400 font-normal">N/A</span>
                         )}
+                      </td>
+
+                      {/* Linked COA Ledger */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        {linkedHead ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200" title={linkedHead.name}>
+                            {linkedHead.code} - {linkedHead.name.split(' ')[0]}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[10px] italic">—</span>
+                        )}
+                      </td>
+
+                      {/* Live Balance / Collected */}
+                      <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-black">
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                          liveAmt > 0
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            : liveAmt < 0
+                            ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}>
+                          ৳ {liveAmt.toLocaleString()}
+                        </span>
                       </td>
 
                       {/* Service Fee */}

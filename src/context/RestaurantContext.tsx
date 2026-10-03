@@ -589,7 +589,7 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     isDefault: true,
     isActive: true,
     notes: "Default cash drawer currency payments",
-    ledgerAccountId: "1001"
+    ledgerAccountId: "1010"
   },
   {
     id: "card_pos",
@@ -600,7 +600,7 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     isDefault: false,
     isActive: true,
     notes: "Debit & credit cards swipe/tap terminal",
-    ledgerAccountId: "1002"
+    ledgerAccountId: "1030"
   },
   {
     id: "bkash_merchant",
@@ -612,7 +612,7 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     isDefault: false,
     isActive: true,
     notes: "Merchant QR Code & direct digital payment",
-    ledgerAccountId: "1003"
+    ledgerAccountId: "1040"
   },
   {
     id: "nagad_merchant",
@@ -624,7 +624,7 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     isDefault: false,
     isActive: true,
     notes: "Nagad digital wallet / QR payment",
-    ledgerAccountId: "1004"
+    ledgerAccountId: "1040"
   },
   {
     id: "due_credit",
@@ -634,7 +634,7 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     isDefault: false,
     isActive: true,
     notes: "Credit dining billed to registered customer ledger",
-    ledgerAccountId: "1005"
+    ledgerAccountId: "1050"
   },
   {
     id: "bank_transfer",
@@ -646,7 +646,7 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     isDefault: false,
     isActive: true,
     notes: "Direct BEFTN / NPSB / RTGS account transfer",
-    ledgerAccountId: "1002"
+    ledgerAccountId: "1030"
   }
 ];
 
@@ -1421,6 +1421,7 @@ interface RestaurantContextType {
   addAccountHead: (head: Omit<AccountHead, 'id'>) => void;
   editAccountHead: (id: string, updated: Partial<AccountHead>) => void;
   deleteAccountHead: (id: string) => void;
+  getLiveAccountBalance: (acc: AccountHead) => number;
 
   // Customer Advance Deposits
   saveCustomerAdvance: (advance: Omit<CustomerAdvance, 'id'> & { id?: number }) => void;
@@ -1465,6 +1466,7 @@ interface RestaurantContextType {
     payNagad: number;
     paymentAccountBalances: {
       cashDrawer: number;
+      pettyCash?: number;
       bankTransfer: number;
       cheque: number;
       bkashMerchant: number;
@@ -2323,8 +2325,39 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const payBkash = activeSalesList.reduce((sum, s) => sum + (s.bkash || 0), 0);
   const payNagad = activeSalesList.reduce((sum, s) => sum + (s.nagad || 0), 0);
 
-  // Payment Account Live Balances (Cash Drawer, Bank Transfer, Cheque, bKash Merchant, Nagad Merchant)
-  const totalCashExpenses = data.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  // Payment Account Live Balances (Cash Drawer, Bank Transfer, Cheque, bKash Merchant, Nagad Merchant, Petty Cash)
+  const isExpenseCash = (m?: string) => {
+    if (!m) return true;
+    const norm = m.toLowerCase().trim();
+    return norm.includes('cash in hand') || norm === 'cash' || norm === 'cash drawer' || norm === 'drawer';
+  };
+  const isExpensePettyCash = (m?: string) => {
+    if (!m) return false;
+    const norm = m.toLowerCase().trim();
+    return norm.includes('petty');
+  };
+  const isExpenseBank = (m?: string) => {
+    if (!m) return false;
+    const norm = m.toLowerCase().trim();
+    return norm.includes('bank') || norm.includes('card');
+  };
+  const isExpenseBkash = (m?: string) => {
+    if (!m) return false;
+    const norm = m.toLowerCase().trim();
+    return norm.includes('bkash');
+  };
+  const isExpenseNagad = (m?: string) => {
+    if (!m) return false;
+    const norm = m.toLowerCase().trim();
+    return norm.includes('nagad');
+  };
+
+  const cashExpenses = data.expenses.filter(e => isExpenseCash(e.paymentMethod)).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const pettyCashExpenses = data.expenses.filter(e => isExpensePettyCash(e.paymentMethod)).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const bankExpenses = data.expenses.filter(e => isExpenseBank(e.paymentMethod)).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const bkashExpenses = data.expenses.filter(e => isExpenseBkash(e.paymentMethod)).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const nagadExpenses = data.expenses.filter(e => isExpenseNagad(e.paymentMethod)).reduce((sum, e) => sum + (e.amount || 0), 0);
+
   const totalCashPurchases = data.purchases
     .filter(p => p.status !== 'DRAFT' && p.paymentType === 'CASH')
     .reduce((sum, p) => sum + (p.total || 0), 0);
@@ -2371,16 +2404,18 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const vendorPayNagad = data.payments.filter(p => isNagadMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
 
   const baseCashDrawer = 15000;
+  const basePettyCash = 5000;
   const baseBank = 85000;
   const baseCheque = 50000;
   const baseBkash = 15000;
   const baseNagad = 10000;
 
-  const cashDrawerBalance = Math.max(0, baseCashDrawer + payCash + totalCashDueCollected + advCash - totalCashExpenses - totalCashPurchases - vendorPayCash);
-  const bankTransferBalance = Math.max(0, baseBank + payCard + advBank - vendorPayBank);
+  const cashDrawerBalance = Math.max(0, baseCashDrawer + payCash + totalCashDueCollected + advCash - cashExpenses - totalCashPurchases - vendorPayCash);
+  const pettyCashBalance = Math.max(0, basePettyCash - pettyCashExpenses);
+  const bankTransferBalance = Math.max(0, baseBank + payCard + advBank - vendorPayBank - bankExpenses);
   const chequeBalance = Math.max(0, baseCheque - vendorPayCheque);
-  const bkashMerchantBalance = Math.max(0, baseBkash + payBkash + advBkash - vendorPayBkash);
-  const nagadMerchantBalance = Math.max(0, baseNagad + payNagad + advNagad - vendorPayNagad);
+  const bkashMerchantBalance = Math.max(0, baseBkash + payBkash + advBkash - vendorPayBkash - bkashExpenses);
+  const nagadMerchantBalance = Math.max(0, baseNagad + payNagad + advNagad - vendorPayNagad - nagadExpenses);
 
   const openTables = useMemo(() => {
     return (data.tables || []).filter(t => t.status !== 'free' && (t.cart?.length > 0 || t.status === 'billed' || t.status === 'hold'));
@@ -5948,6 +5983,76 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
+  const getLiveAccountBalance = (acc: AccountHead): number => {
+    const opening = acc.balance || 0;
+    const code = acc.code;
+
+    // Journal entries net effect
+    const journalEffect = (data.journalEntries || []).reduce((sum, j) => {
+      let delta = 0;
+      if (j.debitAccountId === acc.id || j.debitAccountId === acc.code) {
+        delta += (acc.type === 'ASSET' || acc.type === 'EXPENSE') ? j.amount : -j.amount;
+      }
+      if (j.creditAccountId === acc.id || j.creditAccountId === acc.code) {
+        delta += (acc.type === 'LIABILITY' || acc.type === 'EQUITY' || acc.type === 'REVENUE') ? j.amount : -j.amount;
+      }
+      return sum + delta;
+    }, 0);
+
+    if (code === '1010') {
+      return cashDrawerBalance + journalEffect;
+    }
+    if (code === '1020') {
+      return pettyCashBalance + journalEffect;
+    }
+    if (code === '1030') {
+      return bankTransferBalance + journalEffect;
+    }
+    if (code === '1040') {
+      return bkashMerchantBalance + nagadMerchantBalance + journalEffect;
+    }
+    if (code === '1050') {
+      return totalCustomerDue + journalEffect;
+    }
+    if (code === '1060') {
+      return opening + totalClosingStockVal + journalEffect;
+    }
+    if (code === '2010') {
+      return totalVendorDue + journalEffect;
+    }
+    if (code === '2020') {
+      return totalCustomerAdvances + journalEffect;
+    }
+    if (code === '2030') {
+      return opening + journalEffect;
+    }
+    if (code === '3010') {
+      return opening + journalEffect;
+    }
+    if (code === '3020') {
+      return opening + estimatedProfit + journalEffect;
+    }
+    if (code === '4010') {
+      const dineInSales = activeSalesList.filter(s => !s.channelOrAgent || s.channelOrAgent === 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
+      return opening + dineInSales + journalEffect;
+    }
+    if (code === '4020') {
+      const deliverySales = activeSalesList.filter(s => s.channelOrAgent && s.channelOrAgent !== 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
+      return opening + deliverySales + journalEffect;
+    }
+    if (acc.type === 'EXPENSE') {
+      const headExpenses = data.expenses.filter(e => 
+        e.head.toLowerCase().includes(acc.name.toLowerCase().split(' ')[0]) || 
+        acc.name.toLowerCase().includes(e.head.toLowerCase())
+      ).reduce((sum, e) => sum + (e.amount || 0), 0);
+      return opening + headExpenses + journalEffect;
+    }
+    if (acc.type === 'REVENUE') {
+      return opening + totalSales + journalEffect;
+    }
+    return opening + journalEffect;
+  };
+
   // Customer Advance Handlers
   const saveCustomerAdvance = (advance: Omit<CustomerAdvance, 'id'> & { id?: number }) => {
     setData(prev => {
@@ -6404,6 +6509,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addAccountHead,
       editAccountHead,
       deleteAccountHead,
+      getLiveAccountBalance,
       saveCustomerAdvance,
       deleteCustomerAdvance,
       resetModuleData,
@@ -6442,6 +6548,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         payNagad,
         paymentAccountBalances: {
           cashDrawer: cashDrawerBalance,
+          pettyCash: pettyCashBalance,
           bankTransfer: bankTransferBalance,
           cheque: chequeBalance,
           bkashMerchant: bkashMerchantBalance,

@@ -1,14 +1,26 @@
 import React, { useState } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
-import { Wallet, Plus, Trash2, Search, Filter } from 'lucide-react';
+import { 
+  Wallet, 
+  Plus, 
+  Trash2, 
+  Search, 
+  Banknote, 
+  Coins, 
+  Smartphone, 
+  Building, 
+  CreditCard 
+} from 'lucide-react';
 
 export const ExpensesView: React.FC = () => {
   const { data, metrics, saveExpense, deleteExpense } = useRestaurant();
   const [search, setSearch] = useState('');
+  const [filterMedium, setFilterMedium] = useState<string>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [head, setHead] = useState(data.expenseHeads[0] || 'Conveyance');
+  const [paymentMethod, setPaymentMethod] = useState<string>('Cash in Hand (POS Drawer)');
   const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState('');
 
@@ -19,6 +31,7 @@ export const ExpensesView: React.FC = () => {
       date,
       head,
       amount: Number(amount),
+      paymentMethod,
       note: note.trim()
     });
     setIsAddModalOpen(false);
@@ -26,10 +39,77 @@ export const ExpensesView: React.FC = () => {
     setNote('');
   };
 
+  const getMediumBadge = (method?: string) => {
+    const norm = (method || 'Cash in Hand (POS Drawer)').toLowerCase();
+    if (norm.includes('petty')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+          <Coins className="w-3 h-3 text-amber-600" />
+          <span>Petty Cash</span>
+        </span>
+      );
+    }
+    if (norm.includes('bkash')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-pink-50 text-pink-800 border border-pink-200">
+          <Smartphone className="w-3 h-3 text-pink-600" />
+          <span>bKash</span>
+        </span>
+      );
+    }
+    if (norm.includes('nagad')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-800 border border-orange-200">
+          <Smartphone className="w-3 h-3 text-orange-600" />
+          <span>Nagad</span>
+        </span>
+      );
+    }
+    if (norm.includes('bank')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+          <Building className="w-3 h-3 text-indigo-600" />
+          <span>Bank Transfer</span>
+        </span>
+      );
+    }
+    if (norm.includes('card')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+          <CreditCard className="w-3 h-3 text-blue-600" />
+          <span>Card</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+        <Banknote className="w-3 h-3 text-emerald-600" />
+        <span>Cash Drawer</span>
+      </span>
+    );
+  };
+
+  // Metrics breakdown
+  const totalExp = metrics.totalExpenses;
+  const cashExp = data.expenses
+    .filter(e => !e.paymentMethod || e.paymentMethod.toLowerCase().includes('cash') || e.paymentMethod.toLowerCase().includes('drawer'))
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const pettyExp = data.expenses
+    .filter(e => e.paymentMethod && e.paymentMethod.toLowerCase().includes('petty'))
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const digitalExp = totalExp - cashExp - pettyExp;
+
   const filteredExpenses = data.expenses.filter(e => {
-    if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
-    return e.head.toLowerCase().includes(q) || (e.note || '').toLowerCase().includes(q) || e.date.includes(q);
+    const matchesSearch = !q || e.head.toLowerCase().includes(q) || (e.note || '').toLowerCase().includes(q) || e.date.includes(q) || (e.paymentMethod || '').toLowerCase().includes(q);
+    
+    if (filterMedium === 'ALL') return matchesSearch;
+    const m = (e.paymentMethod || 'cash').toLowerCase();
+    if (filterMedium === 'CASH') return matchesSearch && (m.includes('cash') || m.includes('drawer'));
+    if (filterMedium === 'PETTY') return matchesSearch && m.includes('petty');
+    if (filterMedium === 'MFS') return matchesSearch && (m.includes('bkash') || m.includes('nagad'));
+    if (filterMedium === 'BANK') return matchesSearch && (m.includes('bank') || m.includes('card'));
+    return matchesSearch;
   });
 
   return (
@@ -42,7 +122,7 @@ export const ExpensesView: React.FC = () => {
             <span>Operating Expenses Ledger</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Staff salaries, utility bills, maintenance, casual labor, and sundry operational expenses
+            Staff salaries, utility bills, maintenance, casual labor, and sundry operational expenses with payment medium tracking
           </p>
         </div>
 
@@ -56,27 +136,65 @@ export const ExpensesView: React.FC = () => {
         </button>
       </div>
 
-      {/* Summary card */}
-      <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center justify-between">
-        <div>
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Operating Expenses</div>
-          <div className="text-2xl font-extrabold text-rose-700 mt-1">৳ {metrics.totalExpenses.toLocaleString()}</div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Expenses</div>
+          <div className="text-2xl font-black text-rose-700 mt-1">৳ {totalExp.toLocaleString()}</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">{data.expenses.length} records</div>
         </div>
-        <div className="text-xs font-semibold text-slate-500">
-          Total {data.expenses.length} expense records
+
+        <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl shadow-xs">
+          <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Cash Drawer Paid</div>
+          <div className="text-2xl font-black text-emerald-900 mt-1">৳ {cashExp.toLocaleString()}</div>
+          <div className="text-[10px] text-emerald-700 mt-0.5">Deducted from POS drawer</div>
+        </div>
+
+        <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl shadow-xs">
+          <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Petty Cash Paid</div>
+          <div className="text-2xl font-black text-amber-900 mt-1">৳ {pettyExp.toLocaleString()}</div>
+          <div className="text-[10px] text-amber-700 mt-0.5">Petty cash fund expenses</div>
+        </div>
+
+        <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl shadow-xs">
+          <div className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">Bank & MFS Paid</div>
+          <div className="text-2xl font-black text-blue-900 mt-1">৳ {digitalExp.toLocaleString()}</div>
+          <div className="text-[10px] text-blue-700 mt-0.5">bKash, Nagad & Bank transfer</div>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-        <div className="relative">
+      {/* Filter Tabs & Search Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+          {[
+            { id: 'ALL', label: 'All Expenses' },
+            { id: 'CASH', label: 'Cash Drawer' },
+            { id: 'PETTY', label: 'Petty Cash' },
+            { id: 'MFS', label: 'bKash / Nagad' },
+            { id: 'BANK', label: 'Bank / Card' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterMedium(tab.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                filterMedium === tab.id
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full md:w-72">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by expense head, date, or notes..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#004b9b] focus:outline-none"
+            placeholder="Search expense head, date, note..."
+            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-[#004b9b] focus:outline-none"
           />
         </div>
       </div>
@@ -89,6 +207,7 @@ export const ExpensesView: React.FC = () => {
               <tr>
                 <th className="py-3 px-4 font-bold">Date</th>
                 <th className="py-3 px-4 font-bold">Expense Head</th>
+                <th className="py-3 px-4 font-bold">Paid From / Medium</th>
                 <th className="py-3 px-4 font-bold">Note / Description</th>
                 <th className="py-3 px-4 font-bold text-right">Amount (৳)</th>
                 <th className="py-3 px-4 font-bold text-center">Action</th>
@@ -97,7 +216,7 @@ export const ExpensesView: React.FC = () => {
             <tbody className="divide-y divide-slate-200">
               {filteredExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
                     No expense records found.
                   </td>
                 </tr>
@@ -106,6 +225,9 @@ export const ExpensesView: React.FC = () => {
                   <tr key={item.id} className="hover:bg-slate-50 transition">
                     <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">{item.date}</td>
                     <td className="py-3 px-4 font-extrabold text-slate-900">{item.head}</td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      {getMediumBadge(item.paymentMethod)}
+                    </td>
                     <td className="py-3 px-4 text-slate-600">{item.note || '-'}</td>
                     <td className="py-3 px-4 text-right font-extrabold text-rose-700 text-sm whitespace-nowrap">
                       ৳ {item.amount.toLocaleString()}
@@ -132,7 +254,7 @@ export const ExpensesView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <h3 className="font-extrabold text-slate-900 text-lg mb-1">Record New Expense</h3>
-            <p className="text-xs text-slate-500 mb-4">Record restaurant operational or sundry expenses</p>
+            <p className="text-xs text-slate-500 mb-4">Record restaurant operational or sundry expenses with payment medium</p>
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
@@ -156,6 +278,24 @@ export const ExpensesView: React.FC = () => {
                   {data.expenseHeads.map(h => (
                     <option key={h} value={h}>{h}</option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Payment Medium / Paid From (টাকা পরিশোধের মাধ্যম) *
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={e => setPaymentMethod(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white"
+                >
+                  <option value="Cash in Hand (POS Drawer)">💵 Cash in Hand (POS Drawer)</option>
+                  <option value="Petty Cash Fund">🪙 Petty Cash Fund</option>
+                  <option value="bKash Merchant">📱 bKash Merchant</option>
+                  <option value="Nagad Merchant">👛 Nagad Merchant</option>
+                  <option value="Bank - City Bank A/C">🏦 Bank Account (Wire Transfer)</option>
+                  <option value="Card (Company Card)">💳 Card (Company Debit/Credit)</option>
                 </select>
               </div>
 
@@ -205,4 +345,3 @@ export const ExpensesView: React.FC = () => {
     </div>
   );
 };
-  

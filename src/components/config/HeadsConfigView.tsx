@@ -56,6 +56,8 @@ export const HeadsConfigView: React.FC = () => {
     addAccountHead,
     editAccountHead,
     deleteAccountHead,
+    getLiveAccountBalance,
+    metrics,
     addCustomTable,
     editCustomTable,
     deleteCustomTable,
@@ -1108,6 +1110,41 @@ export const HeadsConfigView: React.FC = () => {
       {/* Chart of Accounts Tab */}
       {activeTab === 'coa' && (
         <div className="space-y-4">
+          {/* Summary Stat Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl shadow-xs">
+              <div className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">Live Total Assets</div>
+              <div className="text-xl font-black text-blue-950 mt-1">
+                ৳ {chartList.filter(a => a.type === 'ASSET').reduce((sum, a) => sum + getLiveAccountBalance(a), 0).toLocaleString()}
+              </div>
+              <div className="text-[10px] text-blue-700 mt-0.5">Cash, Bank, Stock & Receivables</div>
+            </div>
+
+            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl shadow-xs">
+              <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Live Total Liabilities</div>
+              <div className="text-xl font-black text-amber-950 mt-1">
+                ৳ {chartList.filter(a => a.type === 'LIABILITY').reduce((sum, a) => sum + getLiveAccountBalance(a), 0).toLocaleString()}
+              </div>
+              <div className="text-[10px] text-amber-700 mt-0.5">Vendor dues & Customer advances</div>
+            </div>
+
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl shadow-xs">
+              <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Live Revenue / Sales</div>
+              <div className="text-xl font-black text-emerald-950 mt-1">
+                ৳ {metrics.totalSales.toLocaleString()}
+              </div>
+              <div className="text-[10px] text-emerald-700 mt-0.5">POS Dine-in & Delivery gross</div>
+            </div>
+
+            <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl shadow-xs">
+              <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Live Operating Expenses</div>
+              <div className="text-xl font-black text-rose-950 mt-1">
+                ৳ {metrics.totalExpenses.toLocaleString()}
+              </div>
+              <div className="text-[10px] text-rose-700 mt-0.5">All operating & sundry expenses</div>
+            </div>
+          </div>
+
           {/* Controls Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
             <div className="flex flex-wrap items-center gap-2">
@@ -1154,62 +1191,69 @@ export const HeadsConfigView: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold uppercase tracking-wider">
+                  <tr className="bg-slate-900 text-slate-300 border-b border-slate-800 font-extrabold uppercase tracking-wider">
                     <th className="py-3 px-4">Account Code</th>
                     <th className="py-3 px-4">Account Title / Name</th>
                     <th className="py-3 px-4">Account Type</th>
                     <th className="py-3 px-4">Classification / Category</th>
-                    <th className="py-3 px-4 text-right">Balance / Opening (৳)</th>
+                    <th className="py-3 px-4 text-right">Opening (৳)</th>
+                    <th className="py-3 px-4 text-right">Live Current Balance (৳)</th>
                     <th className="py-3 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                   {filteredAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
+                      <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
                         No accounts match the selected filter.
                       </td>
                     </tr>
                   ) : (
-                    filteredAccounts.map(acc => (
-                      <tr key={acc.id} className="hover:bg-slate-50/80 transition">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                          {acc.code}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-slate-900">
-                          {acc.name}
-                        </td>
-                        <td className="py-3 px-4">
-                          {getAccountTypeBadge(acc.type)}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 font-medium">
-                          {acc.category}
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold font-mono text-slate-900">
-                          ৳ {(acc.balance || 0).toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditCoa(acc)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                              title="Edit Account Head"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCoa(acc)}
-                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                              title="Delete Account Head"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    filteredAccounts.map(acc => {
+                      const liveBalance = getLiveAccountBalance(acc);
+                      return (
+                        <tr key={acc.id} className="hover:bg-slate-50/80 transition">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                            {acc.code}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-slate-900">
+                            {acc.name}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {getAccountTypeBadge(acc.type)}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 font-medium">
+                            {acc.category}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-slate-500 whitespace-nowrap">
+                            ৳ {(acc.balance || 0).toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold font-mono text-sm whitespace-nowrap text-emerald-700">
+                            ৳ {liveBalance.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditCoa(acc)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                title="Edit Account Head"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCoa(acc)}
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                title="Delete Account Head"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
