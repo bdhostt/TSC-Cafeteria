@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useRestaurant, isSaleActive, resolveExpenseAccount, DEFAULT_CHART_OF_ACCOUNTS } from '../../context/RestaurantContext';
+import { useRestaurant, isSaleActive, resolveExpenseAccount, DEFAULT_CHART_OF_ACCOUNTS, computeCogsBomAllocation } from '../../context/RestaurantContext';
 import { ReportFilters, DatePreset, exportCsvHelper } from './ReportFilters';
 import { 
   Scale, 
@@ -56,18 +56,16 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       });
     };
 
-    const cashAcc = getAccountByCode('1010') || getAccountByKeyword('ASSET', ['cash in hand', 'drawer', 'cash']) || coaList.find(a => a.type === 'ASSET');
-    const pettyCashAcc = getAccountByCode('1020') || getAccountByKeyword('ASSET', ['petty cash', 'petty']) || cashAcc;
-    const bankAcc = getAccountByCode('1030') || getAccountByKeyword('ASSET', ['bank a/c', 'bank', 'city bank']) || cashAcc;
-    const mfsAcc = getAccountByCode('1040') || getAccountByKeyword('ASSET', ['bkash', 'nagad', 'mobile', 'mfs']) || bankAcc;
-    const arAcc = getAccountByCode('1050') || getAccountByKeyword('ASSET', ['receivable', 'customer due', 'due']) || coaList.find(a => a.type === 'ASSET');
-    const invAcc = getAccountByCode('1060') || getAccountByKeyword('ASSET', ['inventory', 'raw material', 'stock']) || coaList.find(a => a.type === 'ASSET');
-    const apAcc = getAccountByCode('2010') || getAccountByKeyword('LIABILITY', ['payable', 'vendor', 'creditor']) || coaList.find(a => a.type === 'LIABILITY');
-    const advanceAcc = getAccountByCode('2020') || getAccountByCode('2030') || getAccountByKeyword('LIABILITY', ['advance', 'deposit']) || coaList.find(a => a.type === 'LIABILITY');
+    const cashAcc = getAccountByKeyword('ASSET', ['cash in hand', 'drawer', 'cash']) || getAccountByCode('1010') || coaList.find(a => a.type === 'ASSET');
+    const pettyCashAcc = getAccountByKeyword('ASSET', ['petty cash', 'petty']) || getAccountByCode('1020') || cashAcc;
+    const bankAcc = getAccountByKeyword('ASSET', ['bank a/c', 'bank', 'city bank']) || getAccountByCode('1030') || cashAcc;
+    const mfsAcc = getAccountByKeyword('ASSET', ['bkash', 'nagad', 'mobile banking', 'mfs']) || getAccountByCode('1040') || bankAcc;
+    const arAcc = getAccountByKeyword('ASSET', ['receivable', 'customer due', 'due']) || getAccountByCode('1050') || coaList.find(a => a.type === 'ASSET');
+    const invAcc = getAccountByKeyword('ASSET', ['inventory', 'raw material inventory', 'stock']) || getAccountByCode('1060') || coaList.find(a => a.type === 'ASSET');
+    const apAcc = getAccountByKeyword('LIABILITY', ['payable', 'vendor', 'creditor']) || getAccountByCode('2010') || coaList.find(a => a.type === 'LIABILITY');
+    const advanceAcc = getAccountByKeyword('LIABILITY', ['advance', 'customer advance', 'deposit']) || getAccountByCode('2020') || getAccountByCode('2050') || coaList.find(a => a.type === 'LIABILITY');
     const dineInRevAcc = getAccountByCode('4010') || getAccountByKeyword('REVENUE', ['dine-in', 'sales', 'revenue']) || coaList.find(a => a.type === 'REVENUE');
     const deliveryRevAcc = getAccountByCode('4020') || getAccountByKeyword('REVENUE', ['delivery', 'takeaway']) || dineInRevAcc;
-    const cogsMeatAcc = getAccountByCode('5010') || getAccountByKeyword('EXPENSE', ['meat', 'cogs', 'bom']) || coaList.find(a => a.type === 'EXPENSE');
-    const cogsGroceryAcc = getAccountByCode('5020') || getAccountByKeyword('EXPENSE', ['grocery', 'cogs', 'bom']) || cogsMeatAcc;
 
     // Movement tracking for each account code
     const movements: Record<string, { priorDr: number; priorCr: number; periodDr: number; periodCr: number }> = {};
@@ -268,51 +266,84 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
     });
 
     // 7. Process Recipe BOM Food Cost (COGS & Raw Material Inventory Consumption)
-    let priorBOMCost = 0;
-    let periodBOMCost = 0;
+    const rawRatesMap: Record<number, number> = {};
+    data.masterItems.forEach(item => {
+      let recQty = 0;
+      let recVal = 0;
+      data.purchases.forEach(p => {
+        if (p.status === 'DRAFT') return;
+        (p.items || []).forEach(sub => {
+          if (sub.itemId === item.id || (sub.item && sub.item.toLowerCase().trim() === item.name.toLowerCase().trim())) {
+            const q = Number(sub.qty) || 0;
+            const r = Number(sub.rate) || 0;
+            recQty += q;
+            recVal += (q * r);
+          }
+        });
+      });
+      (data.purchaseReturns || []).forEach(ret => {
+        if (ret.itemId === item.id || (ret.item && ret.item.toLowerCase().trim() === item.name.toLowerCase().trim())) {
+          const q = Number(ret.qty) || 0;
+          const r = Number(ret.rate) || 0;
+          recQty = Math.max(0, recQty - q);
+          recVal = Math.max(0, recVal - (q * r));
+        }
+      });
+      const avgRate = recQty > 0 ? (recVal / recQty) : (Number(item.defaultRate) || 0);
+      const invRecord = data.inventory.find(x => x.id === item.id);
+      rawRatesMap[item.id] = (invRecord && invRecord.rate) ? Number(invRecord.rate) : avgRate;
+    });
+
+    const priorBomUsageMap: Record<number, number> = {};
+    const periodBomUsageMap: Record<number, number> = {};
+
     data.sales.forEach(sale => {
       if (!isSaleActive(sale)) return;
       const isPrior = Boolean(startDate && sale.date && sale.date < startDate);
       const isPeriod = (!startDate || sale.date >= startDate) && (!endDate || sale.date <= endDate);
       if (!isPrior && !isPeriod) return;
 
-      let saleBOM = 0;
       (sale.items || []).forEach(ci => {
         const m = data.menuItems.find(mi => mi.id === ci.id);
         if (m?.recipe) {
           m.recipe.forEach(ing => {
-            const raw = data.masterItems.find(r => r.id === ing.rawItemId);
-            if (raw) {
-              saleBOM += (Number(ci.qty) || 0) * (Number(ing.qty) || 0) * (raw.defaultRate || 0);
+            const rawId = ing.rawItemId;
+            const used = (Number(ci.qty) || 0) * (Number(ing.qty) || 0);
+            if (isPrior) {
+              priorBomUsageMap[rawId] = (priorBomUsageMap[rawId] || 0) + used;
+            } else {
+              periodBomUsageMap[rawId] = (periodBomUsageMap[rawId] || 0) + used;
             }
           });
         }
       });
-
-      if (isPrior) priorBOMCost += saleBOM;
-      else if (isPeriod) periodBOMCost += saleBOM;
     });
 
-    if (priorBOMCost > 0) {
-      if (cogsMeatAcc && cogsGroceryAcc && cogsMeatAcc.code !== cogsGroceryAcc.code) {
-        const meatAmt = Math.round(priorBOMCost * 0.65);
-        postEntry(cogsMeatAcc.code, meatAmt, 0, true);
-        postEntry(cogsGroceryAcc.code, priorBOMCost - meatAmt, 0, true);
-      } else {
-        postEntry(cogsMeatAcc?.code || '5010', priorBOMCost, 0, true);
+    // Dynamic BOM Cost distribution matching COA heads
+    const priorAllocation = computeCogsBomAllocation(data.masterItems, priorBomUsageMap, rawRatesMap, coaList);
+    let totalPriorBom = 0;
+    coaList.filter(a => a.type === 'EXPENSE').forEach(acc => {
+      const amt = priorAllocation[acc.id] || 0;
+      if (amt > 0) {
+        postEntry(acc.code, amt, 0, true);
+        totalPriorBom += amt;
       }
-      postEntry(invAcc?.code || '1060', 0, priorBOMCost, true);
+    });
+    if (totalPriorBom > 0) {
+      postEntry(invAcc?.code || '1060', 0, totalPriorBom, true);
     }
 
-    if (periodBOMCost > 0) {
-      if (cogsMeatAcc && cogsGroceryAcc && cogsMeatAcc.code !== cogsGroceryAcc.code) {
-        const meatAmt = Math.round(periodBOMCost * 0.65);
-        postEntry(cogsMeatAcc.code, meatAmt, 0, false);
-        postEntry(cogsGroceryAcc.code, periodBOMCost - meatAmt, 0, false);
-      } else {
-        postEntry(cogsMeatAcc?.code || '5010', periodBOMCost, 0, false);
+    const periodAllocation = computeCogsBomAllocation(data.masterItems, periodBomUsageMap, rawRatesMap, coaList);
+    let totalPeriodBom = 0;
+    coaList.filter(a => a.type === 'EXPENSE').forEach(acc => {
+      const amt = periodAllocation[acc.id] || 0;
+      if (amt > 0) {
+        postEntry(acc.code, amt, 0, false);
+        totalPeriodBom += amt;
       }
-      postEntry(invAcc?.code || '1060', 0, periodBOMCost, false);
+    });
+    if (totalPeriodBom > 0) {
+      postEntry(invAcc?.code || '1060', 0, totalPeriodBom, false);
     }
 
     // 8. Process Manual Journal Entries
@@ -485,7 +516,35 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
 
     const netRevenue = grossSales - totalDiscounts;
 
-    // Cost of Sales (COGS): Recipe BOM consumption
+    // Cost of Sales (COGS): Recipe BOM consumption using live valuation rates
+    const rawRateLookup: Record<number, number> = {};
+    data.masterItems.forEach(item => {
+      let recQty = 0;
+      let recVal = 0;
+      data.purchases.forEach(p => {
+        if (p.status === 'DRAFT') return;
+        (p.items || []).forEach(sub => {
+          if (sub.itemId === item.id || (sub.item && sub.item.toLowerCase().trim() === item.name.toLowerCase().trim())) {
+            const q = Number(sub.qty) || 0;
+            const r = Number(sub.rate) || 0;
+            recQty += q;
+            recVal += (q * r);
+          }
+        });
+      });
+      (data.purchaseReturns || []).forEach(ret => {
+        if (ret.itemId === item.id || (ret.item && ret.item.toLowerCase().trim() === item.name.toLowerCase().trim())) {
+          const q = Number(ret.qty) || 0;
+          const r = Number(ret.rate) || 0;
+          recQty = Math.max(0, recQty - q);
+          recVal = Math.max(0, recVal - (q * r));
+        }
+      });
+      const avgRate = recQty > 0 ? (recVal / recQty) : (Number(item.defaultRate) || 0);
+      const invRecord = data.inventory.find(x => x.id === item.id);
+      rawRateLookup[item.id] = (invRecord && invRecord.rate) ? Number(invRecord.rate) : avgRate;
+    });
+
     let cogsRawCost = 0;
     data.sales.forEach(s => {
       if (!isSaleActive(s)) return;
@@ -496,7 +555,8 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
           m.recipe.forEach(ing => {
             const raw = data.masterItems.find(r => r.id === ing.rawItemId);
             if (raw) {
-              cogsRawCost += (Number(ci.qty) || 0) * (Number(ing.qty) || 0) * (raw.defaultRate || 0);
+              const rate = rawRateLookup[raw.id] || Number(raw.defaultRate) || 0;
+              cogsRawCost += (Number(ci.qty) || 0) * (Number(ing.qty) || 0) * rate;
             }
           });
         }

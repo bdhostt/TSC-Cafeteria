@@ -1238,11 +1238,13 @@ export const HeadsConfigView: React.FC = () => {
             </div>
 
             <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl shadow-xs">
-              <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Live Operating Expenses</div>
+              <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Live Total Expenses</div>
               <div className="text-xl font-black text-rose-950 mt-1">
-                ৳ {metrics.totalExpenses.toLocaleString()}
+                ৳ {(metrics.totalBomCostVal + metrics.totalExpenses).toLocaleString()}
               </div>
-              <div className="text-[10px] text-rose-700 mt-0.5">All operating & sundry expenses</div>
+              <div className="text-[10px] text-rose-700 mt-0.5">
+                COGS: ৳{metrics.totalBomCostVal.toLocaleString()} | OpEx: ৳{metrics.totalExpenses.toLocaleString()}
+              </div>
             </div>
           </div>
 
@@ -1329,7 +1331,11 @@ export const HeadsConfigView: React.FC = () => {
                           <td className="py-3 px-4 text-right font-mono text-slate-500 whitespace-nowrap">
                             ৳ {(acc.balance || 0).toLocaleString()}
                           </td>
-                          <td className="py-3 px-4 text-right font-bold font-mono text-sm whitespace-nowrap text-emerald-700">
+                          <td className={`py-3 px-4 text-right font-bold font-mono text-sm whitespace-nowrap ${
+                            acc.type === 'EXPENSE' ? 'text-rose-700' :
+                            acc.type === 'REVENUE' ? 'text-emerald-700' :
+                            acc.type === 'ASSET' ? 'text-blue-900' : 'text-slate-900'
+                          }`}>
                             ৳ {liveBalance.toLocaleString()}
                           </td>
                           <td className="py-3 px-4 text-center whitespace-nowrap">

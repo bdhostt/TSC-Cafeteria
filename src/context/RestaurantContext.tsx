@@ -1729,6 +1729,114 @@ export const resolveExpenseAccount = (
   return bestAccount;
 };
 
+/**
+ * Dynamically allocates live Recipe BOM Consumption Cost to Chart of Accounts heads
+ * based on raw material categories and names, ensuring 1-to-1 deterministic distribution
+ * with zero duplication and zero hardcoded percentages.
+ */
+export function computeCogsBomAllocation(
+  masterItems: RawMasterItem[],
+  autoBomUsageMap: Record<number, number>,
+  rawItemRates: Record<number, number>,
+  chartOfAccounts: AccountHead[]
+): Record<string, number> {
+  const bomAccounts = chartOfAccounts.filter(a => {
+    if (a.type !== 'EXPENSE') return false;
+    const c = a.code || '';
+    const n = (a.name || '').toLowerCase();
+    const cat = (a.category || '').toLowerCase();
+    const isC = c.startsWith('50') || cat.includes('cost of goods') || cat.includes('bom') || n.includes('cogs');
+    if (!isC) return false;
+    if (c === '6050' || n.includes('manual') || n.includes('wastage') || n.includes('spoilage')) return false;
+    return true;
+  });
+
+  const result: Record<string, number> = {};
+  bomAccounts.forEach(a => {
+    result[a.id] = 0;
+    result[a.code] = 0;
+  });
+
+  if (bomAccounts.length === 0) return result;
+
+  // If there's only 1 BOM account in the entire system, it receives 100% of all BOM cost
+  let totalBom = 0;
+  masterItems.forEach(item => {
+    const qty = autoBomUsageMap[item.id] || 0;
+    const rate = rawItemRates[item.id] || Number(item.defaultRate) || 0;
+    totalBom += (qty * rate);
+  });
+
+  if (bomAccounts.length === 1) {
+    const single = bomAccounts[0];
+    result[single.id] = totalBom;
+    if (single.code && single.code !== single.id) {
+      result[single.code] = totalBom;
+    }
+    return result;
+  }
+
+  // Helper to match account name against category or raw item name
+  const matchesCategoryOrName = (acc: AccountHead, rawCategory: string, rawItemName: string): boolean => {
+    const aName = (acc.name || '').toLowerCase().replace(/[^a-z0-9]/g, ' ');
+    const targetCat = (rawCategory || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+    const targetItem = (rawItemName || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+
+    if (targetCat && aName.includes(targetCat)) return true;
+
+    // Check individual words of category (length >= 3)
+    if (targetCat) {
+      const catWords = targetCat.split(/\s+/).filter(w => w.length >= 3);
+      if (catWords.length > 0 && catWords.every(w => aName.includes(w))) return true;
+    }
+
+    // Direct item name match (e.g. "Chicken" in "COGS - Raw Chicken")
+    if (targetItem && aName.includes(targetItem)) return true;
+
+    // Common synonyms in restaurant inventory & accounting
+    if (targetCat.includes('chicken') && (aName.includes('chicken') || aName.includes('poultry') || aName.includes('meat'))) return true;
+    if (targetCat.includes('beef') && (aName.includes('beef') || aName.includes('meat'))) return true;
+    if (targetCat.includes('mutton') && (aName.includes('mutton') || aName.includes('meat'))) return true;
+    if (targetCat.includes('grocery') && (aName.includes('grocery') || aName.includes('rice') || aName.includes('oil') || aName.includes('flour'))) return true;
+    if (targetCat.includes('beverage') && (aName.includes('beverage') || aName.includes('cold') || aName.includes('drink') || aName.includes('coffee'))) return true;
+    if (targetCat.includes('fish') && (aName.includes('fish') || aName.includes('seafood'))) return true;
+    if (targetCat.includes('vegetable') && (aName.includes('vegetable') || aName.includes('veg'))) return true;
+    if (targetCat.includes('egg') && aName.includes('egg')) return true;
+    if (targetCat.includes('ice cream') && (aName.includes('ice cream') || aName.includes('sweet') || aName.includes('dessert'))) return true;
+    if (targetCat.includes('dairy') && (aName.includes('dairy') || aName.includes('milk') || aName.includes('cheese'))) return true;
+
+    return false;
+  };
+
+  // Find generic fallback BOM account (e.g. "COGS - Raw Material", "Cost of Goods Sold")
+  const generalAcc = bomAccounts.find(a => {
+    const n = (a.name || '').toLowerCase();
+    return n.includes('raw material') || n.includes('general') || n === 'cogs' || n === 'cost of goods sold';
+  }) || bomAccounts[0];
+
+  // Distribute BOM cost for each raw item
+  masterItems.forEach(item => {
+    const qty = autoBomUsageMap[item.id] || 0;
+    if (qty <= 0) return;
+    const rate = rawItemRates[item.id] || Number(item.defaultRate) || 0;
+    const itemCost = qty * rate;
+    if (itemCost <= 0) return;
+
+    const cat = (item.category || '').trim();
+
+    // Priority 1: Specific account matching category (exclude generic generalAcc)
+    const specificAcc = bomAccounts.filter(a => a.id !== generalAcc.id).find(a => matchesCategoryOrName(a, cat, item.name || ''));
+
+    const targetAcc = specificAcc || generalAcc;
+    result[targetAcc.id] = (result[targetAcc.id] || 0) + itemCost;
+    if (targetAcc.code && targetAcc.code !== targetAcc.id) {
+      result[targetAcc.code] = (result[targetAcc.code] || 0) + itemCost;
+    }
+  });
+
+  return result;
+}
+
 export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<AppData>(() => {
     try {
@@ -2512,6 +2620,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   let lowStockCount = 0;
   let negativeStockCount = 0;
   const totalStockItemsCount = data.masterItems.length;
+  const rawItemRatesMap: Record<number, number> = {};
 
   data.masterItems.forEach(item => {
     let totalReceivedQty = 0;
@@ -2545,6 +2654,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const manualUsedQty = invRecord ? (invRecord.manualUsed !== undefined ? Number(invRecord.manualUsed) : (Number(invRecord.used) || 0)) : 0;
     const wastageQty = invRecord ? (Number(invRecord.wastage) || 0) : 0;
     const valuationRate = (invRecord && invRecord.rate) ? Number(invRecord.rate) : avgPurchaseBid;
+    rawItemRatesMap[item.id] = valuationRate;
+
     const posBomUsedQty = autoBomUsageMap[item.id] || 0;
 
     const openVal = openQty * valuationRate;
@@ -2574,7 +2685,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     totalClosingStockVal += closingVal;
   });
 
-  const estimatedProfit = totalSales - (totalBomCostVal + totalExpenses);
+  // Dynamic BOM cost distribution across Chart of Accounts heads
+  const bomCostPerAccount = computeCogsBomAllocation(
+    data.masterItems,
+    autoBomUsageMap,
+    rawItemRatesMap,
+    data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS
+  );
+
+  const totalProductionCost = totalBomCostVal + totalManualUsedCostVal + totalWastageCostVal;
+  const estimatedProfit = totalSales - (totalProductionCost + totalExpenses);
 
   const payCash = activeSalesList.reduce((sum, s) => sum + (s.cash || 0), 0);
   const payCard = activeSalesList.reduce((sum, s) => sum + (s.card || 0), 0);
@@ -2707,19 +2827,23 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
   const getOpeningBalance = (code: string, fallbackKeywords: string[] = []): number => {
-    const acc = coaList.find(a => {
-      if (a.code === code || a.id === code) return true;
-      const lowerName = (a.name || '').toLowerCase();
-      return fallbackKeywords.some(kw => lowerName.includes(kw));
-    });
+    if (fallbackKeywords.length > 0) {
+      const matchByKw = coaList.find(a => {
+        const lowerName = (a.name || '').toLowerCase();
+        const lowerCat = (a.category || '').toLowerCase();
+        return fallbackKeywords.some(kw => lowerName.includes(kw) || lowerCat.includes(kw));
+      });
+      if (matchByKw) return Number(matchByKw.balance) || 0;
+    }
+    const acc = coaList.find(a => a.code === code || a.id === code);
     return Number(acc?.balance) || 0;
   };
 
   const baseCashDrawer = getOpeningBalance('1010', ['cash in hand', 'drawer']);
   const basePettyCash = getOpeningBalance('1020', ['petty cash']);
-  const baseBank = getOpeningBalance('1030', ['bank']);
+  const baseBank = getOpeningBalance('1030', ['bank a/c', 'city bank']);
   const baseCheque = 0;
-  const baseBkash = getOpeningBalance('1040', ['bkash']);
+  const baseBkash = getOpeningBalance('1040', ['bkash', 'nagad', 'mobile banking', 'mfs']);
   const baseNagad = 0;
 
   const cashDrawerBalance = Math.max(0, baseCashDrawer + payCash + totalCashDueCollected + advCash - cashExpenses - totalCashPurchases - vendorPayCash);
@@ -6426,70 +6550,99 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return sum + delta;
     }, 0);
 
-    if (code === '1010') {
-      return cashDrawerBalance + journalEffect;
-    }
-    if (code === '1020') {
-      return pettyCashBalance + journalEffect;
-    }
-    if (code === '1030') {
-      return bankTransferBalance + journalEffect;
-    }
-    if (code === '1040') {
-      return bkashMerchantBalance + nagadMerchantBalance + journalEffect;
-    }
-    if (code === '1050') {
-      return totalCustomerDue + journalEffect;
-    }
-    if (code === '1060') {
+    const normName = (acc.name || '').toLowerCase();
+    const normCat = (acc.category || '').toLowerCase();
+
+    // 1. Raw Material Inventory Asset (matches category or name or code 1060)
+    const isInventoryAsset = normCat.includes('inventory') || normName.includes('inventory') || normName.includes('stock asset') || normName.includes('raw material inventory') || code === '1060';
+    if (isInventoryAsset && acc.type === 'ASSET') {
       return opening + totalClosingStockVal + journalEffect;
     }
-    if (code === '2010') {
+
+    // 2. Cash Drawer
+    if (code === '1010' || normName.includes('cash in hand') || normName.includes('drawer') || normName.includes('pos cash')) {
+      return cashDrawerBalance + journalEffect;
+    }
+
+    // 3. Petty Cash Fund
+    if (code === '1020' || normName.includes('petty cash')) {
+      return pettyCashBalance + journalEffect;
+    }
+
+    // 4. Bank A/C
+    if ((code === '1030' && !isInventoryAsset) || (acc.type === 'ASSET' && (normCat.includes('bank') || normName.includes('bank a/c')) && !normCat.includes('mobile') && !normName.includes('bkash') && !normName.includes('nagad'))) {
+      return bankTransferBalance + journalEffect;
+    }
+
+    // 5. Mobile Banking / MFS (bKash / Nagad)
+    if (normCat.includes('mobile banking') || normName.includes('bkash') || normName.includes('nagad') || normName.includes('mfs') || (code === '1040' && !isInventoryAsset)) {
+      return bkashMerchantBalance + nagadMerchantBalance + journalEffect;
+    }
+
+    // 6. Receivables (Customer Dues)
+    if (code === '1050' || normCat.includes('receivable') || normName.includes('receivable') || normName.includes('customer due')) {
+      return totalCustomerDue + journalEffect;
+    }
+
+    // 7. Liabilities: Accounts Payable (Vendor Dues)
+    if (code === '2010' || normCat.includes('payable') || normName.includes('payable') || normName.includes('vendor due')) {
       return totalVendorDue + journalEffect;
     }
-    if (code === '2020') {
+
+    // 8. Liabilities: Customer Advance Deposits
+    if (code === '2020' || code === '2050' || normCat.includes('advance') || normName.includes('customer advance') || normName.includes('deposit')) {
       return totalCustomerAdvances + journalEffect;
     }
-    if (code === '2030') {
+
+    // 9. Statutory / Tax Liabilities
+    if (code === '2030' || normName.includes('vat') || normName.includes('tax')) {
       return opening + journalEffect;
     }
-    if (code === '3010') {
-      return opening + journalEffect;
-    }
-    if (code === '3020') {
+
+    // 10. Equity: Retained Earnings
+    if (code === '3020' || normName.includes('retained earnings')) {
       return opening + estimatedProfit + journalEffect;
     }
-    if (code === '4010') {
-      const dineInSales = activeSalesList.filter(s => !s.channelOrAgent || s.channelOrAgent === 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
-      return opening + dineInSales + journalEffect;
+
+    // 11. Equity: Owner Equity & Capital
+    if (code === '3010' || normName.includes('capital') || normName.includes('owner equity')) {
+      return opening + journalEffect;
     }
-    if (code === '4020') {
+
+    // 12. Revenue Accounts
+    if (code === '4010' || (acc.type === 'REVENUE' && (normName.includes('dine-in') || normName.includes('restaurant sales')))) {
+      const dineInSales = activeSalesList.filter(s => !s.channelOrAgent || s.channelOrAgent === 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
+      return opening + (dineInSales > 0 ? dineInSales : totalSales) + journalEffect;
+    }
+    if (code === '4020' || (acc.type === 'REVENUE' && (normName.includes('takeaway') || normName.includes('delivery')))) {
       const deliverySales = activeSalesList.filter(s => s.channelOrAgent && s.channelOrAgent !== 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
       return opening + deliverySales + journalEffect;
     }
-    if (code === '4030') {
+    if (code === '4030' || (acc.type === 'REVENUE' && (normName.includes('beverage') || normName.includes('bar counter')))) {
       const bevSales = activeSalesList.filter(s => 
         (s.items || []).some(i => (i.department || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('coffee'))
       ).reduce((sum, s) => sum + (s.total || 0), 0);
       return opening + bevSales + journalEffect;
     }
+
+    // 13. Expense Accounts
     if (acc.type === 'EXPENSE') {
       const isCogs = (code && code.startsWith('50')) || 
-        (acc.category || '').toLowerCase().includes('cost of goods') || 
-        (acc.category || '').toLowerCase().includes('bom') ||
-        (acc.name || '').toLowerCase().includes('cogs');
+        normCat.includes('cost of goods') || 
+        normCat.includes('bom') ||
+        normName.includes('cogs');
 
       if (isCogs) {
-        if (code === '6050' || (acc.name || '').toLowerCase().includes('manual')) {
+        if (code === '6050' || normName.includes('manual')) {
           return opening + totalManualUsedCostVal + journalEffect;
         }
-        if (code === '5010') {
-          return opening + Math.round(totalBomCostVal * 0.65) + journalEffect;
+        if (normName.includes('wastage') || normName.includes('spoilage')) {
+          return opening + totalWastageCostVal + journalEffect;
         }
-        if (code === '5020') {
-          return opening + Math.round(totalBomCostVal * 0.35) + journalEffect;
-        }
-        return opening + totalBomCostVal + journalEffect;
+
+        // Dynamic BOM cost matching per category & head
+        const cogsAmt = bomCostPerAccount[acc.code] ?? bomCostPerAccount[acc.id] ?? 0;
+        return opening + cogsAmt + journalEffect;
       }
 
       // Operating Expenses Matching - Deterministic 1-to-1 unique allocation (No double counting)
