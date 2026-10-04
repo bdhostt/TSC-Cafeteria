@@ -21,6 +21,94 @@ import {
   DollarSign
 } from 'lucide-react';
 
+export interface PaymentTypeOption {
+  type: PaymentMethodType;
+  label: string;
+  bnLabel: string;
+  subTitle: string;
+  bnSubTitle: string;
+  defaultProvider: string;
+  defaultLedgerCode: string;
+  badgeClass: string;
+  borderClass: string;
+  activeBorderClass: string;
+}
+
+export const PAYMENT_TYPE_OPTIONS: PaymentTypeOption[] = [
+  {
+    type: 'CASH',
+    label: 'Cash in Hand',
+    bnLabel: 'ক্যাশ ইন হ্যান্ড',
+    subTitle: 'Physical cash drawer currency',
+    bnSubTitle: 'কাউন্টারে নগদ ক্যাশ লেনদেন',
+    defaultProvider: 'Drawer Cash',
+    defaultLedgerCode: '1010',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    borderClass: 'border-slate-200 hover:border-emerald-300',
+    activeBorderClass: 'border-emerald-500 ring-2 ring-emerald-400 bg-emerald-50/70 text-emerald-950'
+  },
+  {
+    type: 'MFS',
+    label: 'Mobile Banking (MFS)',
+    bnLabel: 'মোবাইল ব্যাংকিং (MFS)',
+    subTitle: 'bKash, Nagad, Rocket, Upay QR & App',
+    bnSubTitle: 'বিকাশ, নগদ, রকেট কিউআর ও ওয়ালেট',
+    defaultProvider: 'bKash',
+    defaultLedgerCode: '1040',
+    badgeClass: 'bg-pink-100 text-pink-800 border-pink-300',
+    borderClass: 'border-slate-200 hover:border-pink-300',
+    activeBorderClass: 'border-pink-500 ring-2 ring-pink-400 bg-pink-50/70 text-pink-950'
+  },
+  {
+    type: 'CARD',
+    label: 'Bank Card / POS',
+    bnLabel: 'ব্যাংক কার্ড / পিওএস',
+    subTitle: 'Visa, Mastercard, Amex POS swipe terminal',
+    bnSubTitle: 'ভিসা, মাস্টারকার্ড, পিওএস মেশিন সোয়াইপ',
+    defaultProvider: 'POS Terminal',
+    defaultLedgerCode: '1030',
+    badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
+    borderClass: 'border-slate-200 hover:border-blue-300',
+    activeBorderClass: 'border-blue-500 ring-2 ring-blue-400 bg-blue-50/70 text-blue-950'
+  },
+  {
+    type: 'BANK',
+    label: 'Bank Wire Transfer',
+    bnLabel: 'ব্যাংক ওয়্যার ট্রান্সফার',
+    subTitle: 'Direct BEFTN / NPSB / RTGS account transfer',
+    bnSubTitle: 'সরাসরি ব্যাংক একাউন্টে ট্রান্সফার ও চেক',
+    defaultProvider: 'Bank Transfer',
+    defaultLedgerCode: '1030',
+    badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    borderClass: 'border-slate-200 hover:border-indigo-300',
+    activeBorderClass: 'border-indigo-500 ring-2 ring-indigo-400 bg-indigo-50/70 text-indigo-950'
+  },
+  {
+    type: 'CREDIT',
+    label: 'Customer Due / Credit',
+    bnLabel: 'কাস্টমার বাকি / ডিউ',
+    subTitle: 'Dining billed to customer account ledger',
+    bnSubTitle: 'কাস্টমারের নামে বাকি বা ক্রেডিট ব্যালেন্স',
+    defaultProvider: 'Accounts Receivable',
+    defaultLedgerCode: '1050',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+    borderClass: 'border-slate-200 hover:border-amber-300',
+    activeBorderClass: 'border-amber-500 ring-2 ring-amber-400 bg-amber-50/70 text-amber-950'
+  },
+  {
+    type: 'OTHER',
+    label: 'Other Digital Gateway',
+    bnLabel: 'অন্যান্য গেটওয়ে',
+    subTitle: 'Custom digital payment or voucher gateway',
+    bnSubTitle: 'অন্যান্য ডিজিটাল বা গিফট ভাউচার গেটওয়ে',
+    defaultProvider: 'Custom Gateway',
+    defaultLedgerCode: '1040',
+    badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
+    borderClass: 'border-slate-200 hover:border-slate-400',
+    activeBorderClass: 'border-slate-600 ring-2 ring-slate-400 bg-slate-100 text-slate-900'
+  }
+];
+
 export const PaymentMethodsConfigView: React.FC = () => {
   const {
     data,
@@ -57,6 +145,17 @@ export const PaymentMethodsConfigView: React.FC = () => {
   const [formIsActive, setFormIsActive] = useState(true);
   const [formIsDefault, setFormIsDefault] = useState(false);
 
+  // Type Counts for dynamic filtering tabs
+  const typeCounts: Record<string, number> = {
+    ALL: paymentMethods.length,
+    CASH: paymentMethods.filter(m => m.type === 'CASH').length,
+    MFS: paymentMethods.filter(m => m.type === 'MFS').length,
+    CARD: paymentMethods.filter(m => m.type === 'CARD').length,
+    BANK: paymentMethods.filter(m => m.type === 'BANK').length,
+    CREDIT: paymentMethods.filter(m => m.type === 'CREDIT').length,
+    OTHER: paymentMethods.filter(m => m.type === 'OTHER').length,
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -64,16 +163,44 @@ export const PaymentMethodsConfigView: React.FC = () => {
 
   const handleOpenAdd = () => {
     setEditingMethod(null);
+    // Inherit the active filter type if filtered by a specific type
+    const initialType: PaymentMethodType =
+      filterType !== 'ALL' && PAYMENT_TYPE_OPTIONS.some(o => o.type === filterType)
+        ? (filterType as PaymentMethodType)
+        : 'MFS';
+
+    const defaultOpt = PAYMENT_TYPE_OPTIONS.find(o => o.type === initialType);
     setFormName('');
-    setFormType('MFS');
-    setFormProvider('bKash');
+    setFormType(initialType);
+    setFormProvider(defaultOpt?.defaultProvider || 'bKash');
     setFormAccountNumber('');
     setFormChargePercent(0);
-    setFormLedgerAccountId('1040');
+    setFormLedgerAccountId(defaultOpt?.defaultLedgerCode || '1040');
     setFormNotes('');
     setFormIsActive(true);
     setFormIsDefault(false);
     setIsModalOpen(true);
+  };
+
+  const handleSelectType = (selectedType: PaymentMethodType) => {
+    setFormType(selectedType);
+    const opt = PAYMENT_TYPE_OPTIONS.find(o => o.type === selectedType);
+    if (!opt) return;
+
+    // When creating a new method, auto-fill suggested default provider & ledger code if empty or previous defaults
+    if (!editingMethod) {
+      const isProviderEmptyOrDefault =
+        !formProvider || PAYMENT_TYPE_OPTIONS.some(o => o.defaultProvider === formProvider);
+      if (isProviderEmptyOrDefault) {
+        setFormProvider(opt.defaultProvider);
+      }
+
+      const isLedgerEmptyOrDefault =
+        !formLedgerAccountId || PAYMENT_TYPE_OPTIONS.some(o => o.defaultLedgerCode === formLedgerAccountId);
+      if (isLedgerEmptyOrDefault) {
+        setFormLedgerAccountId(opt.defaultLedgerCode);
+      }
+    }
   };
 
   const handleOpenEdit = (m: PaymentMethodConfig) => {
@@ -130,37 +257,40 @@ export const PaymentMethodsConfigView: React.FC = () => {
     showToast(language === 'bn' ? 'পেমেন্ট মেথড মুছে ফেলা হয়েছে' : 'Payment method deleted');
   };
 
-  const getTypeIcon = (type: PaymentMethodType) => {
+  const getTypeIcon = (type: PaymentMethodType, className?: string) => {
+    const iconClass = className || 'w-4 h-4';
     switch (type) {
       case 'CASH':
-        return <Banknote className="w-4 h-4 text-emerald-600" />;
+        return <Banknote className={`${iconClass} text-emerald-600`} />;
       case 'MFS':
-        return <Smartphone className="w-4 h-4 text-pink-600" />;
+        return <Smartphone className={`${iconClass} text-pink-600`} />;
       case 'CARD':
-        return <CreditCard className="w-4 h-4 text-blue-600" />;
+        return <CreditCard className={`${iconClass} text-blue-600`} />;
       case 'BANK':
-        return <Building className="w-4 h-4 text-indigo-600" />;
+        return <Building className={`${iconClass} text-indigo-600`} />;
       case 'CREDIT':
-        return <UserCheck className="w-4 h-4 text-amber-600" />;
+        return <UserCheck className={`${iconClass} text-amber-600`} />;
       default:
-        return <Zap className="w-4 h-4 text-slate-600" />;
+        return <Zap className={`${iconClass} text-slate-600`} />;
     }
   };
 
   const getTypeBadge = (type: PaymentMethodType) => {
+    const opt = PAYMENT_TYPE_OPTIONS.find(o => o.type === type);
+    const badgeClass = opt?.badgeClass || 'bg-slate-100 text-slate-800 border-slate-200';
     switch (type) {
       case 'CASH':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">Cash</span>;
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Cash</span>;
       case 'MFS':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-pink-100 text-pink-800 border border-pink-200">MFS / Mobile</span>;
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>MFS / Mobile</span>;
       case 'CARD':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">Card / POS</span>;
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Card / POS</span>;
       case 'BANK':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">Bank Transfer</span>;
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Bank Transfer</span>;
       case 'CREDIT':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">Credit / Due</span>;
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Credit / Due</span>;
       default:
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-slate-100 text-slate-800 border border-slate-200">Other</span>;
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Other</span>;
     }
   };
 
@@ -260,40 +390,115 @@ export const PaymentMethodsConfigView: React.FC = () => {
       </div>
 
       {/* Filter Tabs & Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-          {[
-            { id: 'ALL', label: 'All Methods' },
-            { id: 'CASH', label: 'Cash in Hand' },
-            { id: 'MFS', label: 'Mobile Banking (MFS)' },
-            { id: 'CARD', label: 'Bank Card / POS' },
-            { id: 'BANK', label: 'Bank Wire Transfer' },
-            { id: 'CREDIT', label: 'Customer Due / Credit' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterType(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                filterType === tab.id
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      <div className="space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            {[
+              { id: 'ALL', label: language === 'bn' ? 'সব মেথড' : 'All Methods', icon: <Sliders className="w-3.5 h-3.5" /> },
+              { id: 'CASH', label: language === 'bn' ? 'ক্যাশ ইন হ্যান্ড' : 'Cash in Hand', icon: <Banknote className="w-3.5 h-3.5 text-emerald-600" /> },
+              { id: 'MFS', label: language === 'bn' ? 'মোবাইল ব্যাংকিং (MFS)' : 'Mobile Banking (MFS)', icon: <Smartphone className="w-3.5 h-3.5 text-pink-600" /> },
+              { id: 'CARD', label: language === 'bn' ? 'কার্ড / POS' : 'Bank Card / POS', icon: <CreditCard className="w-3.5 h-3.5 text-blue-600" /> },
+              { id: 'BANK', label: language === 'bn' ? 'ব্যাংক ট্রান্সফার' : 'Bank Transfer', icon: <Building className="w-3.5 h-3.5 text-indigo-600" /> },
+              { id: 'CREDIT', label: language === 'bn' ? 'কাস্টমার ডিউ' : 'Customer Due / Credit', icon: <UserCheck className="w-3.5 h-3.5 text-amber-600" /> },
+              ...(typeCounts.OTHER > 0
+                ? [{ id: 'OTHER', label: language === 'bn' ? 'অন্যান্য' : 'Other Gateways', icon: <Zap className="w-3.5 h-3.5 text-slate-600" /> }]
+                : [])
+            ].map(tab => {
+              const isSelected = filterType === tab.id;
+              const count = typeCounts[tab.id] ?? 0;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilterType(tab.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-[#004b9b] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <span className={isSelected ? 'text-white' : ''}>
+                    {tab.icon}
+                  </span>
+                  <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      isSelected
+                        ? 'bg-white/25 text-white'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative w-full md:w-64">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search method or account..."
+              className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#004b9b]"
+            />
+          </div>
         </div>
 
-        <div className="relative w-full md:w-64">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search method or account..."
-            className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#004b9b]"
-          />
-        </div>
+        {/* Active Filter Strip */}
+        {(filterType !== 'ALL' || search) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-slate-800 animate-in fade-in">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-slate-700">
+                {language === 'bn' ? 'ফিল্টার ভিত্তিক প্রদর্শিত:' : 'Filtered by:'}
+              </span>
+              {filterType !== 'ALL' && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-white border border-blue-300 font-black text-[#004b9b] shadow-2xs">
+                  {getTypeIcon(filterType as PaymentMethodType, 'w-3.5 h-3.5')}
+                  <span>
+                    {language === 'bn'
+                      ? PAYMENT_TYPE_OPTIONS.find(o => o.type === filterType)?.bnLabel || filterType
+                      : PAYMENT_TYPE_OPTIONS.find(o => o.type === filterType)?.label || filterType}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterType('ALL')}
+                    className="hover:text-rose-600 font-bold ml-1 cursor-pointer text-slate-400 hover:bg-slate-100 rounded px-1"
+                    title="Remove type filter"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {search && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-white border border-slate-300 font-semibold text-slate-800 shadow-2xs">
+                  <span>Search: "{search}"</span>
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="hover:text-rose-600 font-bold ml-1 cursor-pointer text-slate-400 hover:bg-slate-100 rounded px-1"
+                    title="Clear search"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              <span className="text-[11px] text-slate-500 font-semibold">
+                ({filteredMethods.length} {language === 'bn' ? 'টি মেথড পাওয়া গেছে' : 'found'})
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => { setFilterType('ALL'); setSearch(''); }}
+              className="text-xs font-bold text-[#004b9b] hover:text-[#00356e] underline cursor-pointer flex items-center gap-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'সব মেথড দেখুন (Clear Filter)' : 'Show All Methods'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Methods Table */}
@@ -317,8 +522,44 @@ export const PaymentMethodsConfigView: React.FC = () => {
             <tbody className="divide-y divide-slate-200">
               {filteredMethods.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-slate-400">
-                    No payment methods found matching "{search}".
+                  <td colSpan={10} className="py-10 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <div className="p-3 bg-slate-100 rounded-full text-slate-400">
+                        <Sliders className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-xs text-slate-600">
+                        {language === 'bn'
+                          ? 'নির্বাচিত ফিল্টারে কোনো পেমেন্ট মেথড পাওয়া যায়নি'
+                          : 'No payment methods found matching the selected filter'}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {filterType !== 'ALL'
+                          ? language === 'bn'
+                            ? `এই ক্যাটাগরিতে (${filterType}) নতুন মেথড যোগ করতে "+ Add" বাটনে ক্লিক করুন`
+                            : `Click "+ Add Payment Method" to create a new method for ${filterType}`
+                          : language === 'bn'
+                          ? 'অন্য কোনো শব্দ দিয়ে সার্চ করুন'
+                          : 'Try a different search query or clear filters'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {(filterType !== 'ALL' || search) && (
+                          <button
+                            type="button"
+                            onClick={() => { setFilterType('ALL'); setSearch(''); }}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                          >
+                            {language === 'bn' ? 'ফিল্টার রিসেট করুন' : 'Clear Filters'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleOpenAdd}
+                          className="px-3 py-1.5 bg-[#004b9b] hover:bg-[#005bb8] text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                        >
+                          + {language === 'bn' ? 'নতুন মেথড যোগ করুন' : 'Add Payment Method'}
+                        </button>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -356,8 +597,18 @@ export const PaymentMethodsConfigView: React.FC = () => {
                       </td>
 
                       {/* Type Badge */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {getTypeBadge(m.type)}
+                      <td className="py-3 px-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => setFilterType(m.type)}
+                          className="group inline-flex items-center gap-1 cursor-pointer transition hover:scale-105 active:scale-95"
+                          title={language === 'bn' ? `ক্লিক করে শুধুমাত্র ${m.type} মেথড ফিল্টার করুন` : `Click to filter by ${m.type}`}
+                        >
+                          {getTypeBadge(m.type)}
+                          <span className="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition">
+                            🔍
+                          </span>
+                        </button>
                       </td>
 
                       {/* Provider */}
@@ -482,7 +733,7 @@ export const PaymentMethodsConfigView: React.FC = () => {
       {/* Add / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-700">
@@ -501,13 +752,14 @@ export const PaymentMethodsConfigView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition"
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleSave} className="space-y-4">
+              {/* Payment Method Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Method Name *
@@ -522,37 +774,70 @@ export const PaymentMethodsConfigView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Payment Type *
+              {/* Payment Type Selection (Visual Cards Marking) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-black text-slate-800">
+                    {language === 'bn' ? 'পেমেন্ট টাইপ মার্ক করুন (Mark Payment Type) *' : 'Mark Payment Type *'}
                   </label>
-                  <select
-                    value={formType}
-                    onChange={e => setFormType(e.target.value as PaymentMethodType)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#004b9b]"
-                  >
-                    <option value="MFS">MFS / Mobile Banking</option>
-                    <option value="CASH">Cash in Hand</option>
-                    <option value="CARD">Bank Card / POS Machine</option>
-                    <option value="BANK">Bank Wire Transfer</option>
-                    <option value="CREDIT">Customer Credit / Due</option>
-                    <option value="OTHER">Other Gateway</option>
-                  </select>
+                  <span className="text-[10px] font-bold text-slate-500">
+                    {language === 'bn' ? 'টাইপ ভিত্তিক ফিল্টারিং ও লেজার সংযোগ' : 'Type-based POS filtering & ledger mapping'}
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Provider Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formProvider}
-                    onChange={e => setFormProvider(e.target.value)}
-                    placeholder="e.g. bKash, DBBL, City Bank"
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#004b9b]"
-                  />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {PAYMENT_TYPE_OPTIONS.map(opt => {
+                    const isSelected = formType === opt.type;
+                    return (
+                      <button
+                        key={opt.type}
+                        type="button"
+                        onClick={() => handleSelectType(opt.type)}
+                        className={`p-2.5 rounded-xl border text-left transition relative cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? opt.activeBorderClass
+                            : `${opt.borderClass} bg-slate-50/60 hover:bg-slate-100/70`
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <div className="p-1.5 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+                            {getTypeIcon(opt.type, 'w-3.5 h-3.5')}
+                          </div>
+                          {isSelected ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-[#004b9b] text-white">
+                              <Check className="w-2.5 h-2.5" />
+                              <span>Marked</span>
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-semibold text-slate-400">Select</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-[11px] leading-tight">
+                            {language === 'bn' ? opt.bnLabel : opt.label}
+                          </div>
+                          <div className="text-[9px] text-slate-500 mt-0.5 line-clamp-1 leading-snug">
+                            {language === 'bn' ? opt.bnSubTitle : opt.subTitle}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
+
+              {/* Provider Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Provider / Channel / Machine Name
+                </label>
+                <input
+                  type="text"
+                  value={formProvider}
+                  onChange={e => setFormProvider(e.target.value)}
+                  placeholder="e.g. bKash, DBBL, City Bank, Drawer Cash"
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#004b9b]"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
