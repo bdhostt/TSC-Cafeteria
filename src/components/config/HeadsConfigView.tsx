@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS, getNextAccountCode, CANONICAL_EXPENSE_HEAD_MAP } from '../../context/RestaurantContext';
 import { AccountHead, AccountType, RestaurantProfile, CommissionAgent } from '../../types';
 import { PrintersConfigView } from './PrintersConfigView';
 import { PrintTemplatesConfigView } from './PrintTemplatesConfigView';
@@ -293,8 +293,9 @@ export const HeadsConfigView: React.FC = () => {
   // COA modal handlers
   const handleOpenAddCoa = () => {
     setEditingAccount(null);
+    const autoCode = getNextAccountCode('EXPENSE', chartList, 'Operating Expenses');
     setCoaForm({
-      code: '',
+      code: autoCode,
       name: '',
       type: 'EXPENSE',
       category: 'Operating Expenses',
@@ -315,25 +316,51 @@ export const HeadsConfigView: React.FC = () => {
     setIsCoaModalOpen(true);
   };
 
+  const handleCoaTypeChange = (newType: AccountType) => {
+    const defaultCat = 
+      newType === 'ASSET' ? 'Current Assets' :
+      newType === 'LIABILITY' ? 'Current Liabilities' :
+      newType === 'EQUITY' ? 'Owner Equity' :
+      newType === 'REVENUE' ? 'Food Sales Revenue' : 'Operating Expenses';
+    const autoCode = getNextAccountCode(newType, chartList, defaultCat);
+    setCoaForm(prev => ({
+      ...prev,
+      type: newType,
+      category: defaultCat,
+      code: autoCode
+    }));
+  };
+
   const handleSaveCoa = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!coaForm.name.trim() || !coaForm.code.trim()) {
+    const trimmedCode = coaForm.code.trim();
+    const trimmedName = coaForm.name.trim();
+
+    if (!trimmedName || !trimmedCode) {
       alert('Please enter both Account Code and Account Title.');
+      return;
+    }
+
+    const codeConflict = chartList.some(a => 
+      (a.code || '').trim() === trimmedCode && (!editingAccount || a.id !== editingAccount.id)
+    );
+    if (codeConflict) {
+      alert(`Account Code "${trimmedCode}" already exists! Each account code must be strictly unique.`);
       return;
     }
 
     if (editingAccount) {
       editAccountHead(editingAccount.id, {
-        code: coaForm.code.trim(),
-        name: coaForm.name.trim(),
+        code: trimmedCode,
+        name: trimmedName,
         type: coaForm.type,
         category: coaForm.category.trim(),
         balance: Number(coaForm.balance) || 0
       });
     } else {
       addAccountHead({
-        code: coaForm.code.trim(),
-        name: coaForm.name.trim(),
+        code: trimmedCode,
+        name: trimmedName,
         type: coaForm.type,
         category: coaForm.category.trim(),
         balance: Number(coaForm.balance) || 0
@@ -1070,6 +1097,14 @@ export const HeadsConfigView: React.FC = () => {
                                     {currentZone}
                                   </span>
                                 )}
+                                {sec.id === 'expenseHeads' && (() => {
+                                  const linked = CANONICAL_EXPENSE_HEAD_MAP[item.toLowerCase().trim()];
+                                  return linked ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-mono font-bold shrink-0">
+                                      [{linked.code}] {linked.name}
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
 
                               <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
@@ -1322,15 +1357,42 @@ export const HeadsConfigView: React.FC = () => {
 
             <form onSubmit={handleSaveCoa} className="space-y-3.5 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Account Code *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">Account Code *</label>
+                  {!editingAccount && (
+                    <button
+                      type="button"
+                      onClick={() => setCoaForm(prev => ({ ...prev, code: getNextAccountCode(prev.type, chartList, prev.category) }))}
+                      className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200 transition cursor-pointer flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-2.5 h-2.5" />
+                      <span>Auto-Generate Next Code</span>
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   required
                   value={coaForm.code}
                   onChange={e => setCoaForm({ ...coaForm, code: e.target.value })}
-                  placeholder="e.g. 6050"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  placeholder="e.g. 6060"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-xl font-bold font-mono text-slate-900 focus:bg-white focus:ring-2 focus:outline-none ${
+                    chartList.some(a => (a.code || '').trim() === coaForm.code.trim() && (!editingAccount || a.id !== editingAccount.id))
+                      ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/50'
+                      : 'border-slate-300 focus:ring-amber-500'
+                  }`}
                 />
+                {chartList.some(a => (a.code || '').trim() === coaForm.code.trim() && (!editingAccount || a.id !== editingAccount.id)) ? (
+                  <p className="text-[10px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-rose-600" />
+                    <span>⚠️ Account Code &quot;{coaForm.code.trim()}&quot; already in use! Must be strictly unique.</span>
+                  </p>
+                ) : coaForm.code.trim() ? (
+                  <p className="text-[10px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>✓ Unique system-verified account code</span>
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -1350,7 +1412,7 @@ export const HeadsConfigView: React.FC = () => {
                   <label className="block font-bold text-slate-700 mb-1">Account Type *</label>
                   <select
                     value={coaForm.type}
-                    onChange={e => setCoaForm({ ...coaForm, type: e.target.value as AccountType })}
+                    onChange={e => handleCoaTypeChange(e.target.value as AccountType)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   >
                     <option value="ASSET">ASSET (1000)</option>

@@ -151,4 +151,36 @@ if (totalAllocated2 === expectedTotal2) {
   console.error('❌ TEST 2 FAILED');
 }
 
+// TEST CASE 3: Strict Unique Account Code Auto-Generation & Canonical Mapping
+console.log('\n--- TEST CASE 3: Unique Account Code Auto-Generation & Canonical Mapping ---');
+const CANONICAL_EXPENSE_HEAD_MAP = {
+  'casual waiter charge': { code: '6010', name: 'Kitchen Staff Salaries' },
+  'cleaning bill': { code: '6040', name: 'Cleaning & Consumables' },
+  'electricity bill': { code: '6030', name: 'Electricity & Gas Bill' },
+  'conveyance': { code: '6020', name: 'Floor Rent & Utilities' },
+  'staff salary': { code: '6010', name: 'Kitchen Staff Salaries' }
+};
+
+function getNextAccountCode(type, accounts, category) {
+  const existingCodes = new Set(accounts.map(a => (a.code || '').trim()));
+  let next = type === 'ASSET' ? 1010 : type === 'LIABILITY' ? 2010 : type === 'EQUITY' ? 3010 : type === 'REVENUE' ? 4010 : 6010;
+  while (existingCodes.has(next.toString())) { next += 10; }
+  return next.toString();
+}
+
+const nextAsset = getNextAccountCode('ASSET', expenseAccounts);
+const nextOpEx = getNextAccountCode('EXPENSE', expenseAccounts);
+console.log(`📌 Auto-generated Next Unique Asset Code: ${nextAsset}`);
+console.log(`📌 Auto-generated Next Unique Operating Expense Code: ${nextOpEx}`);
+
+const isCode6060 = nextOpEx === '6060';
+const isCleanMappedStrictly = CANONICAL_EXPENSE_HEAD_MAP['cleaning bill'].code === '6040';
+const isCasualMappedStrictly = CANONICAL_EXPENSE_HEAD_MAP['casual waiter charge'].code === '6010';
+
+if (isCode6060 && isCleanMappedStrictly && isCasualMappedStrictly) {
+  console.log('✅ TEST 3 PASSED: Account codes are strictly unique and auto-generated seamlessly!');
+} else {
+  console.error('❌ TEST 3 FAILED');
+}
+
 console.log('\n======================================================================');

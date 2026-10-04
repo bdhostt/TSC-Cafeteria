@@ -21,6 +21,7 @@ import {
   ActiveTab,
   DiscountType,
   AccountHead,
+  AccountType,
   CustomerAdvance,
   AppUser,
   UserRole,
@@ -1509,24 +1510,112 @@ export const getModuleForTab = (tab: ActiveTab, subNav?: string): string => {
   return 'sales-pos';
 };
 
+export const CANONICAL_EXPENSE_HEAD_MAP: Record<string, { code: string; name: string }> = {
+  'casual waiter charge': { code: '6010', name: 'Kitchen Staff Salaries' },
+  'staff salary': { code: '6010', name: 'Kitchen Staff Salaries' },
+  'salary': { code: '6010', name: 'Kitchen Staff Salaries' },
+  'salaries': { code: '6010', name: 'Kitchen Staff Salaries' },
+  'waiter charge': { code: '6010', name: 'Kitchen Staff Salaries' },
+  'cleaning bill': { code: '6040', name: 'Cleaning & Consumables' },
+  'cleaning & consumables': { code: '6040', name: 'Cleaning & Consumables' },
+  'cleaning': { code: '6040', name: 'Cleaning & Consumables' },
+  'consumables': { code: '6040', name: 'Cleaning & Consumables' },
+  'electricity bill': { code: '6030', name: 'Electricity & Gas Bill' },
+  'electric bill': { code: '6030', name: 'Electricity & Gas Bill' },
+  'gas bill': { code: '6030', name: 'Electricity & Gas Bill' },
+  'electricity & gas bill': { code: '6030', name: 'Electricity & Gas Bill' },
+  'conveyance': { code: '6020', name: 'Floor Rent & Utilities' },
+  'floor rent': { code: '6020', name: 'Floor Rent & Utilities' },
+  'floor rent & utilities': { code: '6020', name: 'Floor Rent & Utilities' },
+  'rent': { code: '6020', name: 'Floor Rent & Utilities' },
+  'transport': { code: '6020', name: 'Floor Rent & Utilities' },
+  'cogs manual use': { code: '6050', name: 'COGS Manual Use (MU)' }
+};
+
+export const getNextAccountCode = (
+  type: AccountType,
+  chartAccounts: AccountHead[],
+  category?: string
+): string => {
+  const existingCodes = new Set(chartAccounts.map(a => (a.code || '').trim()));
+
+  if (type === 'ASSET') {
+    let next = 1010;
+    while (existingCodes.has(next.toString())) {
+      next += 10;
+    }
+    return next.toString();
+  }
+
+  if (type === 'LIABILITY') {
+    let next = 2010;
+    while (existingCodes.has(next.toString())) {
+      next += 10;
+    }
+    return next.toString();
+  }
+
+  if (type === 'EQUITY') {
+    let next = 3010;
+    while (existingCodes.has(next.toString())) {
+      next += 10;
+    }
+    return next.toString();
+  }
+
+  if (type === 'REVENUE') {
+    let next = 4010;
+    while (existingCodes.has(next.toString())) {
+      next += 10;
+    }
+    return next.toString();
+  }
+
+  if (type === 'EXPENSE') {
+    const isCogs = (category || '').toLowerCase().includes('cost of goods') || (category || '').toLowerCase().includes('bom');
+    if (isCogs) {
+      let next = 5010;
+      while (existingCodes.has(next.toString())) {
+        next += 10;
+      }
+      return next.toString();
+    } else {
+      let next = 6010;
+      while (existingCodes.has(next.toString())) {
+        next += 10;
+      }
+      return next.toString();
+    }
+  }
+
+  return '9010';
+};
+
 export const resolveExpenseAccount = (
   e: ExpenseRecord,
   accounts: AccountHead[]
 ): AccountHead | undefined => {
-  // 1. Explicit accountId or accountCode match
-  if (e.accountId) {
-    const acc = accounts.find(a => a.id === e.accountId || a.code === e.accountId);
-    if (acc) return acc;
-  }
+  // 1. Explicit accountCode or accountId match
   if (e.accountCode) {
     const acc = accounts.find(a => a.code === e.accountCode);
+    if (acc) return acc;
+  }
+  if (e.accountId) {
+    const acc = accounts.find(a => a.id === e.accountId || a.code === e.accountId);
     if (acc) return acc;
   }
 
   const eHead = (e.head || '').toLowerCase().trim();
   const eCat = (e.category || '').toLowerCase().trim();
 
-  // 2. Direct exact name match
+  // 2. Strict canonical head map (Strict 1-to-1 match guaranteed)
+  const canonical = CANONICAL_EXPENSE_HEAD_MAP[eHead];
+  if (canonical) {
+    const acc = accounts.find(a => a.code === canonical.code);
+    if (acc) return acc;
+  }
+
+  // 3. Direct exact name match
   const exactMatch = accounts.find(a => a.name.toLowerCase().trim() === eHead);
   if (exactMatch) return exactMatch;
 
@@ -6138,20 +6227,39 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
-  // Chart of Accounts Handlers
+  // Chart of Accounts Handlers (Strict Unique Code Enforcement)
   const addAccountHead = (head: Omit<AccountHead, 'id'>) => {
-    const id = head.code || `ACC-${Date.now()}`;
-    setData(prev => ({
-      ...prev,
-      chartOfAccounts: [...(prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS), { ...head, id }]
-    }));
+    const code = head.code.trim();
+    setData(prev => {
+      const currentList = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+      if (currentList.some(h => (h.code || '').trim() === code)) {
+        console.warn(`Account code ${code} already exists! Duplicate skipped.`);
+        return prev;
+      }
+      const id = code || `ACC-${Date.now()}`;
+      return {
+        ...prev,
+        chartOfAccounts: [...currentList, { ...head, code, id }]
+      };
+    });
   };
 
   const editAccountHead = (id: string, updated: Partial<AccountHead>) => {
-    setData(prev => ({
-      ...prev,
-      chartOfAccounts: (prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS).map(h => h.id === id ? { ...h, ...updated } : h)
-    }));
+    setData(prev => {
+      const currentList = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+      if (updated.code) {
+        const trimmedCode = updated.code.trim();
+        const conflict = currentList.some(h => h.id !== id && (h.code || '').trim() === trimmedCode);
+        if (conflict) {
+          console.warn(`Account code ${trimmedCode} already exists! Update skipped.`);
+          return prev;
+        }
+      }
+      return {
+        ...prev,
+        chartOfAccounts: currentList.map(h => h.id === id ? { ...h, ...updated } : h)
+      };
+    });
   };
 
   const deleteAccountHead = (id: string) => {
