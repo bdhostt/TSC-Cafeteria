@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { PaymentMethodConfig, PaymentMethodType } from '../../types';
 import {
@@ -155,6 +155,13 @@ export const PaymentMethodsConfigView: React.FC = () => {
     CREDIT: paymentMethods.filter(m => m.type === 'CREDIT').length,
     OTHER: paymentMethods.filter(m => m.type === 'OTHER').length,
   };
+
+  // If active filter type no longer has any methods, reset to 'ALL'
+  useEffect(() => {
+    if (filterType !== 'ALL' && (typeCounts[filterType] || 0) === 0) {
+      setFilterType('ALL');
+    }
+  }, [filterType, paymentMethods]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -382,11 +389,19 @@ export const PaymentMethodsConfigView: React.FC = () => {
           <div className="text-[10px] text-pink-600 mt-1">bKash ৳{metrics.paymentAccountBalances.bkashMerchant.toLocaleString()} | Nagad ৳{metrics.paymentAccountBalances.nagadMerchant.toLocaleString()}</div>
         </div>
 
-        <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl shadow-xs">
-          <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-1">Bank & POS Card Sales</div>
-          <div className="text-2xl font-black text-blue-900">৳ {(metrics.paymentAccountBalances.bankTransfer + metrics.payCard).toLocaleString()}</div>
-          <div className="text-[10px] text-blue-600 mt-1">Bank ৳{metrics.paymentAccountBalances.bankTransfer.toLocaleString()} | Card ৳{metrics.payCard.toLocaleString()}</div>
-        </div>
+        {(typeCounts.CARD > 0 || typeCounts.BANK > 0 || typeCounts.CREDIT === 0) ? (
+          <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl shadow-xs">
+            <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-1">Bank & POS Card Sales</div>
+            <div className="text-2xl font-black text-blue-900">৳ {(metrics.paymentAccountBalances.bankTransfer + metrics.payCard).toLocaleString()}</div>
+            <div className="text-[10px] text-blue-600 mt-1">Bank ৳{metrics.paymentAccountBalances.bankTransfer.toLocaleString()} | Card ৳{metrics.payCard.toLocaleString()}</div>
+          </div>
+        ) : (
+          <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl shadow-xs">
+            <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-1">Customer Credit / Due</div>
+            <div className="text-2xl font-black text-amber-900">৳ {(metrics.totalCustomerDue || 0).toLocaleString()}</div>
+            <div className="text-[10px] text-amber-600 mt-1">Active customer credit balance</div>
+          </div>
+        )}
       </div>
 
       {/* Filter Tabs & Search Bar */}
@@ -395,14 +410,13 @@ export const PaymentMethodsConfigView: React.FC = () => {
           <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             {[
               { id: 'ALL', label: language === 'bn' ? 'সব মেথড' : 'All Methods', icon: <Sliders className="w-3.5 h-3.5" /> },
-              { id: 'CASH', label: language === 'bn' ? 'ক্যাশ ইন হ্যান্ড' : 'Cash in Hand', icon: <Banknote className="w-3.5 h-3.5 text-emerald-600" /> },
-              { id: 'MFS', label: language === 'bn' ? 'মোবাইল ব্যাংকিং (MFS)' : 'Mobile Banking (MFS)', icon: <Smartphone className="w-3.5 h-3.5 text-pink-600" /> },
-              { id: 'CARD', label: language === 'bn' ? 'কার্ড / POS' : 'Bank Card / POS', icon: <CreditCard className="w-3.5 h-3.5 text-blue-600" /> },
-              { id: 'BANK', label: language === 'bn' ? 'ব্যাংক ট্রান্সফার' : 'Bank Transfer', icon: <Building className="w-3.5 h-3.5 text-indigo-600" /> },
-              { id: 'CREDIT', label: language === 'bn' ? 'কাস্টমার ডিউ' : 'Customer Due / Credit', icon: <UserCheck className="w-3.5 h-3.5 text-amber-600" /> },
-              ...(typeCounts.OTHER > 0
-                ? [{ id: 'OTHER', label: language === 'bn' ? 'অন্যান্য' : 'Other Gateways', icon: <Zap className="w-3.5 h-3.5 text-slate-600" /> }]
-                : [])
+              ...PAYMENT_TYPE_OPTIONS
+                .filter(opt => (typeCounts[opt.type] || 0) > 0)
+                .map(opt => ({
+                  id: opt.type,
+                  label: language === 'bn' ? opt.bnLabel : opt.label,
+                  icon: getTypeIcon(opt.type, 'w-3.5 h-3.5')
+                }))
             ].map(tab => {
               const isSelected = filterType === tab.id;
               const count = typeCounts[tab.id] ?? 0;
