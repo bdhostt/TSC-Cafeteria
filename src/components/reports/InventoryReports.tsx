@@ -637,7 +637,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
     searchQuery
   ]);
 
-  // --- 5. ITEM SPECIFIC LASER DRILLDOWN DATA FOR MODAL ---
+  // --- 5. ITEM SPECIFIC LEDGER DRILLDOWN DATA FOR MODAL ---
   const modalItemLedgerEntries = useMemo(() => {
     if (!selectedLedgerItem) return [];
 
@@ -1082,7 +1082,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
               </div>
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Stock Valuation Ledger & Transactional Laser</span>
+                  <span>Stock Valuation & Transactional Ledger</span>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold border border-emerald-300">
                     Live POS Recipe BOM
                   </span>
@@ -1301,7 +1301,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
                       <th className="py-2.5 px-2.5 font-bold text-right text-white">Closing Stock</th>
                       <th className="py-2.5 px-2.5 font-bold text-right">Avg Rate (৳)</th>
                       <th className="py-2.5 px-3 font-bold text-right text-amber-400">Total Stock Value (৳)</th>
-                      <th className="py-2.5 px-3 font-bold text-center">Laser Drilldown</th>
+                      <th className="py-2.5 px-3 font-bold text-center">Ledger Drilldown</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1400,16 +1400,16 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
                               </div>
                             </td>
 
-                            {/* Action: Laser Drilldown */}
+                            {/* Action: Ledger Drilldown */}
                             <td className="py-2.5 px-3 text-center">
                               <button
                                 type="button"
                                 onClick={() => setSelectedLedgerItem(row.item)}
                                 className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold flex items-center gap-1 mx-auto transition cursor-pointer"
-                                title="Open Detailed Stock Laser Ledger"
+                                title="Open Detailed Stock Ledger Statement"
                               >
                                 <Eye className="w-3 h-3" />
-                                <span>Laser</span>
+                                <span>Ledger</span>
                               </button>
                             </td>
                           </tr>
@@ -1531,7 +1531,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
             </div>
           )}
 
-          {/* ITEM STOCK LASER DRILLDOWN MODAL */}
+          {/* ITEM STOCK LEDGER DRILLDOWN MODAL */}
           {selectedLedgerItem && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs">
               <div className="bg-white rounded-2xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
@@ -1543,7 +1543,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
                     </div>
                     <div>
                       <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                        <span>Stock Laser Statement: {selectedLedgerItem.name}</span>
+                        <span>Stock Ledger Statement: {selectedLedgerItem.name}</span>
                         <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
                           {selectedLedgerItem.category}
                         </span>
@@ -1593,7 +1593,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
                   </div>
                 </div>
 
-                {/* Modal Laser Table */}
+                {/* Modal Ledger Table */}
                 <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl shadow-xs">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-900 text-slate-300 sticky top-0">
@@ -1662,7 +1662,7 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
                     onClick={() => setSelectedLedgerItem(null)}
                     className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
                   >
-                    Close Laser
+                    Close Ledger
                   </button>
                 </div>
               </div>

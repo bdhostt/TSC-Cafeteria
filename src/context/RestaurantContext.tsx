@@ -1766,9 +1766,19 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           openedBy: "Admin / Cashier",
           dayNumber: 1
         };
+        let sanitizedInventory = parsed.inventory || [];
+        if (Array.isArray(sanitizedInventory) && parsed.purchases?.some((p: any) => p.billNo === 'BILL-8540' || p.billNo?.includes('8540'))) {
+          sanitizedInventory = sanitizedInventory.map((inv: any) => {
+            if (inv.id === 1 && inv.open === 1) {
+              return { ...inv, open: 0 };
+            }
+            return inv;
+          });
+        }
         return { 
           ...DEFAULT_DATA, 
           ...parsed,
+          inventory: sanitizedInventory,
           businessDay,
           tables: mergedTables,
           tableZones: mergedZones,
@@ -2028,6 +2038,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
           result.data.tableDimensions = { width: 147, height: 98 };
+        }
+        if (Array.isArray(result.data.inventory) && result.data.purchases?.some((p: any) => p.billNo === 'BILL-8540' || p.billNo?.includes('8540'))) {
+          result.data.inventory = result.data.inventory.map((inv: any) => {
+            if (inv.id === 1 && inv.open === 1) {
+              return { ...inv, open: 0 };
+            }
+            return inv;
+          });
         }
         if (result.data.tables) {
           result.data.tables = result.data.tables.map((t: Table) => {
@@ -2509,6 +2527,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             totalReceivedVal += (q * r);
           }
         });
+      }
+    });
+
+    (data.purchaseReturns || []).forEach(ret => {
+      if (ret.itemId === item.id || (ret.item && ret.item.toLowerCase().trim() === item.name.toLowerCase().trim())) {
+        const q = Number(ret.qty) || 0;
+        const r = Number(ret.rate) || 0;
+        totalReceivedQty = Math.max(0, totalReceivedQty - q);
+        totalReceivedVal = Math.max(0, totalReceivedVal - (q * r));
       }
     });
 
@@ -5571,7 +5598,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updatedPurchases = [voucher, ...prev.purchases];
       }
 
-      // Update inventory stock if voucher is FINAL
+      // Update inventory valuation rate if voucher is FINAL (Do not add purchase quantity to opening stock)
       let updatedInventory = prev.inventory || [];
       if (voucher.status === 'FINAL') {
         const invMap = new Map<number, StockInventoryRecord>(updatedInventory.map(i => [i.id, { ...i }]));
@@ -5579,13 +5606,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (itm.itemId) {
             const existing = invMap.get(itm.itemId);
             if (existing) {
-              existing.open += (itm.qty || 0);
               existing.rate = itm.rate || existing.rate;
             } else {
               invMap.set(itm.itemId, {
                 id: itm.itemId,
-                open: itm.qty || 0,
+                open: 0,
                 used: 0,
+                manualUsed: 0,
+                wastage: 0,
                 rate: itm.rate
               });
             }
@@ -5675,19 +5703,20 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         items: JSON.parse(JSON.stringify(receivedItems))
       };
 
-      // 2. Update Stock Inventory
+      // 2. Update Stock Inventory Valuation Rate (Do not add purchase quantity to opening stock)
       const invMap = new Map<number, StockInventoryRecord>((prev.inventory || []).map(i => [i.id, { ...i }]));
       receivedItems.forEach(itm => {
         if (itm.itemId) {
           const existing = invMap.get(itm.itemId);
           if (existing) {
-            existing.open += (itm.qty || 0);
             existing.rate = itm.rate || existing.rate;
           } else {
             invMap.set(itm.itemId, {
               id: itm.itemId,
-              open: itm.qty || 0,
+              open: 0,
               used: 0,
+              manualUsed: 0,
+              wastage: 0,
               rate: itm.rate
             });
           }
@@ -5778,34 +5807,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         qtyDiff = targetRet.qty || 0;
       }
 
-      // Deduct returned stock from inventory
-      let updatedInventory = prev.inventory || [];
-      if (targetRet.itemId) {
-        let found = false;
-        updatedInventory = updatedInventory.map(inv => {
-          if (inv.id === targetRet.itemId) {
-            found = true;
-            return {
-              ...inv,
-              open: Math.max(0, inv.open - qtyDiff)
-            };
-          }
-          return inv;
-        });
-        if (!found && qtyDiff > 0) {
-          updatedInventory = [...updatedInventory, {
-            id: targetRet.itemId,
-            open: 0,
-            used: 0,
-            rate: targetRet.rate || 0
-          }];
-        }
-      }
-
       return {
         ...prev,
-        purchaseReturns: updatedReturns,
-        inventory: updatedInventory
+        purchaseReturns: updatedReturns
       };
     });
   };
@@ -5813,23 +5817,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const deletePurchaseReturn = (id: number) => {
     setData(prev => {
       const list = prev.purchaseReturns || DEFAULT_PURCHASE_RETURNS;
-      const target = list.find(pr => pr.id === id);
-      let updatedInventory = prev.inventory || [];
-      if (target && target.itemId) {
-        updatedInventory = updatedInventory.map(inv => {
-          if (inv.id === target.itemId) {
-            return {
-              ...inv,
-              open: inv.open + (target.qty || 0)
-            };
-          }
-          return inv;
-        });
-      }
       return {
         ...prev,
-        purchaseReturns: list.filter(pr => pr.id !== id),
-        inventory: updatedInventory
+        purchaseReturns: list.filter(pr => pr.id !== id)
       };
     });
   };

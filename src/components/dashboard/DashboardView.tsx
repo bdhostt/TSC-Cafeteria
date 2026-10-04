@@ -204,7 +204,7 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Metric Cards - Row 2: Stock Movement & Valuation Laser (6 Cards from Picture 1) */}
+      {/* Metric Cards - Row 2: Stock Movement & Valuation Ledger (6 Cards from Picture 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* 1. Opening Stock */}
         <div 
