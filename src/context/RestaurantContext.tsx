@@ -1512,24 +1512,38 @@ export const getModuleForTab = (tab: ActiveTab, subNav?: string): string => {
 };
 
 export const CANONICAL_EXPENSE_HEAD_MAP: Record<string, { code: string; name: string }> = {
-  'casual waiter charge': { code: '6010', name: 'Kitchen Staff Salaries' },
-  'staff salary': { code: '6010', name: 'Kitchen Staff Salaries' },
-  'salary': { code: '6010', name: 'Kitchen Staff Salaries' },
-  'salaries': { code: '6010', name: 'Kitchen Staff Salaries' },
-  'waiter charge': { code: '6010', name: 'Kitchen Staff Salaries' },
-  'cleaning bill': { code: '6040', name: 'Cleaning & Consumables' },
-  'cleaning & consumables': { code: '6040', name: 'Cleaning & Consumables' },
-  'cleaning': { code: '6040', name: 'Cleaning & Consumables' },
-  'consumables': { code: '6040', name: 'Cleaning & Consumables' },
-  'electricity bill': { code: '6030', name: 'Electricity & Gas Bill' },
-  'electric bill': { code: '6030', name: 'Electricity & Gas Bill' },
-  'gas bill': { code: '6030', name: 'Electricity & Gas Bill' },
-  'electricity & gas bill': { code: '6030', name: 'Electricity & Gas Bill' },
-  'conveyance': { code: '6020', name: 'Floor Rent & Utilities' },
-  'floor rent': { code: '6020', name: 'Floor Rent & Utilities' },
-  'floor rent & utilities': { code: '6020', name: 'Floor Rent & Utilities' },
-  'rent': { code: '6020', name: 'Floor Rent & Utilities' },
-  'transport': { code: '6020', name: 'Floor Rent & Utilities' },
+  'staff salary & advance': { code: '6010', name: 'Staff Salary & Advance' },
+  'staff salary': { code: '6010', name: 'Staff Salary & Advance' },
+  'salary': { code: '6010', name: 'Staff Salary & Advance' },
+  'salaries': { code: '6010', name: 'Staff Salary & Advance' },
+  'casual waiter charge': { code: '6010', name: 'Staff Salary & Advance' },
+  'waiter charge': { code: '6010', name: 'Staff Salary & Advance' },
+  'kitchen staff salaries': { code: '6010', name: 'Staff Salary & Advance' },
+  'office & shop rent': { code: '6020', name: 'Office & Shop Rent' },
+  'floor rent': { code: '6020', name: 'Office & Shop Rent' },
+  'rent': { code: '6020', name: 'Office & Shop Rent' },
+  'gas bill': { code: '6030', name: 'Gas Bill' },
+  'electricity bill': { code: '6040', name: 'Electricity Bill' },
+  'electric bill': { code: '6040', name: 'Electricity Bill' },
+  'staff house rent': { code: '6050', name: 'Staff House Rent' },
+  'software service charge': { code: '6060', name: 'Software Service Charge' },
+  'cleaning bill': { code: '6070', name: 'Cleaning Bill' },
+  'cleaning & consumables': { code: '6070', name: 'Cleaning Bill' },
+  'cleaning': { code: '6070', name: 'Cleaning Bill' },
+  'conveyance': { code: '6080', name: 'Conveyance' },
+  'transport': { code: '6080', name: 'Conveyance' },
+  'internet bill': { code: '6090', name: 'Internet Bill' },
+  'misc exp.': { code: '6100', name: 'Misc Exp.' },
+  'misc exp': { code: '6100', name: 'Misc Exp.' },
+  'printing & branding': { code: '6110', name: 'Printing & Branding' },
+  'repair maintenance': { code: '6120', name: 'Repair Maintenance' },
+  'staff expenses( food & others)': { code: '6130', name: 'Staff Expenses (Food & Others)' },
+  'staff expenses': { code: '6130', name: 'Staff Expenses (Food & Others)' },
+  'overtime': { code: '6140', name: 'Overtime' },
+  'mobile bill': { code: '6150', name: 'Mobile Bill' },
+  'first aid': { code: '6160', name: 'First Aid' },
+  'donation': { code: '6170', name: 'Donation' },
+  'bank charge': { code: '6180', name: 'Bank Charge' },
   'cogs manual use': { code: '6050', name: 'COGS Manual Use (MU)' }
 };
 
@@ -1608,17 +1622,29 @@ export const resolveExpenseAccount = (
 
   const eHead = (e.head || '').toLowerCase().trim();
   const eCat = (e.category || '').toLowerCase().trim();
+  if (!eHead) return undefined;
 
-  // 2. Strict canonical head map (Strict 1-to-1 match guaranteed)
+  // 2. Direct exact name match (Highest priority: matches user's actual accounts!)
+  const exactMatch = accounts.find(a => 
+    a.type === 'EXPENSE' && a.name.toLowerCase().trim() === eHead
+  ) || accounts.find(a => a.name.toLowerCase().trim() === eHead);
+  if (exactMatch) return exactMatch;
+
+  // 3. Clean normalized alphanumeric match (handles spacing/punctuation e.g. "Misc Exp." vs "Misc Exp")
+  const normHead = eHead.replace(/[^a-z0-9]/g, '');
+  if (normHead) {
+    const normMatch = accounts.find(a => 
+      a.type === 'EXPENSE' && a.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normHead
+    ) || accounts.find(a => a.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normHead);
+    if (normMatch) return normMatch;
+  }
+
+  // 4. Strict canonical head map
   const canonical = CANONICAL_EXPENSE_HEAD_MAP[eHead];
   if (canonical) {
     const acc = accounts.find(a => a.code === canonical.code);
     if (acc) return acc;
   }
-
-  // 3. Direct exact name match
-  const exactMatch = accounts.find(a => a.name.toLowerCase().trim() === eHead);
-  if (exactMatch) return exactMatch;
 
   // 3. Filter candidate operating expense accounts (exclude pure BOM COGS unless head explicitly mentions COGS/BOM)
   const candidateAccounts = accounts.filter(a => {

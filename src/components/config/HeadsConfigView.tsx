@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant, DEFAULT_PAYMENT_METHODS, getNextAccountCode, CANONICAL_EXPENSE_HEAD_MAP } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS, getNextAccountCode, resolveExpenseAccount, CANONICAL_EXPENSE_HEAD_MAP } from '../../context/RestaurantContext';
 import { AccountHead, AccountType, RestaurantProfile, CommissionAgent } from '../../types';
 import { PrintersConfigView } from './PrintersConfigView';
 import { PrintTemplatesConfigView } from './PrintTemplatesConfigView';
@@ -1123,7 +1123,7 @@ export const HeadsConfigView: React.FC = () => {
                                   </span>
                                 )}
                                 {sec.id === 'expenseHeads' && (() => {
-                                  const linked = CANONICAL_EXPENSE_HEAD_MAP[item.toLowerCase().trim()];
+                                  const linked = resolveExpenseAccount({ id: 0, date: '', head: item, amount: 0 }, chartList);
                                   return linked ? (
                                     <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-mono font-bold shrink-0">
                                       [{linked.code}] {linked.name}
