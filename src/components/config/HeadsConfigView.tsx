@@ -234,19 +234,44 @@ export const HeadsConfigView: React.FC = () => {
     ? data.tableZones
     : ['Floor 1', 'Floor 2', 'VIP Lounge', 'Rooftop Garden'];
 
-  const handleAdd = (type: string) => {
-    const val = inputVal[type]?.trim();
-    if (!val) return;
-    if (type === 'tables') {
-      addCustomTable(val, selectedZoneForNewTable || allZones[0]);
-    } else if (type === 'tableZones') {
-      addTableZone(val);
-    } else {
-      addConfigItem(type as any, val);
+  React.useEffect(() => {
+    if (allZones.length > 0 && !allZones.includes(selectedZoneForNewTable)) {
+      setSelectedZoneForNewTable(allZones[0]);
     }
-    setInputVal(prev => ({ ...prev, [type]: '' }));
-    setJustAddedSec(type);
-    setTimeout(() => setJustAddedSec(null), 2500);
+  }, [allZones, selectedZoneForNewTable]);
+
+  const handleAdd = (type: string) => {
+    const rawVal = inputVal[type];
+    const val = rawVal?.trim();
+    if (!val) {
+      alert(language === 'bn' ? 'অনুগ্রহ করে একটি নাম লিখুন।' : 'Please enter a name first.');
+      return;
+    }
+
+    const secObj = sections.find(s => s.id === type);
+    const secTitle = secObj?.title || type;
+
+    // Duplicate check across existing items in this section
+    const currentItems = secObj?.items || [];
+    if (currentItems.some(i => i.toLowerCase().trim() === val.toLowerCase().trim())) {
+      alert(language === 'bn' ? `"${val}" ইতিমধ্যে "${secTitle}"-এ রয়েছে!` : `"${val}" already exists in ${secTitle}!`);
+      return;
+    }
+
+    let success: boolean | void = false;
+    if (type === 'tables') {
+      success = addCustomTable(val, selectedZoneForNewTable || allZones[0]);
+    } else if (type === 'tableZones') {
+      success = addTableZone(val);
+    } else {
+      success = addConfigItem(type as any, val);
+    }
+
+    if (success !== false) {
+      setInputVal(prev => ({ ...prev, [type]: '' }));
+      setJustAddedSec(type);
+      setTimeout(() => setJustAddedSec(null), 2500);
+    }
   };
 
   const handleStartEdit = (sectionId: string, index: number, currentText: string, currentZone?: string) => {
@@ -1151,16 +1176,24 @@ export const HeadsConfigView: React.FC = () => {
 
                     <div className="flex gap-1.5">
                       <input
+                        id={`input-add-${sec.id}`}
                         type="text"
                         value={inputVal[sec.id] || ''}
                         onChange={e => setInputVal(prev => ({ ...prev, [sec.id]: e.target.value }))}
-                        onKeyDown={e => e.key === 'Enter' && handleAdd(sec.id)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAdd(sec.id);
+                          }
+                        }}
                         placeholder={`Add ${sec.title.toLowerCase()}...`}
                         className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none placeholder:text-slate-400"
                       />
                       <button
+                        id={`btn-add-${sec.id}`}
                         type="button"
                         onClick={() => handleAdd(sec.id)}
+                        title={`Add new ${sec.title}`}
                         className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1 cursor-pointer shrink-0"
                       >
                         <Plus className="w-3.5 h-3.5" />

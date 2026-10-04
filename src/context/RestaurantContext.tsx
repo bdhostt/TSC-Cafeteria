@@ -1380,16 +1380,16 @@ interface RestaurantContextType {
   saveInventoryRecord: (rawItemId: number, open: number, used: number, rate?: number, wastage?: number) => void;
   
   // Configurations & Master Heads
-  addConfigItem: (type: 'tables' | 'waiters' | 'vendors' | 'purchaseCategories' | 'departments' | 'menuCategories' | 'expenseHeads' | 'customers' | 'tableZones', val: string) => void;
+  addConfigItem: (type: 'tables' | 'waiters' | 'vendors' | 'purchaseCategories' | 'departments' | 'menuCategories' | 'expenseHeads' | 'customers' | 'tableZones', val: string, extraZone?: string) => boolean | void;
   editConfigItem: (type: 'tables' | 'waiters' | 'vendors' | 'purchaseCategories' | 'departments' | 'menuCategories' | 'expenseHeads' | 'customers' | 'tableZones', index: number, newVal: string) => void;
   removeConfigItem: (type: 'tables' | 'waiters' | 'vendors' | 'purchaseCategories' | 'departments' | 'menuCategories' | 'expenseHeads' | 'customers' | 'tableZones', itemOrIndex: string | number) => void;
   addCustomHead: (type: 'vendor' | 'rawCategory' | 'waiter' | 'department' | 'menuCat' | 'expense' | 'customer' | 'tableZone', val: string) => void;
   editCustomHead: (type: 'vendor' | 'rawCategory' | 'waiter' | 'department' | 'menuCat' | 'expense' | 'customer' | 'tableZone', index: number, newVal: string) => void;
   deleteCustomHead: (type: 'vendor' | 'rawCategory' | 'waiter' | 'department' | 'menuCat' | 'expense' | 'customer' | 'tableZone', index: number) => void;
-  addCustomTable: (name: string, zone?: string) => void;
+  addCustomTable: (name: string, zone?: string) => boolean | void;
   editCustomTable: (index: number, newName: string, newZone?: string) => void;
   deleteCustomTable: (index: number) => void;
-  addTableZone: (zone: string) => void;
+  addTableZone: (zone: string) => boolean | void;
   editTableZone: (oldZone: string, newZone: string) => void;
   deleteTableZone: (zone: string) => void;
 
@@ -1960,8 +1960,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Synchronize state from server
   const syncFromServer = async (isInitial = false) => {
-    // If local update/delete/edit happened within 5s, don't let periodic background polling overwrite it
-    if (!isInitial && Date.now() - lastLocalEditTimeRef.current < 5000) {
+    // If local update/delete/edit happened within 15s, don't let periodic background polling overwrite it
+    if (!isInitial && Date.now() - lastLocalEditTimeRef.current < 15000) {
       return;
     }
 
@@ -5873,22 +5873,27 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
-  const addTableZone = (zone: string) => {
+  const addTableZone = (zone: string): boolean => {
     const trimmed = zone.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
+    lastLocalEditTimeRef.current = Date.now();
+    let added = false;
     setData(prev => {
       const current = prev.tableZones || [];
       if (current.some(z => z.toLowerCase() === trimmed.toLowerCase())) return prev;
+      added = true;
       return {
         ...prev,
         tableZones: [...current, trimmed]
       };
     });
+    return added;
   };
 
   const editTableZone = (oldZone: string, newZone: string) => {
     const trimmed = newZone.trim();
     if (!trimmed || oldZone === trimmed) return;
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       tableZones: (prev.tableZones || []).map(z => z === oldZone ? trimmed : z),
@@ -5897,6 +5902,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const deleteTableZone = (zone: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       tableZones: (prev.tableZones || []).filter(z => z !== zone),
@@ -5904,11 +5910,17 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
-  const addCustomTable = (name: string, zone?: string) => {
+  const addCustomTable = (name: string, zone?: string): boolean => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
+    lastLocalEditTimeRef.current = Date.now();
+    let added = false;
     setData(prev => {
       const tables = prev.tables || [];
+      if (tables.some(t => t.name.toLowerCase().trim() === trimmed.toLowerCase())) {
+        return prev;
+      }
+      added = true;
       const id = 'T-' + (tables.length + 1).toString().padStart(2, '0');
       const assignedZone = zone?.trim() || (prev.tableZones && prev.tableZones.length > 0 ? prev.tableZones[0] : 'Floor 1');
       return {
@@ -5926,11 +5938,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }]
       };
     });
+    return added;
   };
 
   const editCustomTable = (index: number, newName: string, newZone?: string) => {
     const trimmed = newName.trim();
     if (!trimmed) return;
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => {
       const arr = [...(prev.tables || [])];
       if (arr[index]) {
@@ -5945,6 +5959,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const deleteCustomTable = (index: number) => {
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       tables: (prev.tables || []).filter((_, i) => i !== index)
@@ -5956,24 +5971,49 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     type: 'tables' | 'waiters' | 'vendors' | 'purchaseCategories' | 'departments' | 'menuCategories' | 'expenseHeads' | 'customers' | 'tableZones', 
     val: string,
     extraZone?: string
-  ) => {
+  ): boolean => {
     const trimmed = val.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
+    lastLocalEditTimeRef.current = Date.now();
     if (type === 'tables') {
-      addCustomTable(trimmed, extraZone);
+      return addCustomTable(trimmed, extraZone);
     } else if (type === 'tableZones') {
-      addTableZone(trimmed);
+      return addTableZone(trimmed);
     } else {
+      let added = false;
       setData(prev => {
         const currentList = (prev[type] as string[]) || [];
         if (currentList.some(item => item.toLowerCase() === trimmed.toLowerCase())) {
           return prev;
         }
+        added = true;
+
+        let updatedCoa = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+        if (type === 'expenseHeads') {
+          const alreadyInCoa = updatedCoa.some(a => a.name.toLowerCase().trim() === trimmed.toLowerCase());
+          if (!alreadyInCoa) {
+            const nextCode = getNextAccountCode('EXPENSE', updatedCoa, 'Operating Expenses');
+            updatedCoa = [
+              ...updatedCoa,
+              {
+                id: nextCode,
+                code: nextCode,
+                name: trimmed,
+                type: 'EXPENSE',
+                category: 'Operating Expenses',
+                balance: 0
+              }
+            ];
+          }
+        }
+
         return {
           ...prev,
-          [type]: [...currentList, trimmed]
+          [type]: [...currentList, trimmed],
+          ...(type === 'expenseHeads' ? { chartOfAccounts: updatedCoa } : {})
         };
       });
+      return added;
     }
   };
 
@@ -5984,6 +6024,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   ) => {
     const trimmed = newVal.trim();
     if (!trimmed) return;
+    lastLocalEditTimeRef.current = Date.now();
     if (type === 'tables') {
       editCustomTable(index, trimmed);
     } else if (type === 'tableZones') {
@@ -6009,6 +6050,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         let updatedPurchaseOrders = prev.purchaseOrders;
         let updatedPurchaseReturns = prev.purchaseReturns;
         let updatedPayments = prev.payments;
+        let updatedCoa = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
 
         if (type === 'departments') {
           updatedMenu = prev.menuItems.map(m => m.department === oldVal ? { ...m, department: trimmed } : m);
@@ -6022,6 +6064,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           updatedPurchaseOrders = (prev.purchaseOrders || []).map(po => po.vendor === oldVal ? { ...po, vendor: trimmed } : po);
           updatedPurchaseReturns = (prev.purchaseReturns || []).map(pr => pr.vendor === oldVal ? { ...pr, vendor: trimmed } : pr);
           updatedPayments = (prev.payments || []).map(pay => pay.vendor === oldVal ? { ...pay, vendor: trimmed } : pay);
+        } else if (type === 'expenseHeads') {
+          updatedCoa = updatedCoa.map(a => (oldVal && a.name.toLowerCase().trim() === oldVal.toLowerCase().trim()) ? { ...a, name: trimmed } : a);
         }
 
         return {
@@ -6032,7 +6076,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           purchases: updatedPurchases,
           purchaseOrders: updatedPurchaseOrders,
           purchaseReturns: updatedPurchaseReturns,
-          payments: updatedPayments
+          payments: updatedPayments,
+          chartOfAccounts: updatedCoa
         };
       });
     }
@@ -6042,6 +6087,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     type: 'tables' | 'waiters' | 'vendors' | 'purchaseCategories' | 'departments' | 'menuCategories' | 'expenseHeads' | 'customers' | 'tableZones', 
     itemOrIndex: string | number
   ) => {
+    lastLocalEditTimeRef.current = Date.now();
     if (type === 'tables') {
       setData(prev => {
         const idx = typeof itemOrIndex === 'number' 
@@ -6229,6 +6275,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Chart of Accounts Handlers (Strict Unique Code Enforcement)
   const addAccountHead = (head: Omit<AccountHead, 'id'>) => {
+    lastLocalEditTimeRef.current = Date.now();
     const code = head.code.trim();
     setData(prev => {
       const currentList = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
@@ -6245,6 +6292,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const editAccountHead = (id: string, updated: Partial<AccountHead>) => {
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => {
       const currentList = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
       if (updated.code) {
@@ -6263,6 +6311,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const deleteAccountHead = (id: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       chartOfAccounts: (prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS).filter(h => h.id !== id)
@@ -6675,6 +6724,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Restaurant Profile & Logo
   const updateRestaurantProfile = (profileUpdates: Partial<RestaurantProfile>) => {
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => {
       const updatedProfile: RestaurantProfile = {
         ...(prev.restaurantProfile || DEFAULT_RESTAURANT_PROFILE),
