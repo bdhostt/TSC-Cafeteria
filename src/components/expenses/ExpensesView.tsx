@@ -355,7 +355,7 @@ export const ExpensesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Expense Head (খরচের খাত) *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Expense Head *</label>
                 <select
                   value={head}
                   onChange={e => {
@@ -373,10 +373,10 @@ export const ExpensesView: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-bold text-slate-700">
-                    Chart of Accounts Head (হিসাব খতিয়ান খাত)
+                    Chart of Accounts Head
                   </label>
                   <span className="text-[10px] text-slate-500 font-semibold">
-                    {selectedAccountId ? 'ম্যানুয়ালি নির্ধারিত' : 'স্বয়ংক্রিয় লিংকড'}
+                    {selectedAccountId ? 'Manually Assigned' : 'Auto-Linked'}
                   </span>
                 </div>
                 <select
@@ -391,17 +391,17 @@ export const ExpensesView: React.FC = () => {
                   ))}
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1">
-                  খতিয়ান অ্যাকাউন্ট: <span className="font-semibold text-slate-700">[{autoMatchedAccount?.code || '6020'}] {autoMatchedAccount?.name || 'Operating Expenses'}</span>
+                  Ledger Account: <span className="font-semibold text-slate-700">[{autoMatchedAccount?.code || '6020'}] {autoMatchedAccount?.name || 'Operating Expenses'}</span>
                 </p>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-slate-700">
-                    Payment Medium / Paid From (টাকা পরিশোধের মাধ্যম) *
+                    Payment Medium / Paid From *
                   </label>
                   <span className="text-[11px] font-bold text-slate-500">
-                    উপলব্ধ ব্যালেন্স: <span className="font-mono font-black text-emerald-700">৳ {selectedBalance.toLocaleString()}</span>
+                    Available Balance: <span className="font-mono font-black text-emerald-700">৳ {selectedBalance.toLocaleString()}</span>
                   </span>
                 </div>
 
@@ -413,7 +413,7 @@ export const ExpensesView: React.FC = () => {
                 >
                   {paymentMediumOptions.map(opt => (
                     <option key={opt.id} value={opt.value}>
-                      {opt.label} — (ব্যালেন্স: ৳ {opt.balance.toLocaleString()})
+                      {opt.label} — (Balance: ৳ {opt.balance.toLocaleString()})
                     </option>
                   ))}
                 </select>
@@ -429,7 +429,7 @@ export const ExpensesView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Wallet className="w-4 h-4 shrink-0 text-slate-600" />
                     <div>
-                      <span className="font-bold">বর্তমান তহবিল ব্যালেন্স:</span>
+                      <span className="font-bold">Current Fund Balance:</span>
                       <span className="text-[10px] block opacity-85 font-medium">{selectedMediumObj.label}</span>
                     </div>
                   </div>
@@ -440,8 +440,8 @@ export const ExpensesView: React.FC = () => {
                     {amount > 0 && (
                       <span className="text-[10px] font-bold block">
                         {selectedBalance >= amount
-                          ? `খরচের পর থাকবে: ৳ ${(selectedBalance - amount).toLocaleString()}`
-                          : `⚠️ ঘাটতি: ৳ ${(amount - selectedBalance).toLocaleString()}`
+                          ? `Remaining After Expense: ৳ ${(selectedBalance - amount).toLocaleString()}`
+                          : `⚠️ Shortage: ৳ ${(amount - selectedBalance).toLocaleString()}`
                         }
                       </span>
                     )}
