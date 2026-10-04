@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useRestaurant, isSaleActive } from '../../context/RestaurantContext';
+import { useRestaurant, isSaleActive, resolveExpenseAccount, DEFAULT_CHART_OF_ACCOUNTS } from '../../context/RestaurantContext';
 import { ReportFilters, DatePreset, exportCsvHelper } from './ReportFilters';
 import { 
   Scale, 
@@ -25,6 +25,8 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [coaTypeFilter, setCoaTypeFilter] = useState<string>('ALL');
+  const [hideZeroBalances, setHideZeroBalances] = useState(false);
 
   // Date filter helper
   const matchesDate = (itemDate: string) => {
@@ -36,155 +38,243 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
 
   // --- 14. TRIAL BALANCE (TRANSACTIONAL & PERIOD-AWARE) ---
   const trialBalanceData = useMemo(() => {
-    // 1. Prior Period Calculations (Transactions strictly before startDate)
-    let priorSalesGross = 0;
-    let priorDiscount = 0;
-    let priorCashSales = 0;
-    let priorDigitalSales = 0;
-    let priorDueGiven = 0;
-    let priorDueCollected = 0;
+    // 1. Get complete list of all accounts from Chart of Accounts
+    const coaList = (data.chartOfAccounts && data.chartOfAccounts.length > 0)
+      ? [...data.chartOfAccounts]
+      : [...DEFAULT_CHART_OF_ACCOUNTS];
 
-    // 2. Current Period Calculations (Between startDate and endDate)
-    let periodSalesGross = 0;
-    let periodDiscount = 0;
-    let periodCashSales = 0;
-    let periodDigitalSales = 0;
-    let periodDueGiven = 0;
-    let periodDueCollected = 0;
+    // Sort accounts numerically by code (1010, 1020, 1030, etc.)
+    coaList.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
 
+    // Fast lookup helpers for standard account heads
+    const getAccountByCode = (code: string) => coaList.find(a => a.code === code || a.id === code);
+    const getAccountByKeyword = (type: string, keywords: string[]) => {
+      return coaList.find(a => {
+        if (a.type !== type) return false;
+        const norm = (a.name + ' ' + (a.category || '')).toLowerCase();
+        return keywords.some(k => norm.includes(k.toLowerCase()));
+      });
+    };
+
+    const cashAcc = getAccountByCode('1010') || getAccountByKeyword('ASSET', ['cash in hand', 'drawer', 'cash']) || coaList.find(a => a.type === 'ASSET');
+    const pettyCashAcc = getAccountByCode('1020') || getAccountByKeyword('ASSET', ['petty cash', 'petty']) || cashAcc;
+    const bankAcc = getAccountByCode('1030') || getAccountByKeyword('ASSET', ['bank a/c', 'bank', 'city bank']) || cashAcc;
+    const mfsAcc = getAccountByCode('1040') || getAccountByKeyword('ASSET', ['bkash', 'nagad', 'mobile', 'mfs']) || bankAcc;
+    const arAcc = getAccountByCode('1050') || getAccountByKeyword('ASSET', ['receivable', 'customer due', 'due']) || coaList.find(a => a.type === 'ASSET');
+    const invAcc = getAccountByCode('1060') || getAccountByKeyword('ASSET', ['inventory', 'raw material', 'stock']) || coaList.find(a => a.type === 'ASSET');
+    const apAcc = getAccountByCode('2010') || getAccountByKeyword('LIABILITY', ['payable', 'vendor', 'creditor']) || coaList.find(a => a.type === 'LIABILITY');
+    const advanceAcc = getAccountByCode('2020') || getAccountByCode('2030') || getAccountByKeyword('LIABILITY', ['advance', 'deposit']) || coaList.find(a => a.type === 'LIABILITY');
+    const dineInRevAcc = getAccountByCode('4010') || getAccountByKeyword('REVENUE', ['dine-in', 'sales', 'revenue']) || coaList.find(a => a.type === 'REVENUE');
+    const deliveryRevAcc = getAccountByCode('4020') || getAccountByKeyword('REVENUE', ['delivery', 'takeaway']) || dineInRevAcc;
+    const cogsMeatAcc = getAccountByCode('5010') || getAccountByKeyword('EXPENSE', ['meat', 'cogs', 'bom']) || coaList.find(a => a.type === 'EXPENSE');
+    const cogsGroceryAcc = getAccountByCode('5020') || getAccountByKeyword('EXPENSE', ['grocery', 'cogs', 'bom']) || cogsMeatAcc;
+
+    // Movement tracking for each account code
+    const movements: Record<string, { priorDr: number; priorCr: number; periodDr: number; periodCr: number }> = {};
+    coaList.forEach(a => {
+      movements[a.code] = { priorDr: 0, priorCr: 0, periodDr: 0, periodCr: 0 };
+    });
+
+    const postEntry = (accCode: string | undefined, dr: number, cr: number, isPrior: boolean) => {
+      if (!accCode || (dr === 0 && cr === 0)) return;
+      const targetAcc = coaList.find(a => a.code === accCode || a.id === accCode);
+      const code = targetAcc ? targetAcc.code : accCode;
+      if (!movements[code]) {
+        movements[code] = { priorDr: 0, priorCr: 0, periodDr: 0, periodCr: 0 };
+      }
+      if (isPrior) {
+        movements[code].priorDr += dr;
+        movements[code].priorCr += cr;
+      } else {
+        movements[code].periodDr += dr;
+        movements[code].periodCr += cr;
+      }
+    };
+
+    const getPaymentAccountCode = (methodIdOrName: string | undefined, fallbackCode: string): string => {
+      if (!methodIdOrName) return fallbackCode;
+      const norm = methodIdOrName.toUpperCase();
+      if (norm === 'PETTY_CASH' || norm === 'PETTY') return pettyCashAcc?.code || '1020';
+      if (norm === 'CASH') return cashAcc?.code || '1010';
+      if (norm === 'BKASH' || norm === 'NAGAD' || norm === 'MFS' || norm === 'ROCKET' || norm === 'UPAY') return mfsAcc?.code || '1040';
+      if (norm === 'BANK' || norm === 'CARD' || norm === 'CHEQUE' || norm === 'POS') return bankAcc?.code || '1030';
+      if (norm === 'CREDIT' || norm === 'DUE') return arAcc?.code || '1050';
+
+      const directAcc = coaList.find(a => a.code === methodIdOrName || a.id === methodIdOrName);
+      if (directAcc) return directAcc.code;
+
+      const methods = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : [];
+      const mObj = methods.find(m => m.id === methodIdOrName || m.name.toLowerCase() === methodIdOrName.toLowerCase());
+      if (mObj?.ledgerAccountId) {
+        const found = coaList.find(a => a.code === mObj.ledgerAccountId || a.id === mObj.ledgerAccountId);
+        if (found) return found.code;
+      }
+      if (mObj?.type === 'CASH') return cashAcc?.code || '1010';
+      if (mObj?.type === 'MFS') return mfsAcc?.code || '1040';
+      if (mObj?.type === 'CARD' || mObj?.type === 'BANK') return bankAcc?.code || '1030';
+      if (mObj?.type === 'CREDIT') return arAcc?.code || '1050';
+      return fallbackCode;
+    };
+
+    // 1. Process Sales (Food Billing, Collections, Receivables)
     data.sales.forEach(s => {
       if (!isSaleActive(s)) return;
       const isPrior = Boolean(startDate && s.date && s.date < startDate);
       const isPeriod = (!startDate || s.date >= startDate) && (!endDate || s.date <= endDate);
+      if (!isPrior && !isPeriod) return;
 
-      const gross = s.subtotal || s.total;
+      const gross = s.subtotal || s.total || 0;
       const disc = s.discountVal || 0;
       const cash = s.cash || 0;
-      const digital = (s.card || 0) + (s.bkash || 0) + (s.nagad || 0);
       const dueG = s.dueGiven || 0;
       const dueC = s.dueCollected || 0;
 
-      if (isPrior) {
-        priorSalesGross += gross;
-        priorDiscount += disc;
-        priorCashSales += cash;
-        priorDigitalSales += digital;
-        priorDueGiven += dueG;
-        priorDueCollected += dueC;
-      } else if (isPeriod) {
-        periodSalesGross += gross;
-        periodDiscount += disc;
-        periodCashSales += cash;
-        periodDigitalSales += digital;
-        periodDueGiven += dueG;
-        periodDueCollected += dueC;
+      // Select target revenue account
+      let revCode = dineInRevAcc?.code || '4010';
+      if (s.channelOrAgent && s.channelOrAgent !== 'dine_in' && deliveryRevAcc) {
+        revCode = deliveryRevAcc.code;
+      }
+
+      // Cr Revenue Gross
+      postEntry(revCode, 0, gross, isPrior);
+
+      // Dr Sales Discount (contra-revenue)
+      if (disc > 0) {
+        postEntry(revCode, disc, 0, isPrior);
+      }
+
+      // Dr Cash Collection
+      if (cash > 0) {
+        const cashCode = getPaymentAccountCode('cash', cashAcc?.code || '1010');
+        postEntry(cashCode, cash, 0, isPrior);
+      }
+
+      // Dr Digital / Card / MFS Collections
+      if (s.paymentBreakdown) {
+        Object.entries(s.paymentBreakdown).forEach(([mId, amt]) => {
+          if (amt > 0 && mId.toLowerCase() !== 'cash') {
+            const code = getPaymentAccountCode(mId, bankAcc?.code || '1030');
+            postEntry(code, amt, 0, isPrior);
+          }
+        });
+      } else {
+        if ((s.card || 0) > 0) postEntry(getPaymentAccountCode('card_pos', bankAcc?.code || '1030'), s.card || 0, 0, isPrior);
+        if ((s.bkash || 0) > 0) postEntry(getPaymentAccountCode('bkash_merchant', mfsAcc?.code || '1040'), s.bkash || 0, 0, isPrior);
+        if ((s.nagad || 0) > 0) postEntry(getPaymentAccountCode('nagad_merchant', mfsAcc?.code || '1040'), s.nagad || 0, 0, isPrior);
+      }
+
+      // Dr Accounts Receivable (Customer Due Incurred)
+      if (dueG > 0) {
+        postEntry(arAcc?.code || '1050', dueG, 0, isPrior);
+      }
+
+      // Cr Accounts Receivable (Customer Due Collected)
+      if (dueC > 0) {
+        postEntry(arAcc?.code || '1050', 0, dueC, isPrior);
       }
     });
 
-    // Purchases
-    let priorRawPurchased = 0;
-    let priorCashPurchases = 0;
-    let priorCreditPurchases = 0;
-
-    let periodRawPurchased = 0;
-    let periodCashPurchases = 0;
-    let periodCreditPurchases = 0;
-
+    // 2. Process Purchases (Raw Material Inwards, Cash & Vendor Payables)
     data.purchases.forEach(p => {
       if (p.status === 'DRAFT') return;
       const isPrior = Boolean(startDate && p.date && p.date < startDate);
       const isPeriod = (!startDate || p.date >= startDate) && (!endDate || p.date <= endDate);
+      if (!isPrior && !isPeriod) return;
 
-      const paid = p.paid ?? (p.paymentType === 'CASH' ? p.total : 0);
-      const creditAmt = Math.max(0, p.total - paid);
+      const total = p.total || 0;
+      const paid = p.paid ?? (p.paymentType === 'CASH' ? total : 0);
+      const unpaid = Math.max(0, total - paid);
 
-      if (isPrior) {
-        priorRawPurchased += p.total;
-        priorCashPurchases += paid;
-        priorCreditPurchases += creditAmt;
-      } else if (isPeriod) {
-        periodRawPurchased += p.total;
-        periodCashPurchases += paid;
-        periodCreditPurchases += creditAmt;
+      // Dr Raw Material Inventory Asset (1060)
+      postEntry(invAcc?.code || '1060', total, 0, isPrior);
+
+      // Cr Funding Account (Cash / Bank)
+      if (paid > 0) {
+        const pCode = getPaymentAccountCode(p.paymentType, cashAcc?.code || '1010');
+        postEntry(pCode, 0, paid, isPrior);
+      }
+
+      // Cr Accounts Payable (Vendor Due 2010)
+      if (unpaid > 0) {
+        postEntry(apAcc?.code || '2010', 0, unpaid, isPrior);
       }
     });
 
-    // Supplier Payments
-    let priorSupplierPaymentsCash = 0;
-    let priorSupplierPaymentsBank = 0;
-    let priorSupplierPaymentsTotal = 0;
+    // 3. Process Purchase Returns
+    (data.purchaseReturns || []).forEach(pr => {
+      const isPrior = Boolean(startDate && pr.date && pr.date < startDate);
+      const isPeriod = (!startDate || pr.date >= startDate) && (!endDate || pr.date <= endDate);
+      if (!isPrior && !isPeriod) return;
 
-    let periodSupplierPaymentsCash = 0;
-    let periodSupplierPaymentsBank = 0;
-    let periodSupplierPaymentsTotal = 0;
+      const retTotal = pr.total || 0;
+      if (retTotal > 0) {
+        postEntry(apAcc?.code || '2010', retTotal, 0, isPrior);
+        postEntry(invAcc?.code || '1060', 0, retTotal, isPrior);
+      }
+    });
 
+    // 4. Process Supplier Payments (Settlement of Vendor Dues)
     data.payments.forEach(pay => {
       const isPrior = Boolean(startDate && pay.date && pay.date < startDate);
       const isPeriod = (!startDate || pay.date >= startDate) && (!endDate || pay.date <= endDate);
+      if (!isPrior && !isPeriod) return;
 
-      if (isPrior) {
-        priorSupplierPaymentsTotal += pay.amount;
-        if (pay.method === 'CASH') priorSupplierPaymentsCash += pay.amount;
-        else priorSupplierPaymentsBank += pay.amount;
-      } else if (isPeriod) {
-        periodSupplierPaymentsTotal += pay.amount;
-        if (pay.method === 'CASH') periodSupplierPaymentsCash += pay.amount;
-        else periodSupplierPaymentsBank += pay.amount;
-      }
+      const amt = pay.amount || 0;
+      if (amt <= 0) return;
+
+      // Dr Accounts Payable
+      postEntry(apAcc?.code || '2010', amt, 0, isPrior);
+
+      // Cr Payment Account (Cash / Bank / Mobile)
+      const payCode = getPaymentAccountCode(pay.method, cashAcc?.code || '1010');
+      postEntry(payCode, 0, amt, isPrior);
     });
 
-    // Operating Expenses
-    let priorOpEx = 0;
-    const priorExpenseByHead: Record<string, number> = {};
-
-    let periodOpEx = 0;
-    const periodExpenseByHead: Record<string, number> = {};
-
+    // 5. Process Operating Expenses
     data.expenses.forEach(e => {
       const isPrior = Boolean(startDate && e.date && e.date < startDate);
       const isPeriod = (!startDate || e.date >= startDate) && (!endDate || e.date <= endDate);
+      if (!isPrior && !isPeriod) return;
 
-      if (isPrior) {
-        priorOpEx += e.amount;
-        priorExpenseByHead[e.head] = (priorExpenseByHead[e.head] || 0) + e.amount;
-      } else if (isPeriod) {
-        periodOpEx += e.amount;
-        periodExpenseByHead[e.head] = (periodExpenseByHead[e.head] || 0) + e.amount;
-      }
+      const amt = e.amount || 0;
+      if (amt <= 0) return;
+
+      const matchedHead = resolveExpenseAccount(e, coaList);
+      const expCode = matchedHead ? matchedHead.code : (coaList.find(a => a.type === 'EXPENSE')?.code || '6040');
+
+      // Dr Expense Head
+      postEntry(expCode, amt, 0, isPrior);
+
+      // Cr Payment Account (Petty Cash, Cash, Bank)
+      const fundingCode = getPaymentAccountCode(e.paymentMethod, cashAcc?.code || '1010');
+      postEntry(fundingCode, 0, amt, isPrior);
     });
 
-    // Customer Advances
-    let priorCustomerAdvancesCash = 0;
-    let priorCustomerAdvancesBank = 0;
-    let priorCustomerAdvancesTotal = 0;
-
-    let periodCustomerAdvancesCash = 0;
-    let periodCustomerAdvancesBank = 0;
-    let periodCustomerAdvancesTotal = 0;
-
+    // 6. Process Customer Advances
     (data.customerAdvances || []).forEach(adv => {
       const isPrior = Boolean(startDate && adv.date && adv.date < startDate);
       const isPeriod = (!startDate || adv.date >= startDate) && (!endDate || adv.date <= endDate);
+      if (!isPrior && !isPeriod) return;
 
-      if (isPrior) {
-        priorCustomerAdvancesTotal += adv.amount;
-        if (adv.method === 'CASH') priorCustomerAdvancesCash += adv.amount;
-        else priorCustomerAdvancesBank += adv.amount;
-      } else if (isPeriod) {
-        periodCustomerAdvancesTotal += adv.amount;
-        if (adv.method === 'CASH') periodCustomerAdvancesCash += adv.amount;
-        else periodCustomerAdvancesBank += adv.amount;
-      }
+      const amt = adv.amount || 0;
+      if (amt <= 0) return;
+
+      // Dr Funding Account
+      const advFundCode = getPaymentAccountCode(adv.method, cashAcc?.code || '1010');
+      postEntry(advFundCode, amt, 0, isPrior);
+
+      // Cr Customer Advance Deposits
+      postEntry(advanceAcc?.code || '2020', 0, amt, isPrior);
     });
 
-    // Food cost / Recipe BOM consumed
+    // 7. Process Recipe BOM Food Cost (COGS & Raw Material Inventory Consumption)
     let priorBOMCost = 0;
     let periodBOMCost = 0;
-
     data.sales.forEach(sale => {
       if (!isSaleActive(sale)) return;
       const isPrior = Boolean(startDate && sale.date && sale.date < startDate);
       const isPeriod = (!startDate || sale.date >= startDate) && (!endDate || sale.date <= endDate);
+      if (!isPrior && !isPeriod) return;
 
       let saleBOM = 0;
       (sale.items || []).forEach(ci => {
@@ -203,38 +293,44 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       else if (isPeriod) periodBOMCost += saleBOM;
     });
 
-    // --- BASE OPENING POSITION (Genesis / Day 0) ---
-    const coaList = data.chartOfAccounts || [];
-    const getCoaBalance = (code: string) => {
-      const acc = coaList.find(a => a.code === code || a.id === code);
-      return Number(acc?.balance) || 0;
-    };
-    const baseCash = getCoaBalance('1010');
-    const baseBank = getCoaBalance('1030') + getCoaBalance('1040');
-    const baseAR = getCoaBalance('1050');
-    const baseInv = getCoaBalance('1060');
-    const baseFixedAssets = 0;
-    const baseAP = getCoaBalance('2010');
-    const baseEquity = getCoaBalance('3010') + getCoaBalance('3020');
+    if (priorBOMCost > 0) {
+      if (cogsMeatAcc && cogsGroceryAcc && cogsMeatAcc.code !== cogsGroceryAcc.code) {
+        const meatAmt = Math.round(priorBOMCost * 0.65);
+        postEntry(cogsMeatAcc.code, meatAmt, 0, true);
+        postEntry(cogsGroceryAcc.code, priorBOMCost - meatAmt, 0, true);
+      } else {
+        postEntry(cogsMeatAcc?.code || '5010', priorBOMCost, 0, true);
+      }
+      postEntry(invAcc?.code || '1060', 0, priorBOMCost, true);
+    }
 
-    // --- ACCUMULATED OPENING BALANCES (Before startDate) ---
-    // If no startDate filter is applied, opening is initial genesis balance
-    const openingCash = baseCash + priorCashSales + priorDueCollected + priorCustomerAdvancesCash - priorCashPurchases - priorSupplierPaymentsCash - priorOpEx;
-    const openingBank = baseBank + priorDigitalSales + priorCustomerAdvancesBank - priorSupplierPaymentsBank;
-    const openingAR = baseAR + priorDueGiven - priorDueCollected;
-    const openingInv = baseInv + priorRawPurchased - priorBOMCost;
-    const openingFixedAssets = baseFixedAssets;
-    const openingAP = baseAP + priorCreditPurchases - priorSupplierPaymentsTotal;
-    const openingAdvances = priorCustomerAdvancesTotal;
-    const openingEquity = baseEquity;
-    const openingRevenue = priorSalesGross - priorDiscount;
-    const openingCOGS = priorBOMCost;
+    if (periodBOMCost > 0) {
+      if (cogsMeatAcc && cogsGroceryAcc && cogsMeatAcc.code !== cogsGroceryAcc.code) {
+        const meatAmt = Math.round(periodBOMCost * 0.65);
+        postEntry(cogsMeatAcc.code, meatAmt, 0, false);
+        postEntry(cogsGroceryAcc.code, periodBOMCost - meatAmt, 0, false);
+      } else {
+        postEntry(cogsMeatAcc?.code || '5010', periodBOMCost, 0, false);
+      }
+      postEntry(invAcc?.code || '1060', 0, periodBOMCost, false);
+    }
 
-    // --- BUILD MULTI-COLUMN ACCOUNT ROWS ---
+    // 8. Process Manual Journal Entries
+    (data.journalEntries || []).forEach(j => {
+      const isPrior = Boolean(startDate && j.date && j.date < startDate);
+      const isPeriod = (!startDate || j.date >= startDate) && (!endDate || j.date <= endDate);
+      if (!isPrior && !isPeriod) return;
+
+      postEntry(j.debitAccountId, j.amount, 0, isPrior);
+      postEntry(j.creditAccountId, 0, j.amount, isPrior);
+    });
+
+    // 9. Multi-Column Account Rows - Dynamically build for every account in Chart of Accounts!
     interface TrialBalanceRow {
       code: string;
       name: string;
       type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+      category: string;
       openingDebit: number;
       openingCredit: number;
       periodDebit: number;
@@ -243,182 +339,93 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       closingCredit: number;
     }
 
-    const rows: TrialBalanceRow[] = [];
+    const allRows: TrialBalanceRow[] = coaList.map(acc => {
+      const initialBalance = Number(acc.balance) || 0;
+      let initialDr = 0;
+      let initialCr = 0;
 
-    // Helper to calculate closing balances
-    const makeRow = (
-      code: string,
-      name: string,
-      type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE',
-      openingDr: number,
-      openingCr: number,
-      periodDr: number,
-      periodCr: number
-    ): TrialBalanceRow => {
+      if (acc.type === 'ASSET' || acc.type === 'EXPENSE') {
+        if (initialBalance >= 0) initialDr = initialBalance;
+        else initialCr = Math.abs(initialBalance);
+      } else {
+        if (initialBalance >= 0) initialCr = initialBalance;
+        else initialDr = Math.abs(initialBalance);
+      }
+
+      const mv = movements[acc.code] || { priorDr: 0, priorCr: 0, periodDr: 0, periodCr: 0 };
+
+      // Cumulative Opening Position prior to startDate
+      let openingDr = 0;
+      let openingCr = 0;
+
+      if (acc.type === 'ASSET' || acc.type === 'EXPENSE') {
+        const netOpening = (initialDr - initialCr) + (mv.priorDr - mv.priorCr);
+        if (netOpening >= 0) openingDr = Math.round(netOpening);
+        else openingCr = Math.round(Math.abs(netOpening));
+      } else {
+        const netOpening = (initialCr - initialDr) + (mv.priorCr - mv.priorDr);
+        if (netOpening >= 0) openingCr = Math.round(netOpening);
+        else openingDr = Math.round(Math.abs(netOpening));
+      }
+
+      const periodDr = Math.round(mv.periodDr);
+      const periodCr = Math.round(mv.periodCr);
+
+      // Net Closing Balance
       let closingDr = 0;
       let closingCr = 0;
 
-      if (type === 'ASSET' || type === 'EXPENSE') {
-        const net = (openingDr - openingCr) + (periodDr - periodCr);
-        if (net >= 0) closingDr = Math.round(net);
-        else closingCr = Math.round(Math.abs(net));
+      if (acc.type === 'ASSET' || acc.type === 'EXPENSE') {
+        const netClosing = (openingDr - openingCr) + (periodDr - periodCr);
+        if (netClosing >= 0) closingDr = Math.round(netClosing);
+        else closingCr = Math.round(Math.abs(netClosing));
       } else {
-        const net = (openingCr - openingDr) + (periodCr - periodDr);
-        if (net >= 0) closingCr = Math.round(net);
-        else closingDr = Math.round(Math.abs(net));
+        const netClosing = (openingCr - openingDr) + (periodCr - periodDr);
+        if (netClosing >= 0) closingCr = Math.round(netClosing);
+        else closingDr = Math.round(Math.abs(netClosing));
       }
 
       return {
-        code,
-        name,
-        type,
-        openingDebit: Math.round(openingDr),
-        openingCredit: Math.round(openingCr),
-        periodDebit: Math.round(periodDr),
-        periodCredit: Math.round(periodCr),
+        code: acc.code,
+        name: acc.name,
+        type: acc.type,
+        category: acc.category || acc.type,
+        openingDebit: openingDr,
+        openingCredit: openingCr,
+        periodDebit: periodDr,
+        periodCredit: periodCr,
         closingDebit: closingDr,
         closingCredit: closingCr
       };
-    };
-
-    // 1010 - Cash in Hand
-    rows.push(makeRow(
-      '1010',
-      'Cash in Hand (Petty & Register)',
-      'ASSET',
-      Math.max(0, openingCash),
-      Math.max(0, -openingCash),
-      periodCashSales + periodDueCollected + periodCustomerAdvancesCash,
-      periodCashPurchases + periodSupplierPaymentsCash + periodOpEx
-    ));
-
-    // 1020 - Bank & Mobile Wallets
-    rows.push(makeRow(
-      '1020',
-      'Bank & Mobile Financial Accounts',
-      'ASSET',
-      Math.max(0, openingBank),
-      Math.max(0, -openingBank),
-      periodDigitalSales + periodCustomerAdvancesBank,
-      periodSupplierPaymentsBank
-    ));
-
-    // 1050 - Accounts Receivable
-    rows.push(makeRow(
-      '1050',
-      'Accounts Receivable (Customer Dues)',
-      'ASSET',
-      Math.max(0, openingAR),
-      Math.max(0, -openingAR),
-      periodDueGiven,
-      periodDueCollected
-    ));
-
-    // 1060 - Raw Material Inventory Asset
-    rows.push(makeRow(
-      '1060',
-      'Raw Material Inventory Asset',
-      'ASSET',
-      Math.max(0, openingInv),
-      Math.max(0, -openingInv),
-      periodRawPurchased,
-      periodBOMCost
-    ));
-
-    // 1500 - Property, Plant & Kitchen Equipment
-    rows.push(makeRow(
-      '1500',
-      'Property, Plant & Kitchen Equipment',
-      'ASSET',
-      openingFixedAssets,
-      0,
-      0,
-      0
-    ));
-
-    // 2010 - Accounts Payable (Trade Creditors)
-    rows.push(makeRow(
-      '2010',
-      'Accounts Payable (Trade Creditors)',
-      'LIABILITY',
-      Math.max(0, -openingAP),
-      Math.max(0, openingAP),
-      periodSupplierPaymentsTotal,
-      periodCreditPurchases
-    ));
-
-    // 2030 - Customer Advances & Deposits
-    rows.push(makeRow(
-      '2030',
-      'Customer Advances & Deposits',
-      'LIABILITY',
-      0,
-      openingAdvances,
-      0,
-      periodCustomerAdvancesTotal
-    ));
-
-    // 3010 - Owner's Equity & Retained Capital
-    rows.push(makeRow(
-      '3010',
-      "Owner's Equity & Retained Capital",
-      'EQUITY',
-      0,
-      openingEquity,
-      0,
-      0
-    ));
-
-    // 4010 - Dine-in Sales Revenue
-    rows.push(makeRow(
-      '4010',
-      'Food & Beverage Dine-in Sales Revenue',
-      'REVENUE',
-      0,
-      openingRevenue,
-      periodDiscount,
-      periodSalesGross
-    ));
-
-    // 5010 - Cost of Goods Sold (BOM Food Cost)
-    rows.push(makeRow(
-      '5010',
-      'Cost of Goods Sold (BOM Food Cost)',
-      'EXPENSE',
-      openingCOGS,
-      0,
-      periodBOMCost,
-      0
-    ));
-
-    // Operational Expense Heads
-    const allExpenseHeads = Array.from(new Set([
-      ...Object.keys(priorExpenseByHead),
-      ...Object.keys(periodExpenseByHead),
-      ...data.expenses.map(e => e.head)
-    ]));
-
-    allExpenseHeads.forEach((head, idx) => {
-      const priorAmt = priorExpenseByHead[head] || 0;
-      const periodAmt = periodExpenseByHead[head] || 0;
-
-      rows.push(makeRow(
-        `510${idx + 1}`,
-        `Operating Expense: ${head}`,
-        'EXPENSE',
-        priorAmt,
-        0,
-        periodAmt,
-        0
-      ));
     });
 
-    const totalOpeningDebit = rows.reduce((s, r) => s + r.openingDebit, 0);
-    const totalOpeningCredit = rows.reduce((s, r) => s + r.openingCredit, 0);
-    const totalPeriodDebit = rows.reduce((s, r) => s + r.periodDebit, 0);
-    const totalPeriodCredit = rows.reduce((s, r) => s + r.periodCredit, 0);
-    const totalClosingDebit = rows.reduce((s, r) => s + r.closingDebit, 0);
-    const totalClosingCredit = rows.reduce((s, r) => s + r.closingCredit, 0);
+    const filteredRows = allRows.filter(r => {
+      if (coaTypeFilter !== 'ALL' && r.type !== coaTypeFilter) return false;
+      if (hideZeroBalances) {
+        const hasActivity = r.openingDebit > 0 || r.openingCredit > 0 || r.periodDebit > 0 || r.periodCredit > 0 || r.closingDebit > 0 || r.closingCredit > 0;
+        if (!hasActivity) return false;
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchesQ = r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q) || r.category.toLowerCase().includes(q);
+        if (!matchesQ) return false;
+      }
+      return true;
+    });
+
+    const totalOpeningDebit = allRows.reduce((s, r) => s + r.openingDebit, 0);
+    const totalOpeningCredit = allRows.reduce((s, r) => s + r.openingCredit, 0);
+    const totalPeriodDebit = allRows.reduce((s, r) => s + r.periodDebit, 0);
+    const totalPeriodCredit = allRows.reduce((s, r) => s + r.periodCredit, 0);
+    const totalClosingDebit = allRows.reduce((s, r) => s + r.closingDebit, 0);
+    const totalClosingCredit = allRows.reduce((s, r) => s + r.closingCredit, 0);
+
+    const displayedOpeningDebit = filteredRows.reduce((s, r) => s + r.openingDebit, 0);
+    const displayedOpeningCredit = filteredRows.reduce((s, r) => s + r.openingCredit, 0);
+    const displayedPeriodDebit = filteredRows.reduce((s, r) => s + r.periodDebit, 0);
+    const displayedPeriodCredit = filteredRows.reduce((s, r) => s + r.periodCredit, 0);
+    const displayedClosingDebit = filteredRows.reduce((s, r) => s + r.closingDebit, 0);
+    const displayedClosingCredit = filteredRows.reduce((s, r) => s + r.closingCredit, 0);
 
     const isBalanced = 
       Math.abs(totalOpeningDebit - totalOpeningCredit) < 100 &&
@@ -426,30 +433,40 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       Math.abs(totalClosingDebit - totalClosingCredit) < 100;
 
     return {
-      rows: rows.filter(r => {
-        if (!searchQuery) return true;
-        const q = searchQuery.toLowerCase();
-        return r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q);
-      }),
+      rows: filteredRows,
+      allRowsCount: allRows.length,
+      totalCoaCount: coaList.length,
       totalOpeningDebit,
       totalOpeningCredit,
       totalPeriodDebit,
       totalPeriodCredit,
       totalClosingDebit,
       totalClosingCredit,
+      displayedOpeningDebit,
+      displayedOpeningCredit,
+      displayedPeriodDebit,
+      displayedPeriodCredit,
+      displayedClosingDebit,
+      displayedClosingCredit,
       isBalanced
     };
   }, [
     data.sales, 
     data.purchases, 
+    data.purchaseReturns,
     data.payments, 
     data.expenses, 
-    data.customerAdvances, 
+    data.customerAdvances,
+    data.journalEntries,
+    data.paymentMethods,
+    data.chartOfAccounts,
     data.menuItems, 
     data.masterItems, 
     startDate, 
     endDate, 
-    searchQuery
+    searchQuery,
+    coaTypeFilter,
+    hideZeroBalances
   ]);
 
   // --- 15. PROFIT & LOSS ACCOUNT (AS PER IFRS - STATEMENT OF COMPREHENSIVE INCOME) ---
@@ -779,6 +796,46 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
             onPrint={() => window.print()}
           />
 
+          {/* Chart of Accounts Type Filter & Display Options */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-500 mr-1 uppercase tracking-wider">Account Group:</span>
+              {[
+                { label: 'All Accounts', value: 'ALL' },
+                { label: 'Assets (1000)', value: 'ASSET' },
+                { label: 'Liabilities (2000)', value: 'LIABILITY' },
+                { label: 'Equity (3000)', value: 'EQUITY' },
+                { label: 'Revenue (4000)', value: 'REVENUE' },
+                { label: 'Expenses (5000/6000)', value: 'EXPENSE' },
+              ].map(group => (
+                <button
+                  key={group.value}
+                  type="button"
+                  onClick={() => setCoaTypeFilter(group.value)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    coaTypeFilter === group.value
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                  }`}
+                >
+                  {group.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 select-none">
+                <input
+                  type="checkbox"
+                  checked={hideZeroBalances}
+                  onChange={e => setHideZeroBalances(e.target.checked)}
+                  className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                />
+                <span>Hide Zero-Balance Accounts</span>
+              </label>
+            </div>
+          </div>
+
           {/* Multi-Section KPI Balance Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Opening Balance Card */}
@@ -891,8 +948,8 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
-                  {trialBalanceData.rows.length} Accounts Active
+                <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                  Showing {trialBalanceData.rows.length} of {trialBalanceData.totalCoaCount} Chart Accounts
                 </span>
               </div>
             </div>
@@ -929,84 +986,92 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {trialBalanceData.rows.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/80 transition">
-                      {/* Code */}
-                      <td className="py-2.5 px-3.5 font-mono font-bold text-slate-900 border-r border-slate-100 text-center">
-                        {row.code}
-                      </td>
-                      
-                      {/* Title */}
-                      <td className="py-2.5 px-4 font-extrabold text-slate-800 border-r border-slate-100">
-                        {row.name}
-                      </td>
-                      
-                      {/* Category Type */}
-                      <td className="py-2.5 px-3 border-r border-slate-100">
-                        <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
-                          row.type === 'ASSET' ? 'bg-blue-100 text-blue-800' :
-                          row.type === 'LIABILITY' ? 'bg-amber-100 text-amber-800' :
-                          row.type === 'EQUITY' ? 'bg-purple-100 text-purple-800' :
-                          row.type === 'REVENUE' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                        }`}>
-                          {row.type}
-                        </span>
-                      </td>
-
-                      {/* Opening Dr & Cr */}
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700 bg-slate-50/30 border-r border-slate-100">
-                        {row.openingDebit > 0 ? `৳${row.openingDebit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700 bg-slate-50/30 border-r border-slate-200">
-                        {row.openingCredit > 0 ? `৳${row.openingCredit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
-                      </td>
-
-                      {/* Period Dr & Cr */}
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-950 bg-amber-50/20 border-r border-amber-100">
-                        {row.periodDebit > 0 ? `৳${row.periodDebit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-950 bg-amber-50/20 border-r border-slate-200">
-                        {row.periodCredit > 0 ? `৳${row.periodCredit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
-                      </td>
-
-                      {/* Closing Dr & Cr */}
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-teal-950 bg-teal-50/20 border-r border-teal-100">
-                        {row.closingDebit > 0 ? `৳${row.closingDebit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-teal-950 bg-teal-50/20">
-                        {row.closingCredit > 0 ? `৳${row.closingCredit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
+                  {trialBalanceData.rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-10 text-center text-slate-400 text-xs font-semibold">
+                        No chart of accounts heads match the current filter or search criteria.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    trialBalanceData.rows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition">
+                        {/* Code */}
+                        <td className="py-2.5 px-3.5 font-mono font-bold text-slate-900 border-r border-slate-100 text-center">
+                          {row.code}
+                        </td>
+                        
+                        {/* Title */}
+                        <td className="py-2.5 px-4 font-extrabold text-slate-800 border-r border-slate-100">
+                          {row.name}
+                        </td>
+                        
+                        {/* Category Type */}
+                        <td className="py-2.5 px-3 border-r border-slate-100">
+                          <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                            row.type === 'ASSET' ? 'bg-blue-100 text-blue-800' :
+                            row.type === 'LIABILITY' ? 'bg-amber-100 text-amber-800' :
+                            row.type === 'EQUITY' ? 'bg-purple-100 text-purple-800' :
+                            row.type === 'REVENUE' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            {row.type}
+                          </span>
+                        </td>
+
+                        {/* Opening Dr & Cr */}
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700 bg-slate-50/30 border-r border-slate-100">
+                          {row.openingDebit > 0 ? `৳${row.openingDebit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700 bg-slate-50/30 border-r border-slate-200">
+                          {row.openingCredit > 0 ? `৳${row.openingCredit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
+                        </td>
+
+                        {/* Period Dr & Cr */}
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-950 bg-amber-50/20 border-r border-amber-100">
+                          {row.periodDebit > 0 ? `৳${row.periodDebit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-950 bg-amber-50/20 border-r border-slate-200">
+                          {row.periodCredit > 0 ? `৳${row.periodCredit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
+                        </td>
+
+                        {/* Closing Dr & Cr */}
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-teal-950 bg-teal-50/20 border-r border-teal-100">
+                          {row.closingDebit > 0 ? `৳${row.closingDebit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-teal-950 bg-teal-50/20">
+                          {row.closingCredit > 0 ? `৳${row.closingCredit.toLocaleString()}` : <span className="text-slate-300 font-normal">—</span>}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-900 text-white font-black border-t-2 border-slate-700 text-xs">
                     <td colSpan={3} className="py-3 px-4 uppercase tracking-wider text-amber-400 font-extrabold">
-                      GRAND TOTAL TRIAL BALANCE
+                      {coaTypeFilter === 'ALL' ? 'GRAND TOTAL TRIAL BALANCE' : `TOTAL (${coaTypeFilter} ACCOUNTS)`}
                     </td>
                     
                     {/* Opening Totals */}
                     <td className="py-3 px-3 text-right font-mono text-slate-200 border-r border-slate-800">
-                      ৳{trialBalanceData.totalOpeningDebit.toLocaleString()}
+                      ৳{trialBalanceData.displayedOpeningDebit.toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-slate-200 border-r border-slate-700">
-                      ৳{trialBalanceData.totalOpeningCredit.toLocaleString()}
+                      ৳{trialBalanceData.displayedOpeningCredit.toLocaleString()}
                     </td>
 
                     {/* Period Totals */}
                     <td className="py-3 px-3 text-right font-mono text-amber-300 border-r border-slate-800 bg-amber-950/30">
-                      ৳{trialBalanceData.totalPeriodDebit.toLocaleString()}
+                      ৳{trialBalanceData.displayedPeriodDebit.toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-amber-300 border-r border-slate-700 bg-amber-950/30">
-                      ৳{trialBalanceData.totalPeriodCredit.toLocaleString()}
+                      ৳{trialBalanceData.displayedPeriodCredit.toLocaleString()}
                     </td>
 
                     {/* Closing Totals */}
                     <td className="py-3 px-3 text-right font-mono text-emerald-400 border-r border-slate-800 bg-emerald-950/30">
-                      ৳{trialBalanceData.totalClosingDebit.toLocaleString()}
+                      ৳{trialBalanceData.displayedClosingDebit.toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-emerald-400 bg-emerald-950/30">
-                      ৳{trialBalanceData.totalClosingCredit.toLocaleString()}
+                      ৳{trialBalanceData.displayedClosingCredit.toLocaleString()}
                     </td>
                   </tr>
                 </tfoot>

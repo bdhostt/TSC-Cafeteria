@@ -236,7 +236,7 @@ export const DEFAULT_USERS: AppUser[] = [
   }
 ];
 
-const DEFAULT_CHART_OF_ACCOUNTS: AccountHead[] = [
+export const DEFAULT_CHART_OF_ACCOUNTS: AccountHead[] = [
   // ASSETS (1000)
   { id: '1010', code: '1010', name: 'Cash in Hand (POS Drawer)', type: 'ASSET', category: 'Current Assets', balance: 0 },
   { id: '1020', code: '1020', name: 'Petty Cash Fund', type: 'ASSET', category: 'Current Assets', balance: 0 },
