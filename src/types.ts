@@ -489,6 +489,9 @@ export interface ExpenseRecord {
   category?: string;
   notes?: string;
   paymentMethod?: string;
+  accountId?: string;
+  accountCode?: string;
+  accountName?: string;
 }
 
 export interface VendorPayment {

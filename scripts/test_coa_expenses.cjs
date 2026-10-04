@@ -5,18 +5,8 @@ console.log('===================================================================
 console.log('🧪 TESTING EXPENSE HEADS MATCHING IN CHART OF ACCOUNTS');
 console.log('======================================================================\n');
 
-const mockExpenses = [
-  { id: 1, date: '2026-10-04', head: 'Electricity Bill', amount: 2000, paymentMethod: 'Cash in Hand (POS Drawer)' },
-  { id: 2, date: '2026-10-04', head: 'Staff Salary', amount: 15000, paymentMethod: 'Bank Transfer' },
-  { id: 3, date: '2026-10-04', head: 'Conveyance', amount: 500, paymentMethod: 'Petty Cash' },
-  { id: 4, date: '2026-10-04', head: 'Cleaning Bill', amount: 800, paymentMethod: 'Cash in Hand (POS Drawer)' }
-];
-
-const totalBomCostVal = 4200;
-const totalManualUsedCostVal = 600;
-
 const expenseAccounts = [
-  { id: '5020', code: '5020', name: 'COGS', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 0 },
+  { id: '5010', code: '5010', name: 'COGS', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 0 },
   { id: '6010', code: '6010', name: 'Kitchen Staff Salaries', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
   { id: '6020', code: '6020', name: 'Floor Rent & Utilities', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
   { id: '6030', code: '6030', name: 'Electricity & Gas Bill', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
@@ -24,54 +14,141 @@ const expenseAccounts = [
   { id: '6050', code: '6050', name: 'COGS Manual Use (MU)', type: 'EXPENSE', category: 'Cost of Goods Sold (MU)', balance: 0 }
 ];
 
-function calculateBalance(acc) {
-  const opening = acc.balance || 0;
-  const code = acc.code;
-  const isCogs = (code && code.startsWith('50')) || 
-    (acc.category || '').toLowerCase().includes('cost of goods') || 
-    (acc.category || '').toLowerCase().includes('bom') ||
-    (acc.name || '').toLowerCase().includes('cogs');
-
-  if (isCogs) {
-    if (code === '6050' || (acc.name || '').toLowerCase().includes('manual')) {
-      return opening + totalManualUsedCostVal;
-    }
-    return opening + totalBomCostVal;
+function findExpenseAccount(e, accounts) {
+  if (e.accountId) {
+    const acc = accounts.find(a => a.id === e.accountId || a.code === e.accountId);
+    if (acc) return acc;
+  }
+  if (e.accountCode) {
+    const acc = accounts.find(a => a.code === e.accountCode);
+    if (acc) return acc;
   }
 
-  const headExpenses = mockExpenses.filter(e => {
-    const eHead = (e.head || '').toLowerCase().trim();
-    const aName = (acc.name || '').toLowerCase().trim();
-    const aCode = acc.code;
+  const eHead = (e.head || '').toLowerCase().trim();
+  const eCat = (e.category || '').toLowerCase().trim();
 
-    if (eHead && (aName.includes(eHead) || eHead.includes(aName))) return true;
+  // 1. Direct exact name match
+  const exactMatch = accounts.find(a => a.name.toLowerCase().trim() === eHead);
+  if (exactMatch) return exactMatch;
 
-    if (aCode === '6010' || aName.includes('salary') || aName.includes('staff')) {
-      if (eHead.includes('salary') || eHead.includes('staff') || eHead.includes('waiter') || eHead.includes('labor') || eHead.includes('wage')) return true;
-    }
-    if (aCode === '6030' || aName.includes('electric') || aName.includes('gas')) {
-      if (eHead.includes('electric') || eHead.includes('gas') || eHead.includes('power') || eHead.includes('utility') || eHead.includes('bill')) return true;
-    }
-    if (aCode === '6040' || aName.includes('clean') || aName.includes('consumable')) {
-      if (eHead.includes('clean') || eHead.includes('wash') || eHead.includes('soap')) return true;
-    }
-    if (aCode === '6020' || aName.includes('rent') || aName.includes('utilities')) {
-      if (eHead.includes('rent') || eHead.includes('lease') || eHead.includes('conveyance') || eHead.includes('transport') || eHead.includes('travel')) return true;
+  // 2. Filter candidate operating accounts (exclude pure BOM COGS accounts unless head specifically says COGS/BOM)
+  const candidateAccounts = accounts.filter(a => {
+    const code = a.code || '';
+    const cat = (a.category || '').toLowerCase();
+    const isBomCogs = (code.startsWith('50') || cat.includes('cost of goods sold') || cat.includes('bom')) && code !== '6050';
+    if (isBomCogs && !eHead.includes('cogs') && !eHead.includes('bom')) return false;
+    return true;
+  });
+
+  let bestAccount = undefined;
+  let highestScore = 0;
+
+  for (const acc of candidateAccounts) {
+    let score = 0;
+    const aName = acc.name.toLowerCase().trim();
+    const aCode = acc.code || '';
+
+    // Direct substring match
+    if (eHead && (aName.includes(eHead) || eHead.includes(aName))) {
+      score += 50;
     }
 
-    const eWords = eHead.split(/\s+/).filter(w => w.length >= 3);
-    const aWords = aName.split(/\s+/).filter(w => w.length >= 3);
-    return eWords.some(ew => aWords.some(aw => ew.includes(aw) || aw.includes(ew)));
-  }).reduce((sum, e) => sum + (e.amount || 0), 0);
+    // Domain keyword matching
+    const isSalaryAcc = aCode === '6010' || aName.includes('salary') || aName.includes('salaries') || aName.includes('staff') || aName.includes('wage');
+    if (isSalaryAcc) {
+      const salaryKeywords = ['salary', 'salaries', 'staff', 'waiter', 'chef', 'labor', 'labour', 'wage', 'wages', 'casual', 'worker', 'employee', 'bonus', 'overtime'];
+      if (salaryKeywords.some(k => eHead.includes(k) || eCat.includes(k))) score += 80;
+    }
 
-  return opening + headExpenses;
+    const isElectricAcc = aCode === '6030' || aName.includes('electric') || aName.includes('gas') || aName.includes('power');
+    if (isElectricAcc) {
+      const electricKeywords = ['electric', 'electricity', 'power', 'current', 'gas', 'lpg', 'cylinder', 'desco', 'dpdc', 'nesco', 'reb', 'titas', 'generator', 'fuel'];
+      if (electricKeywords.some(k => eHead.includes(k) || eCat.includes(k))) score += 80;
+    }
+
+    const isCleanAcc = aCode === '6040' || aName.includes('clean') || aName.includes('consumable') || aName.includes('wash');
+    if (isCleanAcc) {
+      const cleanKeywords = ['clean', 'cleaning', 'wash', 'washing', 'soap', 'detergent', 'tissue', 'napkin', 'consumable', 'consumables', 'disinfectant', 'harpic', 'sanitiz', 'trash', 'waste', 'pest'];
+      if (cleanKeywords.some(k => eHead.includes(k) || eCat.includes(k))) score += 80;
+    }
+
+    const isRentAcc = aCode === '6020' || aName.includes('rent') || aName.includes('overhead') || aName.includes('utilit');
+    if (isRentAcc) {
+      const rentKeywords = ['rent', 'lease', 'conveyance', 'transport', 'travel', 'fare', 'rickshaw', 'cng', 'taxi', 'bike', 'bus', 'repair', 'maintenance', 'water', 'wasa'];
+      if (rentKeywords.some(k => eHead.includes(k) || eCat.includes(k))) score += 80;
+    }
+
+    // Tokenized word matching (ignoring generic stop words like 'bill', 'charge', 'cost', 'fee', 'the', 'and')
+    const stopWords = new Set(['bill', 'bills', 'charge', 'charges', 'cost', 'costs', 'fee', 'fees', 'the', 'and', 'for', 'all']);
+    const eWords = eHead.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+    const aWords = aName.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+    const wordMatches = eWords.filter(ew => aWords.some(aw => ew.includes(aw) || aw.includes(ew)));
+    score += wordMatches.length * 20;
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestAccount = acc;
+    }
+  }
+
+  if (!bestAccount || highestScore === 0) {
+    bestAccount = candidateAccounts.find(a => a.code === '6020') || candidateAccounts[0] || accounts[0];
+  }
+
+  return bestAccount;
 }
 
+// TEST CASE 1: User's exact live screenshot scenario
+console.log('--- TEST CASE 1: User Live Scenario (Casual Waiter Charge 2000, Cleaning Bill 4000) ---');
+const userLiveExpenses = [
+  { id: 1, date: '2026-10-03', head: 'Casual Waiter Charge', amount: 2000, paymentMethod: 'Bank Transfer' },
+  { id: 2, date: '2026-10-04', head: 'Cleaning Bill', amount: 4000, paymentMethod: 'Cash Drawer' }
+];
+
+let totalAllocated1 = 0;
 expenseAccounts.forEach(acc => {
-  const liveBal = calculateBalance(acc);
-  console.log(`📌 Account [${acc.code}] ${acc.name}: ৳${liveBal.toLocaleString()}`);
+  if (acc.code.startsWith('50') || acc.code === '6050') return;
+  const accTotal = userLiveExpenses.filter(e => {
+    const matched = findExpenseAccount(e, expenseAccounts);
+    return matched && (matched.id === acc.id || matched.code === acc.code);
+  }).reduce((sum, e) => sum + e.amount, 0);
+  totalAllocated1 += accTotal;
+  console.log(`📌 Account [${acc.code}] ${acc.name}: ৳${accTotal.toLocaleString()}`);
 });
 
+console.log(`Total Live Expenses Entered: ৳6,000 | Total Allocated in Accounts: ৳${totalAllocated1.toLocaleString()}`);
+if (totalAllocated1 === 6000) {
+  console.log('✅ TEST 1 PASSED: Exactly ৳6,000 allocated with ZERO double counting!');
+} else {
+  console.error('❌ TEST 1 FAILED');
+}
+
+// TEST CASE 2: Multi-expense scenario
+console.log('\n--- TEST CASE 2: Standard 4-Head Expense Scenario ---');
+const multiExpenses = [
+  { id: 1, date: '2026-10-04', head: 'Electricity Bill', amount: 2000, paymentMethod: 'Cash in Hand (POS Drawer)' },
+  { id: 2, date: '2026-10-04', head: 'Staff Salary', amount: 15000, paymentMethod: 'Bank Transfer' },
+  { id: 3, date: '2026-10-04', head: 'Conveyance', amount: 500, paymentMethod: 'Petty Cash' },
+  { id: 4, date: '2026-10-04', head: 'Cleaning Bill', amount: 800, paymentMethod: 'Cash in Hand (POS Drawer)' }
+];
+
+let totalAllocated2 = 0;
+const expectedTotal2 = multiExpenses.reduce((s, e) => s + e.amount, 0); // 18300
+expenseAccounts.forEach(acc => {
+  if (acc.code.startsWith('50') || acc.code === '6050') return;
+  const accTotal = multiExpenses.filter(e => {
+    const matched = findExpenseAccount(e, expenseAccounts);
+    return matched && (matched.id === acc.id || matched.code === acc.code);
+  }).reduce((sum, e) => sum + e.amount, 0);
+  totalAllocated2 += accTotal;
+  console.log(`📌 Account [${acc.code}] ${acc.name}: ৳${accTotal.toLocaleString()}`);
+});
+
+console.log(`Total Live Expenses: ৳${expectedTotal2.toLocaleString()} | Total Allocated: ৳${totalAllocated2.toLocaleString()}`);
+if (totalAllocated2 === expectedTotal2) {
+  console.log('✅ TEST 2 PASSED: 100% Reconciliation across all standard expense heads!');
+} else {
+  console.error('❌ TEST 2 FAILED');
+}
+
 console.log('\n======================================================================');
-console.log('✅ ALL EXPENSES NOW ACCURATELY CALCULATED IN CHART OF ACCOUNTS');
-console.log('======================================================================');

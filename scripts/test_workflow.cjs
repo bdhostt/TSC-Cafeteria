@@ -42,7 +42,9 @@ const DEFAULT_CHART_OF_ACCOUNTS = [
   { id: '5010', code: '5010', name: 'COGS - Raw Meat & Poultry', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 4800 },
   { id: '5020', code: '5020', name: 'COGS - Grocery, Rice & Oil', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 2250 },
   { id: '6010', code: '6010', name: 'Kitchen Staff Salaries', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
-  { id: '6030', code: '6030', name: 'Electricity & Gas Bill', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 }
+  { id: '6020', code: '6020', name: 'Floor Rent & Utilities', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
+  { id: '6030', code: '6030', name: 'Electricity & Gas Bill', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
+  { id: '6040', code: '6040', name: 'Cleaning & Consumables', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 }
 ];
 
 assert(DEFAULT_CHART_OF_ACCOUNTS.length >= 17, 'COA contains standard 17 primary heads', `Count: ${DEFAULT_CHART_OF_ACCOUNTS.length}`);
@@ -144,17 +146,45 @@ customerReceivablesLedger[orderCustomer].collected += dueCollectedAmount;
 customerReceivablesLedger[orderCustomer].balance -= dueCollectedAmount;
 assert(customerReceivablesLedger['Tanvir Ahmed (VIP)'].balance === 0, 'Due Collection settled successfully', `Remaining Due: ৳${customerReceivablesLedger['Tanvir Ahmed (VIP)'].balance}`);
 
-// 5. OPERATING EXPENSES (OpEx) WORKFLOW
-console.log('\n--- Step 5: Testing Operating Expenses (OpEx) ---');
-const newExpense = {
-  id: Date.now() + 1,
-  date: '2026-10-03',
-  head: 'Electricity Bill',
-  amount: 500,
-  paymentMethod: 'Cash in Hand (POS Drawer)',
-  note: 'Generator fuel & utility cash payment'
-};
-assert(newExpense.amount === 500 && newExpense.head === 'Electricity Bill', 'Expense voucher saved', `Expense: ৳${newExpense.amount} from ${newExpense.paymentMethod}`);
+// 5. OPERATING EXPENSES (OpEx) & COA ALLOCATION WORKFLOW
+console.log('\n--- Step 5: Testing Operating Expenses (OpEx) & COA Allocation ---');
+const sampleExpenses = [
+  { id: Date.now() + 1, date: '2026-10-03', head: 'Casual Waiter Charge', amount: 2000, paymentMethod: 'Bank Wire Transfer' },
+  { id: Date.now() + 2, date: '2026-10-04', head: 'Cleaning Bill', amount: 4000, paymentMethod: 'Cash in Hand (POS Drawer)' }
+];
+
+const newExpense = sampleExpenses[1]; // Cleaning Bill 4000
+assert(sampleExpenses.reduce((s, e) => s + e.amount, 0) === 6000, 'Expense vouchers saved accurately', `Total: ৳6,000 across 2 vouchers`);
+
+// Test exact 1-to-1 allocation to prevent double-counting
+function resolveExpenseAccount(e, accounts) {
+  const eHead = (e.head || '').toLowerCase().trim();
+  const candidateAccounts = accounts.filter(a => a.type === 'EXPENSE' && !a.code.startsWith('50') && a.code !== '6050');
+  let bestAccount = undefined;
+  let highestScore = 0;
+  for (const acc of candidateAccounts) {
+    let score = 0;
+    const aName = acc.name.toLowerCase().trim();
+    const aCode = acc.code || '';
+    if (eHead && (aName.includes(eHead) || eHead.includes(aName))) score += 50;
+    if ((aCode === '6010' || aName.includes('salary') || aName.includes('staff')) && (eHead.includes('waiter') || eHead.includes('salary') || eHead.includes('casual'))) score += 80;
+    if ((aCode === '6030' || aName.includes('electric') || aName.includes('gas')) && (eHead.includes('electric') || eHead.includes('gas') || eHead.includes('power'))) score += 80;
+    if ((aCode === '6040' || aName.includes('clean') || aName.includes('consumable')) && (eHead.includes('clean') || eHead.includes('wash') || eHead.includes('soap'))) score += 80;
+    if ((aCode === '6020' || aName.includes('rent')) && (eHead.includes('rent') || eHead.includes('conveyance'))) score += 80;
+    if (score > highestScore) { highestScore = score; bestAccount = acc; }
+  }
+  return bestAccount || candidateAccounts[0];
+}
+
+const allocatedSalaries = sampleExpenses.filter(e => resolveExpenseAccount(e, DEFAULT_CHART_OF_ACCOUNTS)?.code === '6010').reduce((s, e) => s + e.amount, 0);
+const allocatedCleaning = sampleExpenses.filter(e => resolveExpenseAccount(e, DEFAULT_CHART_OF_ACCOUNTS)?.code === '6040').reduce((s, e) => s + e.amount, 0);
+const allocatedElectric = sampleExpenses.filter(e => resolveExpenseAccount(e, DEFAULT_CHART_OF_ACCOUNTS)?.code === '6030').reduce((s, e) => s + e.amount, 0);
+const totalAllocated = allocatedSalaries + allocatedCleaning + allocatedElectric;
+
+assert(allocatedSalaries === 2000, 'Casual Waiter Charge accurately allocated to Kitchen Staff Salaries [6010]', `Balance: ৳${allocatedSalaries}`);
+assert(allocatedCleaning === 4000, 'Cleaning Bill accurately allocated to Cleaning & Consumables [6040]', `Balance: ৳${allocatedCleaning}`);
+assert(allocatedElectric === 0, 'Electricity & Gas Bill [6030] is ৳0 (No false match with Cleaning Bill)', `Balance: ৳${allocatedElectric}`);
+assert(totalAllocated === 6000, 'Sum of operating accounts exactly matches total expenses (Zero double counting)', `Sum: ৳${totalAllocated}`);
 
 // 6. DOUBLE-ENTRY JOURNAL VOUCHER (JV) WORKFLOW
 console.log('\n--- Step 6: Testing Double-Entry Journal Voucher (JV) ---');
@@ -181,19 +211,19 @@ let baseMfs = 24000;
 // Transactions impact:
 // Sale: +50 Cash, +50 MFS
 // Due Collection: +45 Cash
-// Expense: -500 Cash
+// Expense: -4000 Cash Drawer (Cleaning Bill)
 // JV: -1000 Bank
 const finalCash = baseCash + newSale.cash + dueCollectedAmount - newExpense.amount;
 const finalMfs = baseMfs + newSale.bkash;
 const finalBank = baseBank - newJournalVoucher.amount;
 
-assert(finalCash === 15000 + 50 + 45 - 500, 'Cash Drawer live balance reconciled accurately', `Live Cash: ৳${finalCash}`);
+assert(finalCash === 15000 + 50 + 45 - 4000, 'Cash Drawer live balance reconciled accurately', `Live Cash: ৳${finalCash}`);
 assert(finalMfs === 24000 + 50, 'Bangla QR / MFS balance reconciled accurately', `Live MFS: ৳${finalMfs}`);
 assert(finalBank === 85000 - 1000, 'Bank Account balance reconciled accurately', `Live Bank: ৳${finalBank}`);
 
 const totalRevenue = newSale.total; // 145
 const totalCOGS = 60; // Estimated BOM
-const totalOpEx = newExpense.amount; // 500
+const totalOpEx = sampleExpenses.reduce((s, e) => s + e.amount, 0); // 6000
 const netProfit = totalRevenue - totalCOGS - totalOpEx;
 
 assert(typeof netProfit === 'number', 'P&L Statement generates Net Income / Loss correctly', 

@@ -1430,6 +1430,7 @@ interface RestaurantContextType {
   editAccountHead: (id: string, updated: Partial<AccountHead>) => void;
   deleteAccountHead: (id: string) => void;
   getLiveAccountBalance: (acc: AccountHead) => number;
+  findExpenseAccount: (expense: ExpenseRecord) => AccountHead | undefined;
 
   // Customer Advance Deposits
   saveCustomerAdvance: (advance: Omit<CustomerAdvance, 'id'> & { id?: number }) => void;
@@ -1506,6 +1507,110 @@ export const getModuleForTab = (tab: ActiveTab, subNav?: string): string => {
     return 'reports';
   }
   return 'sales-pos';
+};
+
+export const resolveExpenseAccount = (
+  e: ExpenseRecord,
+  accounts: AccountHead[]
+): AccountHead | undefined => {
+  // 1. Explicit accountId or accountCode match
+  if (e.accountId) {
+    const acc = accounts.find(a => a.id === e.accountId || a.code === e.accountId);
+    if (acc) return acc;
+  }
+  if (e.accountCode) {
+    const acc = accounts.find(a => a.code === e.accountCode);
+    if (acc) return acc;
+  }
+
+  const eHead = (e.head || '').toLowerCase().trim();
+  const eCat = (e.category || '').toLowerCase().trim();
+
+  // 2. Direct exact name match
+  const exactMatch = accounts.find(a => a.name.toLowerCase().trim() === eHead);
+  if (exactMatch) return exactMatch;
+
+  // 3. Filter candidate operating expense accounts (exclude pure BOM COGS unless head explicitly mentions COGS/BOM)
+  const candidateAccounts = accounts.filter(a => {
+    if (a.type !== 'EXPENSE') return false;
+    const code = a.code || '';
+    const cat = (a.category || '').toLowerCase();
+    const isBomCogs = (code.startsWith('50') || cat.includes('cost of goods sold') || cat.includes('bom')) && code !== '6050';
+    if (isBomCogs && !eHead.includes('cogs') && !eHead.includes('bom')) return false;
+    return true;
+  });
+
+  if (candidateAccounts.length === 0) return undefined;
+
+  let bestAccount: AccountHead | undefined = undefined;
+  let highestScore = 0;
+
+  for (const acc of candidateAccounts) {
+    let score = 0;
+    const aName = acc.name.toLowerCase().trim();
+    const aCode = acc.code || '';
+
+    // Direct substring match
+    if (eHead && (aName.includes(eHead) || eHead.includes(aName))) {
+      score += 50;
+    }
+
+    // Specific domain category keywords
+    // 6010 - Kitchen Staff Salaries & Casual Labor
+    const isSalaryAcc = aCode === '6010' || aName.includes('salary') || aName.includes('salaries') || aName.includes('staff') || aName.includes('wage');
+    if (isSalaryAcc) {
+      const salaryKeywords = ['salary', 'salaries', 'staff', 'waiter', 'chef', 'labor', 'labour', 'wage', 'wages', 'casual', 'worker', 'employee', 'bonus', 'overtime'];
+      if (salaryKeywords.some(k => eHead.includes(k) || eCat.includes(k))) {
+        score += 80;
+      }
+    }
+
+    // 6030 - Electricity & Gas, Power, Utility Bills (Explicit energy keywords; DO NOT match bare 'bill'!)
+    const isElectricAcc = aCode === '6030' || aName.includes('electric') || aName.includes('gas') || aName.includes('power');
+    if (isElectricAcc) {
+      const electricKeywords = ['electric', 'electricity', 'power', 'current', 'gas', 'lpg', 'cylinder', 'desco', 'dpdc', 'nesco', 'reb', 'titas', 'generator', 'fuel'];
+      if (electricKeywords.some(k => eHead.includes(k) || eCat.includes(k))) {
+        score += 80;
+      }
+    }
+
+    // 6040 - Cleaning, Consumables, Sanitization
+    const isCleanAcc = aCode === '6040' || aName.includes('clean') || aName.includes('consumable') || aName.includes('wash');
+    if (isCleanAcc) {
+      const cleanKeywords = ['clean', 'cleaning', 'wash', 'washing', 'soap', 'detergent', 'tissue', 'napkin', 'consumable', 'consumables', 'disinfectant', 'harpic', 'sanitiz', 'trash', 'waste', 'pest'];
+      if (cleanKeywords.some(k => eHead.includes(k) || eCat.includes(k))) {
+        score += 80;
+      }
+    }
+
+    // 6020 - Floor Rent & General OpEx / Conveyance
+    const isRentAcc = aCode === '6020' || aName.includes('rent') || aName.includes('overhead') || aName.includes('utilit');
+    if (isRentAcc) {
+      const rentKeywords = ['rent', 'lease', 'conveyance', 'transport', 'travel', 'fare', 'rickshaw', 'cng', 'taxi', 'bike', 'bus', 'repair', 'maintenance', 'water', 'wasa'];
+      if (rentKeywords.some(k => eHead.includes(k) || eCat.includes(k))) {
+        score += 80;
+      }
+    }
+
+    // Tokenized word matching (ignoring generic stop words like 'bill', 'charge', 'cost', 'fee', 'the', 'and')
+    const stopWords = new Set(['bill', 'bills', 'charge', 'charges', 'cost', 'costs', 'fee', 'fees', 'the', 'and', 'for', 'all']);
+    const eWords = eHead.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+    const aWords = aName.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+    const wordMatches = eWords.filter(ew => aWords.some(aw => ew.includes(aw) || aw.includes(ew)));
+    score += wordMatches.length * 20;
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestAccount = acc;
+    }
+  }
+
+  // Fallback: general operating expenses (6020 or first candidate account)
+  if (!bestAccount || highestScore === 0) {
+    bestAccount = candidateAccounts.find(a => a.code === '6020') || candidateAccounts[0] || accounts[0];
+  }
+
+  return bestAccount;
 };
 
 export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -6056,6 +6161,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
+  const findExpenseAccount = (expense: ExpenseRecord): AccountHead | undefined => {
+    return resolveExpenseAccount(expense, data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS);
+  };
+
   const getLiveAccountBalance = (acc: AccountHead): number => {
     const opening = acc.balance || 0;
     const code = acc.code;
@@ -6138,53 +6247,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return opening + totalBomCostVal + journalEffect;
       }
 
-      // Operating Expenses Matching
-      const headExpenses = data.expenses.filter(e => {
-        const eHead = (e.head || '').toLowerCase().trim();
-        const eCat = (e.category || '').toLowerCase().trim();
-        const aName = (acc.name || '').toLowerCase().trim();
-        const aCode = acc.code;
-
-        // Direct exact or substring match
-        if (eHead && (aName.includes(eHead) || eHead.includes(aName))) return true;
-
-        // Specific standard head mappings
-        if (aCode === '6010' || aName.includes('salary') || aName.includes('salaries') || aName.includes('staff')) {
-          if (eHead.includes('salary') || eHead.includes('staff') || eHead.includes('waiter') || eHead.includes('labor') || eHead.includes('wage') || eHead.includes('chef') || eHead.includes('casual')) {
-            return true;
-          }
-        }
-        if (aCode === '6030' || aName.includes('electric') || aName.includes('gas') || aName.includes('power')) {
-          if (eHead.includes('electric') || eHead.includes('gas') || eHead.includes('power') || eHead.includes('desco') || eHead.includes('dpdc') || eHead.includes('titas') || eHead.includes('wasa') || eHead.includes('water') || eHead.includes('utility') || eHead.includes('bill')) {
-            return true;
-          }
-        }
-        if (aCode === '6040' || aName.includes('clean') || aName.includes('consumable')) {
-          if (eHead.includes('clean') || eHead.includes('wash') || eHead.includes('consumable') || eHead.includes('soap') || eHead.includes('tissue') || eHead.includes('packaging')) {
-            return true;
-          }
-        }
-        if (aCode === '6020' || aName.includes('rent') || aName.includes('utilities') || aName.includes('overhead')) {
-          if (eHead.includes('rent') || eHead.includes('lease') || eHead.includes('conveyance') || eHead.includes('transport') || eHead.includes('travel') || eHead.includes('fare') || eHead.includes('maintenance') || eHead.includes('repair')) {
-            return true;
-          }
-        }
-
-        // Tokenized word matching (words with length >= 3)
-        const eWords = eHead.split(/\s+/).filter(w => w.length >= 3);
-        const aWords = aName.split(/\s+/).filter(w => w.length >= 3);
-        const hasWordMatch = eWords.some(ew => aWords.some(aw => ew.includes(aw) || aw.includes(ew)));
-        if (hasWordMatch) return true;
-
-        // Fallback for general OpEx when it doesn't match other specific heads
-        if (aCode === '6020') {
-          const isSalary = eHead.includes('salary') || eHead.includes('staff') || eHead.includes('waiter') || eHead.includes('labor') || eHead.includes('wage');
-          const isElectric = eHead.includes('electric') || eHead.includes('gas') || eHead.includes('power') || eHead.includes('desco');
-          const isClean = eHead.includes('clean') || eHead.includes('wash') || eHead.includes('soap');
-          if (!isSalary && !isElectric && !isClean) return true;
-        }
-
-        return false;
+      // Operating Expenses Matching - Deterministic 1-to-1 unique allocation (No double counting)
+      const chartAccounts = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+      const headExpenses = (data.expenses || []).filter(e => {
+        const matched = resolveExpenseAccount(e, chartAccounts);
+        return matched && (matched.id === acc.id || matched.code === acc.code);
       }).reduce((sum, e) => sum + (e.amount || 0), 0);
 
       return opening + headExpenses + journalEffect;
@@ -6700,6 +6767,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       editAccountHead,
       deleteAccountHead,
       getLiveAccountBalance,
+      findExpenseAccount,
       saveCustomerAdvance,
       deleteCustomerAdvance,
       resetModuleData,
