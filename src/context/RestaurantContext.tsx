@@ -238,30 +238,30 @@ export const DEFAULT_USERS: AppUser[] = [
 
 const DEFAULT_CHART_OF_ACCOUNTS: AccountHead[] = [
   // ASSETS (1000)
-  { id: '1010', code: '1010', name: 'Cash in Hand (POS Drawer)', type: 'ASSET', category: 'Current Assets', balance: 15000 },
-  { id: '1020', code: '1020', name: 'Petty Cash Fund', type: 'ASSET', category: 'Current Assets', balance: 5000 },
-  { id: '1030', code: '1030', name: 'Bank - City Bank A/C', type: 'ASSET', category: 'Bank Accounts', balance: 85000 },
-  { id: '1040', code: '1040', name: 'bKash / Nagad Merchant A/C', type: 'ASSET', category: 'Mobile Banking', balance: 24000 },
-  { id: '1050', code: '1050', name: 'Accounts Receivable (Customer Dues)', type: 'ASSET', category: 'Receivables', balance: 2000 },
-  { id: '1060', code: '1060', name: 'Food & Beverage Inventory Asset', type: 'ASSET', category: 'Inventory Asset', balance: 25000 },
+  { id: '1010', code: '1010', name: 'Cash in Hand (POS Drawer)', type: 'ASSET', category: 'Current Assets', balance: 0 },
+  { id: '1020', code: '1020', name: 'Petty Cash Fund', type: 'ASSET', category: 'Current Assets', balance: 0 },
+  { id: '1030', code: '1030', name: 'Bank - City Bank A/C', type: 'ASSET', category: 'Bank Accounts', balance: 0 },
+  { id: '1040', code: '1040', name: 'bKash / Nagad Merchant A/C', type: 'ASSET', category: 'Mobile Banking', balance: 0 },
+  { id: '1050', code: '1050', name: 'Accounts Receivable (Customer Dues)', type: 'ASSET', category: 'Receivables', balance: 0 },
+  { id: '1060', code: '1060', name: 'Food & Beverage Inventory Asset', type: 'ASSET', category: 'Inventory Asset', balance: 0 },
   
   // LIABILITIES (2000)
-  { id: '2010', code: '2010', name: 'Accounts Payable (Vendor Dues)', type: 'LIABILITY', category: 'Current Liabilities', balance: 10000 },
-  { id: '2020', code: '2020', name: 'Customer Advance Deposits', type: 'LIABILITY', category: 'Advance Liabilities', balance: 3500 },
-  { id: '2030', code: '2030', name: 'VAT & Tax Payable', type: 'LIABILITY', category: 'Statutory Liabilities', balance: 1200 },
+  { id: '2010', code: '2010', name: 'Accounts Payable (Vendor Dues)', type: 'LIABILITY', category: 'Current Liabilities', balance: 0 },
+  { id: '2020', code: '2020', name: 'Customer Advance Deposits', type: 'LIABILITY', category: 'Advance Liabilities', balance: 0 },
+  { id: '2030', code: '2030', name: 'VAT & Tax Payable', type: 'LIABILITY', category: 'Statutory Liabilities', balance: 0 },
 
   // EQUITY (3000)
-  { id: '3010', code: '3010', name: 'Owner Equity & Capital', type: 'EQUITY', category: 'Owner Equity', balance: 100000 },
-  { id: '3020', code: '3020', name: 'Retained Earnings', type: 'EQUITY', category: 'Owner Equity', balance: 39300 },
+  { id: '3010', code: '3010', name: 'Owner Equity & Capital', type: 'EQUITY', category: 'Owner Equity', balance: 0 },
+  { id: '3020', code: '3020', name: 'Retained Earnings', type: 'EQUITY', category: 'Owner Equity', balance: 0 },
 
   // REVENUE (4000)
-  { id: '4010', code: '4010', name: 'Dine-in Restaurant Sales', type: 'REVENUE', category: 'Food Sales Revenue', balance: 26000 },
+  { id: '4010', code: '4010', name: 'Dine-in Restaurant Sales', type: 'REVENUE', category: 'Food Sales Revenue', balance: 0 },
   { id: '4020', code: '4020', name: 'Takeaway & Delivery Sales', type: 'REVENUE', category: 'Food Sales Revenue', balance: 0 },
   { id: '4030', code: '4030', name: 'Beverage & Bar Counter Sales', type: 'REVENUE', category: 'Beverage Revenue', balance: 0 },
 
   // EXPENSES (5000 & 6000)
-  { id: '5010', code: '5010', name: 'COGS - Raw Meat & Poultry', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 4800 },
-  { id: '5020', code: '5020', name: 'COGS - Grocery, Rice & Oil', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 2250 },
+  { id: '5010', code: '5010', name: 'COGS - Raw Meat & Poultry', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 0 },
+  { id: '5020', code: '5020', name: 'COGS - Grocery, Rice & Oil', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 0 },
   { id: '6010', code: '6010', name: 'Kitchen Staff Salaries', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
   { id: '6020', code: '6020', name: 'Floor Rent & Utilities', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
   { id: '6030', code: '6030', name: 'Electricity & Gas Bill', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
@@ -2652,12 +2652,22 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const vendorPayBkash = data.payments.filter(p => isBkashMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
   const vendorPayNagad = data.payments.filter(p => isNagadMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  const baseCashDrawer = 15000;
-  const basePettyCash = 5000;
-  const baseBank = 85000;
-  const baseCheque = 50000;
-  const baseBkash = 15000;
-  const baseNagad = 10000;
+  const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+  const getOpeningBalance = (code: string, fallbackKeywords: string[] = []): number => {
+    const acc = coaList.find(a => {
+      if (a.code === code || a.id === code) return true;
+      const lowerName = (a.name || '').toLowerCase();
+      return fallbackKeywords.some(kw => lowerName.includes(kw));
+    });
+    return Number(acc?.balance) || 0;
+  };
+
+  const baseCashDrawer = getOpeningBalance('1010', ['cash in hand', 'drawer']);
+  const basePettyCash = getOpeningBalance('1020', ['petty cash']);
+  const baseBank = getOpeningBalance('1030', ['bank']);
+  const baseCheque = 0;
+  const baseBkash = getOpeningBalance('1040', ['bkash']);
+  const baseNagad = 0;
 
   const cashDrawerBalance = Math.max(0, baseCashDrawer + payCash + totalCashDueCollected + advCash - cashExpenses - totalCashPurchases - vendorPayCash);
   const pettyCashBalance = Math.max(0, basePettyCash - pettyCashExpenses);

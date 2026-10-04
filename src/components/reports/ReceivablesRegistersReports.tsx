@@ -516,8 +516,13 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
   // --- 13. RECEIPT & PAYMENT REPORT (CASH & BANK BOOK) ---
   const receiptPaymentData = useMemo(() => {
     // Opening Cash
-    const openingCash = 15000;
-    const openingBank = 109000; // City Bank + bKash
+    const coaListReport = data.chartOfAccounts || [];
+    const getReportBalance = (code: string) => {
+      const acc = coaListReport.find(a => a.code === code || a.id === code);
+      return Number(acc?.balance) || 0;
+    };
+    const openingCash = getReportBalance('1010');
+    const openingBank = getReportBalance('1030') + getReportBalance('1040');
 
     let cashReceipts = 0;
     let bankReceipts = 0;

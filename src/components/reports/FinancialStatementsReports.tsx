@@ -204,13 +204,18 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
     });
 
     // --- BASE OPENING POSITION (Genesis / Day 0) ---
-    const baseCash = 15000;
-    const baseBank = 109000;
-    const baseAR = 12500;
-    const baseInv = 28500;
-    const baseFixedAssets = 250000;
-    const baseAP = 8500;
-    const baseEquity = 406500; // Balancing equity: 415,000 assets - 8,500 AP
+    const coaList = data.chartOfAccounts || [];
+    const getCoaBalance = (code: string) => {
+      const acc = coaList.find(a => a.code === code || a.id === code);
+      return Number(acc?.balance) || 0;
+    };
+    const baseCash = getCoaBalance('1010');
+    const baseBank = getCoaBalance('1030') + getCoaBalance('1040');
+    const baseAR = getCoaBalance('1050');
+    const baseInv = getCoaBalance('1060');
+    const baseFixedAssets = 0;
+    const baseAP = getCoaBalance('2010');
+    const baseEquity = getCoaBalance('3010') + getCoaBalance('3020');
 
     // --- ACCUMULATED OPENING BALANCES (Before startDate) ---
     // If no startDate filter is applied, opening is initial genesis balance
@@ -576,8 +581,13 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
     });
 
     // Cash & Cash Equivalents
-    let cashBalance = 15000;
-    let bankBalance = 109000;
+    const coaListReport = data.chartOfAccounts || [];
+    const getReportCoaBalance = (code: string) => {
+      const acc = coaListReport.find(a => a.code === code || a.id === code);
+      return Number(acc?.balance) || 0;
+    };
+    let cashBalance = getReportCoaBalance('1010');
+    let bankBalance = getReportCoaBalance('1030') + getReportCoaBalance('1040');
     data.sales.forEach(s => {
       if (!isSaleActive(s)) return;
       cashBalance += (s.cash || 0) + (s.dueCollected || 0);
