@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { 
   PurchaseVoucher, 
   PurchaseOrder, 
@@ -57,6 +57,7 @@ export const PurchasesView: React.FC = () => {
     addConfigItem,
     editConfigItem,
     settlePurchaseBill,
+    getMethodLiveBalance,
     currentUser
   } = useRestaurant();
 
@@ -175,23 +176,15 @@ export const PurchasesView: React.FC = () => {
     totalAmount: number;
     isAllDues?: boolean;
   } | null>(null);
+  const activeFundMethods = (data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS)
+    .filter(m => m.isActive !== false && m.type !== 'CREDIT');
+
   const [payAmount, setPayAmount] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<'CASH' | 'BANK' | 'BKASH' | 'NAGAD'>('CASH');
+  const [payMethod, setPayMethod] = useState<string>(() => activeFundMethods[0]?.name || 'Cash in Hand');
   const [payNote, setPayNote] = useState('');
 
-  // Payment Account Balances
-  const { cashDrawer = 0, bankTransfer = 0, cheque = 0, bkashMerchant = 0, nagadMerchant = 0 } = metrics?.paymentAccountBalances || {
-    cashDrawer: 0,
-    bankTransfer: 0,
-    cheque: 0,
-    bkashMerchant: 0,
-    nagadMerchant: 0
-  };
-
-  const selectedMethodBalance = 
-    payMethod === 'CASH' ? cashDrawer :
-    payMethod === 'BANK' ? bankTransfer :
-    payMethod === 'BKASH' ? bkashMerchant : nagadMerchant;
+  const selectedPaymentMethodObj = activeFundMethods.find(m => m.name === payMethod || m.id === payMethod || m.name.toLowerCase() === payMethod.toLowerCase()) || activeFundMethods[0];
+  const selectedMethodBalance = selectedPaymentMethodObj ? getMethodLiveBalance(selectedPaymentMethodObj) : 0;
 
   // ================= HANDLERS ================= //
 
@@ -662,10 +655,7 @@ export const PurchasesView: React.FC = () => {
     e.preventDefault();
     if (!payBillTarget || payAmount <= 0) return;
 
-    const methodLabel = 
-      payMethod === 'CASH' ? 'Cash Drawer' :
-      payMethod === 'BANK' ? 'Bank Account Transfer' :
-      payMethod === 'BKASH' ? 'bKash Merchant' : 'Nagad Merchant';
+    const methodLabel = selectedPaymentMethodObj?.name || payMethod;
 
     settlePurchaseBill(
       payBillTarget.billNo || '',
@@ -1842,13 +1832,18 @@ export const PurchasesView: React.FC = () => {
                 </div>
                 <select
                   value={payMethod}
-                  onChange={e => setPayMethod(e.target.value as any)}
+                  onChange={e => setPayMethod(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
                 >
-                  <option value="CASH">💵 Cash Drawer (Available: ৳ {cashDrawer.toLocaleString()})</option>
-                  <option value="BANK">🏦 Bank Account Transfer (Available: ৳ {bankTransfer.toLocaleString()})</option>
-                  <option value="BKASH">📱 bKash Merchant (Available: ৳ {bkashMerchant.toLocaleString()})</option>
-                  <option value="NAGAD">📱 Nagad Merchant (Available: ৳ {nagadMerchant.toLocaleString()})</option>
+                  {activeFundMethods.map(m => {
+                    const bal = getMethodLiveBalance(m);
+                    const icon = m.type === 'CASH' ? '💵' : m.type === 'BANK' ? '🏦' : m.type === 'CARD' ? '💳' : '📱';
+                    return (
+                      <option key={m.id} value={m.name}>
+                        {icon} {m.name} {m.accountNumber ? `(${m.accountNumber})` : ''} (Available: ৳ {bal.toLocaleString()})
+                      </option>
+                    );
+                  })}
                 </select>
 
                 <div className="mt-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">

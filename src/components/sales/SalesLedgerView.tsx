@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant, formatRoleTitle, getOrderTakerDisplay, isSaleActive } from '../../context/RestaurantContext';
+import { useRestaurant, formatRoleTitle, getOrderTakerDisplay, isSaleActive, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { 
   Receipt, 
   Search, 
@@ -52,14 +52,17 @@ export const SalesLedgerView: React.FC = () => {
   const [voidingSale, setVoidingSale] = useState<SaleRecord | null>(null);
   const [voidReason, setVoidReason] = useState<string>('Customer Cancellation');
   const [customVoidReason, setCustomVoidReason] = useState<string>('');
+  const activeFundMethods = (data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS)
+    .filter(m => m.isActive !== false && m.type !== 'CREDIT');
+
   const [refundPayment, setRefundPayment] = useState<boolean>(true);
-  const [refundMethod, setRefundMethod] = useState<'CASH' | 'CARD' | 'BKASH' | 'NAGAD' | 'ORIGINAL'>('CASH');
+  const [refundMethod, setRefundMethod] = useState<string>(() => activeFundMethods[0]?.id || 'cash');
   const [restoreToTable, setRestoreToTable] = useState<boolean>(true);
 
   // Due collection modal state
   const [dueCust, setDueCust] = useState(data.customers[0] || 'Walk-in Customer');
   const [dueAmount, setDueAmount] = useState<number>(0);
-  const [dueMethod, setDueMethod] = useState<'CASH' | 'CARD' | 'BKASH' | 'NAGAD'>('CASH');
+  const [dueMethod, setDueMethod] = useState<string>(() => activeFundMethods[0]?.id || 'cash');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleSaveDue = (e: React.FormEvent) => {
@@ -128,14 +131,22 @@ export const SalesLedgerView: React.FC = () => {
     setVoidReason('Customer Cancellation');
     setCustomVoidReason('');
     setRefundPayment(true);
-    if (sale.card && !sale.cash && !sale.bkash && !sale.nagad) {
-      setRefundMethod('CARD');
+    const firstMethod = activeFundMethods[0]?.id || 'cash';
+    if (sale.paymentBreakdown) {
+      const keys = Object.keys(sale.paymentBreakdown);
+      const matchedKey = keys.find(k => activeFundMethods.some(m => m.id === k || m.name === k));
+      setRefundMethod(matchedKey || keys[0] || firstMethod);
+    } else if (sale.card && !sale.cash && !sale.bkash && !sale.nagad) {
+      const cardMethod = activeFundMethods.find(m => m.type === 'CARD');
+      setRefundMethod(cardMethod?.id || firstMethod);
     } else if (sale.bkash && !sale.cash && !sale.card && !sale.nagad) {
-      setRefundMethod('BKASH');
+      const bkashMethod = activeFundMethods.find(m => m.type === 'MFS' && m.name.toLowerCase().includes('bkash')) || activeFundMethods.find(m => m.type === 'MFS');
+      setRefundMethod(bkashMethod?.id || firstMethod);
     } else if (sale.nagad && !sale.cash && !sale.card && !sale.bkash) {
-      setRefundMethod('NAGAD');
+      const nagadMethod = activeFundMethods.find(m => m.type === 'MFS' && m.name.toLowerCase().includes('nagad')) || activeFundMethods.find(m => m.type === 'MFS');
+      setRefundMethod(nagadMethod?.id || firstMethod);
     } else {
-      setRefundMethod('CASH');
+      setRefundMethod(firstMethod);
     }
     setRestoreToTable(true);
   };
@@ -936,13 +947,14 @@ export const SalesLedgerView: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Received Via</label>
                 <select
                   value={dueMethod}
-                  onChange={e => setDueMethod(e.target.value as any)}
+                  onChange={e => setDueMethod(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900"
                 >
-                  <option value="CASH">Cash Drawer</option>
-                  <option value="CARD">Card</option>
-                  <option value="BKASH">bKash</option>
-                  <option value="NAGAD">Nagad</option>
+                  {activeFundMethods.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} {m.accountNumber ? `(${m.accountNumber})` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1085,23 +1097,18 @@ export const SalesLedgerView: React.FC = () => {
                 <div className="pl-6 pt-1 flex flex-col sm:flex-row sm:items-center gap-2">
                   <span className="text-[11px] font-bold text-slate-700 shrink-0">Refund Method:</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { id: 'CASH', label: 'Cash Drawer' },
-                      { id: 'CARD', label: 'Card' },
-                      { id: 'BKASH', label: 'bKash' },
-                      { id: 'NAGAD', label: 'Nagad' }
-                    ].map(m => (
+                    {activeFundMethods.map(m => (
                       <button
                         key={m.id}
                         type="button"
-                        onClick={() => setRefundMethod(m.id as any)}
+                        onClick={() => setRefundMethod(m.id)}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
                           refundMethod === m.id
                             ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
                             : 'bg-white text-slate-700 border-rose-200 hover:bg-rose-100/50'
                         }`}
                       >
-                        {m.label}
+                        {m.name}
                       </button>
                     ))}
                   </div>

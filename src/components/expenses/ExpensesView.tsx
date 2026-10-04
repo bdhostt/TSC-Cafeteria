@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { 
   Wallet, 
   Plus, 
@@ -13,17 +13,24 @@ import {
 } from 'lucide-react';
 
 export const ExpensesView: React.FC = () => {
-  const { data, metrics, saveExpense, deleteExpense, findExpenseAccount } = useRestaurant();
+  const { data, metrics, saveExpense, deleteExpense, findExpenseAccount, getMethodLiveBalance } = useRestaurant();
   const [search, setSearch] = useState('');
   const [filterMedium, setFilterMedium] = useState<string>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const expenseAccounts = (data.chartOfAccounts || []).filter(a => a.type === 'EXPENSE');
 
+  const activeFundMethods = (data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS)
+    .filter(m => m.isActive !== false && m.type !== 'CREDIT');
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [head, setHead] = useState(data.expenseHeads[0] || 'Conveyance');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('Cash in Hand (POS Drawer)');
+  const [paymentMethod, setPaymentMethod] = useState<string>(() => {
+    const active = (data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS)
+      .filter(m => m.isActive !== false && m.type !== 'CREDIT');
+    return active[0]?.name || 'Cash in Hand';
+  });
   const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState('');
 
@@ -49,52 +56,67 @@ export const ExpensesView: React.FC = () => {
     setSelectedAccountId('');
   };
 
+  const getMediumIcon = (type: string) => {
+    switch (type) {
+      case 'CASH': return Banknote;
+      case 'MFS': return Smartphone;
+      case 'CARD': return CreditCard;
+      case 'BANK': return Building;
+      default: return Wallet;
+    }
+  };
+
   const getMediumBadge = (method?: string) => {
-    const norm = (method || 'Cash in Hand (POS Drawer)').toLowerCase();
+    const norm = (method || '').toLowerCase().trim();
+    const allMethods = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
+    const matched = allMethods.find(m => 
+      m.id.toLowerCase() === norm || 
+      m.name.toLowerCase() === norm || 
+      norm.includes(m.name.toLowerCase()) || 
+      norm.includes(m.id.toLowerCase())
+    );
+    const mType = matched?.type || (norm.includes('cash') || norm.includes('drawer') ? 'CASH' : norm.includes('bank') ? 'BANK' : norm.includes('card') ? 'CARD' : norm.includes('petty') ? 'CASH' : 'MFS');
+    const label = matched?.name || method || 'Cash Drawer';
+
     if (norm.includes('petty')) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
           <Coins className="w-3 h-3 text-amber-600" />
-          <span>Petty Cash</span>
+          <span>{label}</span>
         </span>
       );
     }
-    if (norm.includes('bkash')) {
+    if (mType === 'MFS') {
+      const isNagad = norm.includes('nagad') || (matched?.providerName || '').toLowerCase().includes('nagad');
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-pink-50 text-pink-800 border border-pink-200">
-          <Smartphone className="w-3 h-3 text-pink-600" />
-          <span>bKash</span>
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+          isNagad ? 'bg-orange-50 text-orange-800 border-orange-200' : 'bg-pink-50 text-pink-800 border-pink-200'
+        }`}>
+          <Smartphone className={`w-3 h-3 ${isNagad ? 'text-orange-600' : 'text-pink-600'}`} />
+          <span>{label}</span>
         </span>
       );
     }
-    if (norm.includes('nagad')) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-800 border border-orange-200">
-          <Smartphone className="w-3 h-3 text-orange-600" />
-          <span>Nagad</span>
-        </span>
-      );
-    }
-    if (norm.includes('bank')) {
+    if (mType === 'BANK') {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
           <Building className="w-3 h-3 text-indigo-600" />
-          <span>Bank Transfer</span>
+          <span>{label}</span>
         </span>
       );
     }
-    if (norm.includes('card')) {
+    if (mType === 'CARD') {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
           <CreditCard className="w-3 h-3 text-blue-600" />
-          <span>Card</span>
+          <span>{label}</span>
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
         <Banknote className="w-3 h-3 text-emerald-600" />
-        <span>Cash Drawer</span>
+        <span>{label}</span>
       </span>
     );
   };
@@ -117,66 +139,32 @@ export const ExpensesView: React.FC = () => {
     const m = (e.paymentMethod || 'cash').toLowerCase();
     if (filterMedium === 'CASH') return matchesSearch && (m.includes('cash') || m.includes('drawer'));
     if (filterMedium === 'PETTY') return matchesSearch && m.includes('petty');
-    if (filterMedium === 'MFS') return matchesSearch && (m.includes('bkash') || m.includes('nagad'));
+    if (filterMedium === 'MFS') return matchesSearch && (m.includes('bkash') || m.includes('nagad') || m.includes('qr') || m.includes('upay') || m.includes('rocket'));
     if (filterMedium === 'BANK') return matchesSearch && (m.includes('bank') || m.includes('card'));
     return matchesSearch;
   });
 
-  const paymentMediumOptions = [
-    {
-      id: 'cash',
-      value: 'Cash in Hand (POS Drawer)',
-      label: 'Cash in Hand (POS Drawer)',
-      shortName: 'Cash Drawer',
-      balance: metrics.paymentAccountBalances?.cashDrawer ?? 0,
-      icon: Banknote
-    },
-    {
-      id: 'petty',
-      value: 'Petty Cash Fund',
-      label: 'Petty Cash Fund',
-      shortName: 'Petty Cash',
-      balance: metrics.paymentAccountBalances?.pettyCash ?? 0,
-      icon: Coins
-    },
-    {
-      id: 'bkash',
-      value: 'bKash Merchant',
-      label: 'bKash Merchant',
-      shortName: 'bKash',
-      balance: metrics.paymentAccountBalances?.bkashMerchant ?? 0,
-      icon: Smartphone
-    },
-    {
-      id: 'nagad',
-      value: 'Nagad Merchant',
-      label: 'Nagad Merchant',
-      shortName: 'Nagad',
-      balance: metrics.paymentAccountBalances?.nagadMerchant ?? 0,
-      icon: Smartphone
-    },
-    {
-      id: 'bank',
-      value: 'Bank - City Bank A/C',
-      label: 'Bank Account (City Bank A/C)',
-      shortName: 'Bank A/C',
-      balance: metrics.paymentAccountBalances?.bankTransfer ?? 0,
-      icon: Building
-    },
-    {
-      id: 'card',
-      value: 'Card (Company Card)',
-      label: 'Card (Company Debit/Credit)',
-      shortName: 'Company Card',
-      balance: metrics.payCard ?? 0,
-      icon: CreditCard
-    }
-  ];
+  const paymentMediumOptions = activeFundMethods.map(m => ({
+    id: m.id,
+    value: m.name,
+    label: m.name + (m.accountNumber ? ` (${m.accountNumber})` : m.providerName ? ` (${m.providerName})` : ''),
+    shortName: m.name,
+    balance: getMethodLiveBalance(m),
+    icon: getMediumIcon(m.type)
+  }));
 
   const selectedMediumObj = paymentMediumOptions.find(o => 
     o.value.toLowerCase() === paymentMethod.toLowerCase() || 
-    paymentMethod.toLowerCase().includes(o.id)
-  ) || paymentMediumOptions[0];
+    o.id.toLowerCase() === paymentMethod.toLowerCase() ||
+    paymentMethod.toLowerCase().includes(o.shortName.toLowerCase())
+  ) || paymentMediumOptions[0] || {
+    id: 'cash',
+    value: paymentMethod || 'Cash',
+    label: paymentMethod || 'Cash',
+    shortName: paymentMethod || 'Cash',
+    balance: 0,
+    icon: Banknote
+  };
   const selectedBalance = selectedMediumObj.balance;
   const isInsufficient = amount > 0 && selectedBalance < amount;
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { PurchaseVoucher } from '../../types';
 import { 
   CreditCard, 
@@ -23,38 +23,70 @@ import {
 } from 'lucide-react';
 
 export const PayablesView: React.FC = () => {
-  const { data, metrics, saveVendorPayment, deleteVendorPayment, settlePurchaseBill } = useRestaurant();
+  const { data, metrics, saveVendorPayment, deleteVendorPayment, settlePurchaseBill, getMethodLiveBalance } = useRestaurant();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'bills' | 'summary' | 'history'>('bills');
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [selectedVoucherForSettlement, setSelectedVoucherForSettlement] = useState<PurchaseVoucher | null>(null);
+
+  const activeFundMethods = (data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS)
+    .filter(m => m.isActive !== false && m.type !== 'CREDIT');
 
   // Payment form state
   const [vendor, setVendor] = useState(data.vendors[0] || 'Kader Meat Supply');
   const [billNo, setBillNo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState<number>(0);
-  const [method, setMethod] = useState('Cash Drawer');
+  const [method, setMethod] = useState(() => activeFundMethods[0]?.name || 'Cash in Hand');
   const [note, setNote] = useState('');
 
-  // Payment Accounts & Live Balances
-  const { cashDrawer, bankTransfer, cheque, bkashMerchant, nagadMerchant } = metrics.paymentAccountBalances || {
-    cashDrawer: 0,
-    bankTransfer: 0,
-    cheque: 0,
-    bkashMerchant: 0,
-    nagadMerchant: 0
-  };
+  const PAYMENT_METHODS = activeFundMethods.map(m => {
+    const bal = getMethodLiveBalance(m);
+    let color = 'text-emerald-700';
+    let bg = 'bg-emerald-50';
+    let border = 'border-emerald-200';
+    let activeBorder = 'border-emerald-600';
+    let activeBg = 'bg-emerald-100/70';
+    let IconComp = Banknote;
 
-  const PAYMENT_METHODS = [
-    { id: 'Cash Drawer', label: 'Cash Drawer', balance: cashDrawer, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', activeBorder: 'border-emerald-600', activeBg: 'bg-emerald-100/70', icon: Banknote },
-    { id: 'Bank Transfer', label: 'Bank Transfer', balance: bankTransfer, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', activeBorder: 'border-blue-600', activeBg: 'bg-blue-100/70', icon: Landmark },
-    { id: 'Cheque', label: 'Cheque', balance: cheque, color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200', activeBorder: 'border-purple-600', activeBg: 'bg-purple-100/70', icon: FileCheck },
-    { id: 'bKash Merchant', label: 'bKash Merchant', balance: bkashMerchant, color: 'text-pink-700', bg: 'bg-pink-50', border: 'border-pink-200', activeBorder: 'border-pink-600', activeBg: 'bg-pink-100/70', icon: Smartphone },
-    { id: 'Nagad Merchant', label: 'Nagad Merchant', balance: nagadMerchant, color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', activeBorder: 'border-orange-600', activeBg: 'bg-orange-100/70', icon: Smartphone },
-  ];
+    if (m.type === 'CASH') {
+      IconComp = Banknote;
+      color = 'text-emerald-700'; bg = 'bg-emerald-50'; border = 'border-emerald-200';
+      activeBorder = 'border-emerald-600'; activeBg = 'bg-emerald-100/70';
+    } else if (m.type === 'BANK') {
+      IconComp = Landmark;
+      color = 'text-blue-700'; bg = 'bg-blue-50'; border = 'border-blue-200';
+      activeBorder = 'border-blue-600'; activeBg = 'bg-blue-100/70';
+    } else if (m.type === 'CARD') {
+      IconComp = CreditCard;
+      color = 'text-indigo-700'; bg = 'bg-indigo-50'; border = 'border-indigo-200';
+      activeBorder = 'border-indigo-600'; activeBg = 'bg-indigo-100/70';
+    } else if (m.type === 'MFS') {
+      IconComp = Smartphone;
+      const isNagad = m.name.toLowerCase().includes('nagad') || (m.providerName || '').toLowerCase().includes('nagad');
+      if (isNagad) {
+        color = 'text-orange-700'; bg = 'bg-orange-50'; border = 'border-orange-200';
+        activeBorder = 'border-orange-600'; activeBg = 'bg-orange-100/70';
+      } else {
+        color = 'text-pink-700'; bg = 'bg-pink-50'; border = 'border-pink-200';
+        activeBorder = 'border-pink-600'; activeBg = 'bg-pink-100/70';
+      }
+    } else {
+      IconComp = Wallet;
+      color = 'text-purple-700'; bg = 'bg-purple-50'; border = 'border-purple-200';
+      activeBorder = 'border-purple-600'; activeBg = 'bg-purple-100/70';
+    }
 
-  const selectedMethodObj = PAYMENT_METHODS.find(m => m.id === method) || PAYMENT_METHODS[0];
+    return {
+      id: m.name,
+      label: m.name + (m.accountNumber ? ` (${m.accountNumber})` : ''),
+      balance: bal,
+      color, bg, border, activeBorder, activeBg,
+      icon: IconComp
+    };
+  });
+
+  const selectedMethodObj = PAYMENT_METHODS.find(m => m.id === method || m.id.toLowerCase() === method.toLowerCase()) || PAYMENT_METHODS[0];
   const selectedBalance = selectedMethodObj ? selectedMethodObj.balance : 0;
   const isOverBalance = amount > selectedBalance;
 
@@ -98,7 +130,7 @@ export const PayablesView: React.FC = () => {
     setBillNo('');
     setDate(new Date().toISOString().split('T')[0]);
     setAmount(0);
-    setMethod('Cash Drawer');
+    setMethod(activeFundMethods[0]?.name || 'Cash');
     setNote('');
     setIsPayModalOpen(true);
   };
@@ -112,7 +144,7 @@ export const PayablesView: React.FC = () => {
     setBillNo(voucher.billNo || `VOUCHER-${voucher.id}`);
     setDate(new Date().toISOString().split('T')[0]);
     setAmount(remainingDue);
-    setMethod('Cash Drawer');
+    setMethod(activeFundMethods[0]?.name || 'Cash');
     setNote(`Bill Settlement for ${voucher.billNo}`);
     setIsPayModalOpen(true);
   };

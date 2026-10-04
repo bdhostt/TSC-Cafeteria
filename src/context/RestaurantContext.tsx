@@ -1319,6 +1319,7 @@ interface RestaurantContextType {
     waiterOverride?: string
   ) => void;
   getMethodCollection: (method: PaymentMethodConfig | string) => number;
+  getMethodLiveBalance: (method: PaymentMethodConfig | string) => number;
   
   printableReceipt: PrintableReceipt | null;
   setPrintableReceipt: (receipt: PrintableReceipt | null) => void;
@@ -2527,31 +2528,50 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const payBkash = activeSalesList.reduce((sum, s) => sum + (s.bkash || 0), 0);
   const payNagad = activeSalesList.reduce((sum, s) => sum + (s.nagad || 0), 0);
 
+  // Helper to find configured payment method
+  const getMethodConfig = (m?: string): PaymentMethodConfig | undefined => {
+    if (!m) return undefined;
+    const list = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
+    const norm = m.toLowerCase().trim();
+    return list.find(pm => pm.id.toLowerCase() === norm || pm.name.toLowerCase() === norm || norm.includes(pm.id.toLowerCase()) || norm.includes(pm.name.toLowerCase()));
+  };
+
   // Payment Account Live Balances (Cash Drawer, Bank Transfer, Cheque, bKash Merchant, Nagad Merchant, Petty Cash)
   const isExpenseCash = (m?: string) => {
     if (!m) return true;
     const norm = m.toLowerCase().trim();
-    return norm.includes('cash in hand') || norm === 'cash' || norm === 'cash drawer' || norm === 'drawer';
+    if (norm.includes('petty')) return false;
+    if (norm.includes('cash in hand') || norm === 'cash' || norm === 'cash drawer' || norm === 'drawer') return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'CASH' && !cfg.name.toLowerCase().includes('petty');
   };
   const isExpensePettyCash = (m?: string) => {
     if (!m) return false;
     const norm = m.toLowerCase().trim();
-    return norm.includes('petty');
+    if (norm.includes('petty')) return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.ledgerAccountId === '1020' || (cfg?.type === 'CASH' && cfg?.name.toLowerCase().includes('petty'));
   };
   const isExpenseBank = (m?: string) => {
     if (!m) return false;
     const norm = m.toLowerCase().trim();
-    return norm.includes('bank') || norm.includes('card');
+    if (norm.includes('bank') || norm.includes('card')) return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'BANK' || cfg?.type === 'CARD';
   };
   const isExpenseBkash = (m?: string) => {
     if (!m) return false;
     const norm = m.toLowerCase().trim();
-    return norm.includes('bkash');
+    if (norm.includes('bkash')) return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'MFS' && !cfg.name.toLowerCase().includes('nagad');
   };
   const isExpenseNagad = (m?: string) => {
     if (!m) return false;
     const norm = m.toLowerCase().trim();
-    return norm.includes('nagad');
+    if (norm.includes('nagad')) return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'MFS' && cfg.name.toLowerCase().includes('nagad');
   };
 
   const cashExpenses = data.expenses.filter(e => isExpenseCash(e.paymentMethod)).reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -2565,26 +2585,49 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     .reduce((sum, p) => sum + (p.total || 0), 0);
   const totalCashDueCollected = activeSalesList.reduce((sum, s) => sum + (s.dueCollected || 0), 0);
 
+  const getAdvType = (method?: string): string => {
+    if (!method) return 'CASH';
+    const cfg = getMethodConfig(method);
+    if (cfg) {
+      if (cfg.type === 'CASH') return 'CASH';
+      if (cfg.type === 'BANK' || cfg.type === 'CARD') return 'BANK';
+      if (cfg.type === 'MFS') {
+        if (cfg.name.toLowerCase().includes('nagad')) return 'NAGAD';
+        return 'BKASH';
+      }
+    }
+    const m = method.toUpperCase();
+    if (m === 'CASH') return 'CASH';
+    if (m === 'BANK' || m === 'CARD') return 'BANK';
+    if (m === 'NAGAD') return 'NAGAD';
+    if (m === 'BKASH') return 'BKASH';
+    return 'CASH';
+  };
+
   const advCash = (data.customerAdvances || [])
-    .filter(a => (a.method || '').toUpperCase() === 'CASH')
+    .filter(a => getAdvType(a.method) === 'CASH')
     .reduce((sum, a) => sum + (a.amount || 0), 0);
   const advBank = (data.customerAdvances || [])
-    .filter(a => (a.method || '').toUpperCase() === 'BANK')
+    .filter(a => getAdvType(a.method) === 'BANK')
     .reduce((sum, a) => sum + (a.amount || 0), 0);
   const advBkash = (data.customerAdvances || [])
-    .filter(a => (a.method || '').toUpperCase() === 'BKASH')
+    .filter(a => getAdvType(a.method) === 'BKASH')
     .reduce((sum, a) => sum + (a.amount || 0), 0);
   const advNagad = (data.customerAdvances || [])
-    .filter(a => (a.method || '').toUpperCase() === 'NAGAD')
+    .filter(a => getAdvType(a.method) === 'NAGAD')
     .reduce((sum, a) => sum + (a.amount || 0), 0);
 
   const isCashMethod = (m: string) => {
     const norm = (m || '').toLowerCase().trim();
-    return norm === 'cash drawer' || norm === 'cash';
+    if (norm === 'cash drawer' || norm === 'cash') return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'CASH';
   };
   const isBankMethod = (m: string) => {
     const norm = (m || '').toLowerCase().trim();
-    return norm === 'bank transfer' || norm === 'bank';
+    if (norm === 'bank transfer' || norm === 'bank') return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'BANK' || cfg?.type === 'CARD';
   };
   const isChequeMethod = (m: string) => {
     const norm = (m || '').toLowerCase().trim();
@@ -2592,11 +2635,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
   const isBkashMethod = (m: string) => {
     const norm = (m || '').toLowerCase().trim();
-    return norm === 'bkash merchant' || norm === 'bkash';
+    if (norm === 'bkash merchant' || norm === 'bkash') return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'MFS' && !cfg.name.toLowerCase().includes('nagad');
   };
   const isNagadMethod = (m: string) => {
     const norm = (m || '').toLowerCase().trim();
-    return norm === 'nagad merchant' || norm === 'nagad';
+    if (norm === 'nagad merchant' || norm === 'nagad') return true;
+    const cfg = getMethodConfig(m);
+    return cfg?.type === 'MFS' && cfg.name.toLowerCase().includes('nagad');
   };
 
   const vendorPayCash = data.payments.filter(p => isCashMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -5049,18 +5096,33 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const saveDirectDueCollection = (date: string, customer: string, amount: number, method: string) => {
+    lastLocalEditTimeRef.current = Date.now();
+    const methodList = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
+    const matchedMethod = methodList.find(m => m.id === method || m.name.toLowerCase() === method.toLowerCase() || m.id.toLowerCase() === method.toLowerCase());
+    const mType = matchedMethod?.type || (method === 'CASH' ? 'CASH' : method === 'CARD' ? 'CARD' : method === 'BKASH' ? 'MFS' : method === 'NAGAD' ? 'MFS' : 'CASH');
+    const mName = matchedMethod?.name || method;
+    const mId = matchedMethod?.id || method;
+
     let cash = 0, card = 0, bkash = 0, nagad = 0;
-    if (method === 'CASH') cash = amount;
-    else if (method === 'CARD') card = amount;
-    else if (method === 'BKASH') bkash = amount;
-    else if (method === 'NAGAD') nagad = amount;
+    if (mType === 'CASH') cash = amount;
+    else if (mType === 'CARD') card = amount;
+    else if (mType === 'MFS') {
+      if (mName.toLowerCase().includes('nagad')) nagad = amount;
+      else bkash = amount;
+    } else {
+      cash = amount;
+    }
 
     const newSale: SaleRecord = {
       id: Date.now(),
       date,
       invoiceNo: 'DUE-COLL-' + Date.now().toString().slice(-4),
-      details: `Due Collection (${method})`,
+      details: `Due Collection (${mName})`,
       cash, card, bkash, nagad,
+      paymentBreakdown: {
+        [mId]: amount,
+        [mName]: amount
+      },
       dueGiven: 0,
       dueCustomer: '',
       dueCollected: amount,
@@ -6466,8 +6528,66 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }, 0);
   };
 
+  const getMethodLiveBalance = (methodOrId: PaymentMethodConfig | string): number => {
+    const methodList = (data.paymentMethods && data.paymentMethods.length > 0)
+      ? data.paymentMethods
+      : DEFAULT_PAYMENT_METHODS;
+
+    const methodObj = typeof methodOrId === 'string'
+      ? methodList.find(m => m.id === methodOrId || m.name.toLowerCase() === methodOrId.toLowerCase() || m.id.toLowerCase() === methodOrId.toLowerCase())
+      : methodOrId;
+
+    if (methodObj) {
+      if (methodObj.ledgerAccountId) {
+        const head = (data.chartOfAccounts || []).find(a => a.code === methodObj.ledgerAccountId || a.id === methodObj.ledgerAccountId);
+        if (head) {
+          return getLiveAccountBalance(head);
+        }
+      }
+
+      const nameLower = `${methodObj.name} ${methodObj.providerName || ''}`.toLowerCase();
+      if (methodObj.type === 'CASH') {
+        if (nameLower.includes('petty')) {
+          return pettyCashBalance || 0;
+        }
+        return cashDrawerBalance || 0;
+      }
+      if (methodObj.type === 'MFS') {
+        if (nameLower.includes('nagad')) {
+          return nagadMerchantBalance || 0;
+        }
+        if (nameLower.includes('bkash')) {
+          return bkashMerchantBalance || 0;
+        }
+        return (bkashMerchantBalance || 0) + (nagadMerchantBalance || 0);
+      }
+      if (methodObj.type === 'CARD') {
+        return payCard || 0;
+      }
+      if (methodObj.type === 'BANK') {
+        return bankTransferBalance || 0;
+      }
+      if (methodObj.type === 'CREDIT') {
+        return totalCustomerDue || 0;
+      }
+    }
+
+    if (typeof methodOrId === 'string') {
+      const s = methodOrId.toUpperCase();
+      if (s === 'CASH' || s.includes('DRAWER')) return cashDrawerBalance || 0;
+      if (s.includes('PETTY')) return pettyCashBalance || 0;
+      if (s.includes('BKASH')) return bkashMerchantBalance || 0;
+      if (s.includes('NAGAD')) return nagadMerchantBalance || 0;
+      if (s.includes('CARD')) return payCard || 0;
+      if (s.includes('BANK')) return bankTransferBalance || 0;
+    }
+
+    return 0;
+  };
+
   // Customer Advance Handlers
   const saveCustomerAdvance = (advance: Omit<CustomerAdvance, 'id'> & { id?: number }) => {
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => {
       const list = prev.customerAdvances || [];
       if (advance.id) {
@@ -6855,6 +6975,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       closeSettleModal,
       settlePayment,
       getMethodCollection,
+      getMethodLiveBalance,
       printableReceipt,
       setPrintableReceipt,
       openPrintBill,

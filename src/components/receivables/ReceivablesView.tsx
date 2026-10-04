@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
 import { CustomerAdvance } from '../../types';
 import { 
   UserCheck, 
@@ -26,8 +26,12 @@ export const ReceivablesView: React.FC = () => {
     metrics, 
     saveDirectDueCollection, 
     saveCustomerAdvance, 
-    deleteCustomerAdvance 
+    deleteCustomerAdvance,
+    getMethodLiveBalance 
   } = useRestaurant();
+
+  const activeFundMethods = (data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS)
+    .filter(m => m.isActive !== false && m.type !== 'CREDIT');
 
   const [activeTab, setActiveTab] = useState<'receivables' | 'advances'>('receivables');
   const [search, setSearch] = useState('');
@@ -36,7 +40,7 @@ export const ReceivablesView: React.FC = () => {
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
   const [selectedCust, setSelectedCust] = useState(data.customers[0] || 'Walk-in Customer');
   const [collectAmount, setCollectAmount] = useState<number>(0);
-  const [collectMethod, setCollectMethod] = useState('CASH');
+  const [collectMethod, setCollectMethod] = useState(() => activeFundMethods[0]?.id || 'cash');
   const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Customer Advance Modal State
@@ -89,7 +93,7 @@ export const ReceivablesView: React.FC = () => {
     if (custName) setSelectedCust(custName);
     setCollectDate(new Date().toISOString().split('T')[0]);
     setCollectAmount(0);
-    setCollectMethod('CASH');
+    setCollectMethod(activeFundMethods[0]?.id || 'cash');
     setIsCollectModalOpen(true);
   };
 
@@ -105,7 +109,7 @@ export const ReceivablesView: React.FC = () => {
     if (custName) setAdvanceCustomer(custName);
     setAdvanceDate(new Date().toISOString().split('T')[0]);
     setAdvanceAmount(0);
-    setAdvanceMethod('BKASH');
+    setAdvanceMethod(activeFundMethods[0]?.id || 'cash');
     setAdvanceNote('');
     setIsAdvanceModalOpen(true);
   };
@@ -147,13 +151,7 @@ export const ReceivablesView: React.FC = () => {
   const totalAdvanceHeld = metrics.totalCustomerAdvances || 0;
 
   const getMethodBalance = (method: string): number => {
-    const m = (method || '').toUpperCase();
-    if (m === 'CASH') return metrics.paymentAccountBalances?.cashDrawer ?? 0;
-    if (m === 'BKASH') return metrics.paymentAccountBalances?.bkashMerchant ?? 0;
-    if (m === 'NAGAD') return metrics.paymentAccountBalances?.nagadMerchant ?? 0;
-    if (m === 'CARD') return metrics.payCard ?? 0;
-    if (m === 'BANK') return metrics.paymentAccountBalances?.bankTransfer ?? 0;
-    return 0;
+    return getMethodLiveBalance(method);
   };
 
   return (
@@ -391,7 +389,7 @@ export const ReceivablesView: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-[10px]">
-                          {adv.method}
+                          {(data.paymentMethods || DEFAULT_PAYMENT_METHODS).find(m => m.id === adv.method || m.name.toLowerCase() === adv.method.toLowerCase())?.name || adv.method}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-600 font-medium max-w-xs truncate">
@@ -481,10 +479,14 @@ export const ReceivablesView: React.FC = () => {
                   onChange={e => setCollectMethod(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-cyan-600"
                 >
-                  <option value="CASH">Cash (Cash Drawer) — (Balance: ৳ {(metrics.paymentAccountBalances?.cashDrawer ?? 0).toLocaleString()})</option>
-                  <option value="CARD">Card — (Balance: ৳ {(metrics.payCard ?? 0).toLocaleString()})</option>
-                  <option value="BKASH">bKash — (Balance: ৳ {(metrics.paymentAccountBalances?.bkashMerchant ?? 0).toLocaleString()})</option>
-                  <option value="NAGAD">Nagad — (Balance: ৳ {(metrics.paymentAccountBalances?.nagadMerchant ?? 0).toLocaleString()})</option>
+                  {activeFundMethods.map(m => {
+                    const bal = getMethodLiveBalance(m);
+                    return (
+                      <option key={m.id} value={m.id}>
+                        {m.name} {m.accountNumber ? `(${m.accountNumber})` : m.providerName ? `(${m.providerName})` : ''} — (Balance: ৳ {bal.toLocaleString()})
+                      </option>
+                    );
+                  })}
                 </select>
 
                 <div className="mt-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px]">
@@ -589,11 +591,14 @@ export const ReceivablesView: React.FC = () => {
                   onChange={e => setAdvanceMethod(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#004b9b]"
                 >
-                  <option value="BKASH">bKash (Merchant / Personal) — (Balance: ৳ {(metrics.paymentAccountBalances?.bkashMerchant ?? 0).toLocaleString()})</option>
-                  <option value="NAGAD">Nagad — (Balance: ৳ {(metrics.paymentAccountBalances?.nagadMerchant ?? 0).toLocaleString()})</option>
-                  <option value="CASH">Cash (Cash Drawer) — (Balance: ৳ {(metrics.paymentAccountBalances?.cashDrawer ?? 0).toLocaleString()})</option>
-                  <option value="CARD">Bank Card / POS — (Balance: ৳ {(metrics.payCard ?? 0).toLocaleString()})</option>
-                  <option value="BANK">Direct Bank Transfer — (Balance: ৳ {(metrics.paymentAccountBalances?.bankTransfer ?? 0).toLocaleString()})</option>
+                  {activeFundMethods.map(m => {
+                    const bal = getMethodLiveBalance(m);
+                    return (
+                      <option key={m.id} value={m.id}>
+                        {m.name} {m.accountNumber ? `(${m.accountNumber})` : m.providerName ? `(${m.providerName})` : ''} — (Balance: ৳ {bal.toLocaleString()})
+                      </option>
+                    );
+                  })}
                 </select>
 
                 <div className="mt-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px]">

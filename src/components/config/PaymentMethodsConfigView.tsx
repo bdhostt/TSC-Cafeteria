@@ -26,6 +26,7 @@ export const PaymentMethodsConfigView: React.FC = () => {
     data,
     metrics,
     getLiveAccountBalance,
+    getMethodLiveBalance,
     addPaymentMethod,
     updatePaymentMethod,
     deletePaymentMethod,
@@ -183,41 +184,7 @@ export const PaymentMethodsConfigView: React.FC = () => {
   const chartAccounts = data.chartOfAccounts || [];
 
   const getMethodLiveAmount = (m: PaymentMethodConfig): number => {
-    // If explicitly mapped to a Chart of Accounts ledger code
-    if (m.ledgerAccountId) {
-      const head = chartAccounts.find(a => a.code === m.ledgerAccountId);
-      if (head) {
-        return getLiveAccountBalance(head);
-      }
-    }
-
-    // Fallback logic based on payment method type and name
-    const nameLower = `${m.name} ${m.providerName || ''}`.toLowerCase();
-    if (m.type === 'CASH') {
-      if (nameLower.includes('petty')) {
-        return metrics.paymentAccountBalances.pettyCash || 0;
-      }
-      return metrics.paymentAccountBalances.cashDrawer || 0;
-    }
-    if (m.type === 'MFS') {
-      if (nameLower.includes('nagad')) {
-        return metrics.paymentAccountBalances.nagadMerchant || 0;
-      }
-      if (nameLower.includes('bkash')) {
-        return metrics.paymentAccountBalances.bkashMerchant || 0;
-      }
-      return (metrics.paymentAccountBalances.bkashMerchant || 0) + (metrics.paymentAccountBalances.nagadMerchant || 0);
-    }
-    if (m.type === 'CARD') {
-      return metrics.payCard || 0;
-    }
-    if (m.type === 'BANK') {
-      return metrics.paymentAccountBalances.bankTransfer || 0;
-    }
-    if (m.type === 'CREDIT') {
-      return metrics.totalCustomerDue || 0;
-    }
-    return 0;
+    return getMethodLiveBalance(m);
   };
 
   return (
