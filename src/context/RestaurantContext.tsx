@@ -2973,7 +2973,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const vendorPayNagad = data.payments.filter(p => isNagadMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
 
   const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
-  const getOpeningBalance = (code: string, fallbackKeywords: string[] = []): number => {
+  const getOpeningBalance = (roleOrCode: string, fallbackKeywords: string[] = []): number => {
+    // 1. Dynamic ERP System Role mapping
+    const matchByRole = coaList.find(a => (a.systemRole || getAccountSystemRole(a)) === roleOrCode);
+    if (matchByRole) return Number(matchByRole.balance) || 0;
+
+    // 2. Exact code or ID match
+    const acc = coaList.find(a => a.code === roleOrCode || a.id === roleOrCode);
+    if (acc) return Number(acc?.balance) || 0;
+
+    // 3. Fallback keyword matching
     if (fallbackKeywords.length > 0) {
       const matchByKw = coaList.find(a => {
         const lowerName = (a.name || '').toLowerCase();
@@ -2982,15 +2991,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
       if (matchByKw) return Number(matchByKw.balance) || 0;
     }
-    const acc = coaList.find(a => a.code === code || a.id === code);
-    return Number(acc?.balance) || 0;
+
+    return 0;
   };
 
-  const baseCashDrawer = getOpeningBalance('1010', ['cash in hand', 'drawer']);
-  const basePettyCash = getOpeningBalance('1020', ['petty cash']);
-  const baseBank = getOpeningBalance('1030', ['bank a/c', 'city bank']);
+  const baseCashDrawer = getOpeningBalance('CASH', ['cash in hand', 'drawer']) || getOpeningBalance('1010');
+  const basePettyCash = getOpeningBalance('PETTY_CASH', ['petty cash']) || getOpeningBalance('1020');
+  const baseBank = getOpeningBalance('BANK', ['bank a/c', 'city bank']) || getOpeningBalance('1030');
   const baseCheque = 0;
-  const baseBkash = getOpeningBalance('1040', ['bkash', 'nagad', 'mobile banking', 'mfs']);
+  const baseBkash = getOpeningBalance('MOBILE_BANKING', ['bkash', 'nagad', 'mobile banking', 'mfs']) || getOpeningBalance('1040');
   const baseNagad = 0;
 
   const cashDrawerBalance = Math.max(0, baseCashDrawer + payCash + totalCashDueCollected + advCash - cashExpenses - totalCashPurchases - vendorPayCash);
@@ -6655,6 +6664,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     lastLocalEditTimeRef.current = Date.now();
     setData(prev => {
       const currentList = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+      const targetOld = currentList.find(h => h.id === id);
+      const oldCode = targetOld?.code;
+
       if (updated.code) {
         const trimmedCode = updated.code.trim();
         const conflict = currentList.some(h => h.id !== id && (h.code || '').trim() === trimmedCode);
@@ -6663,14 +6675,44 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return prev;
         }
       }
+
+      const updatedList = currentList.map(h => {
+        if (h.id !== id) return h;
+        const merged = { ...h, ...updated };
+        const systemRole = updated.systemRole !== undefined ? updated.systemRole : (merged.systemRole || getAccountSystemRole(merged));
+        return { ...merged, systemRole };
+      });
+
+      // Cascading updates for foreign-key-like references
+      let updatedPaymentMethods = prev.paymentMethods;
+      let updatedJournalEntries = prev.journalEntries;
+
+      if (updated.code && oldCode && updated.code.trim() !== oldCode) {
+        const newCode = updated.code.trim();
+        if (prev.paymentMethods) {
+          updatedPaymentMethods = prev.paymentMethods.map(m => {
+            if (m.ledgerAccountId === oldCode || m.ledgerAccountId === id) {
+              return { ...m, ledgerAccountId: newCode };
+            }
+            return m;
+          });
+        }
+        if (prev.journalEntries) {
+          updatedJournalEntries = prev.journalEntries.map(j => ({
+            ...j,
+            debitAccountId: j.debitAccountId === oldCode ? newCode : j.debitAccountId,
+            creditAccountId: j.creditAccountId === oldCode ? newCode : j.creditAccountId,
+            debitAccountName: (j.debitAccountId === oldCode || j.debitAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.debitAccountName,
+            creditAccountName: (j.creditAccountId === oldCode || j.creditAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.creditAccountName
+          }));
+        }
+      }
+
       return {
         ...prev,
-        chartOfAccounts: currentList.map(h => {
-          if (h.id !== id) return h;
-          const merged = { ...h, ...updated };
-          const systemRole = updated.systemRole !== undefined ? updated.systemRole : (merged.systemRole || getAccountSystemRole(merged));
-          return { ...merged, systemRole };
-        })
+        chartOfAccounts: updatedList,
+        paymentMethods: updatedPaymentMethods,
+        journalEntries: updatedJournalEntries
       };
     });
   };
@@ -6755,6 +6797,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           (s.items || []).some(i => (i.department || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('coffee'))
         ).reduce((sum, s) => sum + (s.total || 0), 0);
         return opening + bevSales + journalEffect;
+      }
+
+      case 'OPERATING_REVENUE': {
+        return opening + totalSales + journalEffect;
       }
 
       case 'COGS': {

@@ -584,6 +584,48 @@ export const HeadsConfigView: React.FC = () => {
     }
   };
 
+  const getAccountSystemRoleBadge = (role: AccountSystemRole) => {
+    switch (role) {
+      case 'CASH':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Cash Drawer</span>;
+      case 'PETTY_CASH':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">Petty Cash</span>;
+      case 'BANK':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Bank A/C</span>;
+      case 'MOBILE_BANKING':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 border border-pink-200">MFS / Wallet</span>;
+      case 'ACCOUNTS_RECEIVABLE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">Customer Dues</span>;
+      case 'INVENTORY_ASSET':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">Stock Inventory</span>;
+      case 'ACCOUNTS_PAYABLE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Vendor Dues</span>;
+      case 'CUSTOMER_ADVANCE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Customer Advance</span>;
+      case 'TAX_PAYABLE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">VAT / Tax</span>;
+      case 'OWNER_EQUITY':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Owner Capital</span>;
+      case 'RETAINED_EARNINGS':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200">Retained Earnings</span>;
+      case 'DINE_IN_REVENUE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">Dine-in Sales</span>;
+      case 'DELIVERY_REVENUE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-300">Delivery Sales</span>;
+      case 'BEVERAGE_REVENUE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-300">Beverage Sales</span>;
+      case 'OPERATING_REVENUE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">Sales Revenue</span>;
+      case 'COGS':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200">BOM / COGS</span>;
+      case 'OPERATING_EXPENSE':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">Operating Expense</span>;
+      case 'STANDARD':
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header - Master Configurations & Hardware Setup (Hidden when viewing Payment Methods or Chart of Accounts) */}
@@ -1355,16 +1397,7 @@ export const HeadsConfigView: React.FC = () => {
                           <td className="py-3 px-4 font-bold text-slate-900">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span>{acc.name}</span>
-                              {(() => {
-                                const role = acc.systemRole || getAccountSystemRole(acc);
-                                if (role === 'TAX_PAYABLE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">VAT / Tax</span>;
-                                if (role === 'ACCOUNTS_PAYABLE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Vendor Dues</span>;
-                                if (role === 'CUSTOMER_ADVANCE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Customer Advance</span>;
-                                if (role === 'ACCOUNTS_RECEIVABLE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Customer Dues</span>;
-                                if (role === 'INVENTORY_ASSET') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">Inventory</span>;
-                                if (role === 'CASH') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Cash Drawer</span>;
-                                return null;
-                              })()}
+                              {getAccountSystemRoleBadge(acc.systemRole || getAccountSystemRole(acc))}
                             </div>
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
@@ -1571,6 +1604,7 @@ export const HeadsConfigView: React.FC = () => {
                       <option value="DINE_IN_REVENUE">Dine-in Sales Revenue</option>
                       <option value="DELIVERY_REVENUE">Takeaway & Delivery Sales</option>
                       <option value="BEVERAGE_REVENUE">Beverage & Bar Counter Sales</option>
+                      <option value="OPERATING_REVENUE">General Operating Sales Revenue</option>
                     </>
                   )}
                   {coaForm.type === 'EXPENSE' && (

@@ -356,7 +356,8 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
     let currentBalance = openingBalance;
 
     // Route transactions based on account type
-    if (activeHead.id === '1010' || activeHead.id === '1020') {
+    const activeRole = activeHead.systemRole || getAccountSystemRole(activeHead);
+    if (activeRole === 'CASH' || activeRole === 'PETTY_CASH' || activeHead.id === '1010' || activeHead.id === '1020') {
       // Cash in Hand
       data.sales.forEach(s => {
         if (!matchesDate(s.date)) return;
@@ -411,7 +412,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
           });
         }
       });
-    } else if (activeHead.id === '1050' || (activeHead.systemRole || getAccountSystemRole(activeHead)) === 'ACCOUNTS_RECEIVABLE') {
+    } else if (activeRole === 'ACCOUNTS_RECEIVABLE' || activeHead.id === '1050') {
       // Accounts Receivable
       data.sales.forEach(s => {
         if (!matchesDate(s.date)) return;
@@ -438,7 +439,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
           });
         }
       });
-    } else if (activeHead.id === '2010' || (activeHead.systemRole || getAccountSystemRole(activeHead)) === 'ACCOUNTS_PAYABLE') {
+    } else if (activeRole === 'ACCOUNTS_PAYABLE' || activeHead.id === '2010') {
       // Accounts Payable
       data.purchases.forEach(p => {
         if (p.status === 'DRAFT') return;
@@ -517,12 +518,14 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
   const receiptPaymentData = useMemo(() => {
     // Opening Cash
     const coaListReport = data.chartOfAccounts || [];
-    const getReportBalance = (code: string) => {
-      const acc = coaListReport.find(a => a.code === code || a.id === code);
+    const getReportBalance = (roleOrCode: string) => {
+      const byRole = coaListReport.find(a => (a.systemRole || getAccountSystemRole(a)) === roleOrCode);
+      if (byRole) return Number(byRole.balance) || 0;
+      const acc = coaListReport.find(a => a.code === roleOrCode || a.id === roleOrCode);
       return Number(acc?.balance) || 0;
     };
-    const openingCash = getReportBalance('1010');
-    const openingBank = getReportBalance('1030') + getReportBalance('1040');
+    const openingCash = getReportBalance('CASH') || getReportBalance('1010');
+    const openingBank = (getReportBalance('BANK') || getReportBalance('1030')) + (getReportBalance('MOBILE_BANKING') || getReportBalance('1040'));
 
     let cashReceipts = 0;
     let bankReceipts = 0;
