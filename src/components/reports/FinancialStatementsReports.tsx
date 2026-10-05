@@ -387,7 +387,10 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       let initialDr = 0;
       let initialCr = 0;
 
-      if (acc.type === 'ASSET' || acc.type === 'EXPENSE') {
+      // ADE (Assets, Drawings, Expenses) are Debit normal; LCR (Liabilities, Capital, Revenue) are Credit normal
+      const isDebitNormal = acc.type === 'ASSET' || acc.type === 'EXPENSE' || (acc.systemRole || getAccountSystemRole(acc)) === 'OWNER_DRAWINGS';
+
+      if (isDebitNormal) {
         if (initialBalance >= 0) initialDr = initialBalance;
         else initialCr = Math.abs(initialBalance);
       } else {
@@ -401,7 +404,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       let openingDr = 0;
       let openingCr = 0;
 
-      if (acc.type === 'ASSET' || acc.type === 'EXPENSE') {
+      if (isDebitNormal) {
         const netOpening = (initialDr - initialCr) + (mv.priorDr - mv.priorCr);
         if (netOpening >= 0) openingDr = Math.round(netOpening);
         else openingCr = Math.round(Math.abs(netOpening));
@@ -418,7 +421,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       let closingDr = 0;
       let closingCr = 0;
 
-      if (acc.type === 'ASSET' || acc.type === 'EXPENSE') {
+      if (isDebitNormal) {
         const netClosing = (openingDr - openingCr) + (periodDr - periodCr);
         if (netClosing >= 0) closingDr = Math.round(netClosing);
         else closingCr = Math.round(Math.abs(netClosing));

@@ -251,9 +251,10 @@ export const DEFAULT_CHART_OF_ACCOUNTS: AccountHead[] = [
   { id: '2020', code: '2020', name: 'Customer Advance Deposits', type: 'LIABILITY', category: 'Advance Liabilities', systemRole: 'CUSTOMER_ADVANCE', balance: 0 },
   { id: '2030', code: '2030', name: 'VAT & Tax Payable', type: 'LIABILITY', category: 'Statutory Liabilities', systemRole: 'TAX_PAYABLE', balance: 0 },
 
-  // EQUITY (3000)
+  // EQUITY & DRAWINGS (3000)
   { id: '3010', code: '3010', name: 'Owner Equity & Capital', type: 'EQUITY', category: 'Owner Equity', systemRole: 'OWNER_EQUITY', balance: 0 },
   { id: '3020', code: '3020', name: 'Retained Earnings', type: 'EQUITY', category: 'Owner Equity', systemRole: 'RETAINED_EARNINGS', balance: 0 },
+  { id: '3030', code: '3030', name: 'Owner Drawings (Withdrawals)', type: 'EQUITY', category: 'Owner Drawings', systemRole: 'OWNER_DRAWINGS', balance: 0 },
 
   // REVENUE (4000)
   { id: '4010', code: '4010', name: 'Dine-in Restaurant Sales', type: 'REVENUE', category: 'Food Sales Revenue', systemRole: 'DINE_IN_REVENUE', balance: 0 },
@@ -313,7 +314,10 @@ export function getAccountSystemRole(acc: Partial<AccountHead> & { name?: string
     return 'ACCOUNTS_RECEIVABLE';
   }
 
-  // 6. Equity
+  // 6. Equity & Drawings
+  if (code === '3030' || normName.includes('drawing') || normName.includes('withdrawal') || normCat.includes('drawing')) {
+    return 'OWNER_DRAWINGS';
+  }
   if (code === '3010' || normName.includes('owner equity') || normName.includes('owner capital') || normName.includes('capital')) {
     return 'OWNER_EQUITY';
   }
@@ -6733,20 +6737,22 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const opening = acc.balance || 0;
     const code = acc.code;
 
+    const role = acc.systemRole || getAccountSystemRole(acc);
+    const normName = (acc.name || '').toLowerCase();
+    // ADE (Assets, Drawings, Expenses) are Debit normal; LCR (Liabilities, Capital, Revenue) are Credit normal
+    const isDebitNature = acc.type === 'ASSET' || acc.type === 'EXPENSE' || role === 'OWNER_DRAWINGS';
+
     // Journal entries net effect
     const journalEffect = (data.journalEntries || []).reduce((sum, j) => {
       let delta = 0;
       if (j.debitAccountId === acc.id || j.debitAccountId === acc.code) {
-        delta += (acc.type === 'ASSET' || acc.type === 'EXPENSE') ? j.amount : -j.amount;
+        delta += isDebitNature ? j.amount : -j.amount;
       }
       if (j.creditAccountId === acc.id || j.creditAccountId === acc.code) {
-        delta += (acc.type === 'LIABILITY' || acc.type === 'EQUITY' || acc.type === 'REVENUE') ? j.amount : -j.amount;
+        delta += !isDebitNature ? j.amount : -j.amount;
       }
       return sum + delta;
     }, 0);
-
-    const role = acc.systemRole || getAccountSystemRole(acc);
-    const normName = (acc.name || '').toLowerCase();
 
     switch (role) {
       case 'INVENTORY_ASSET':
@@ -6780,6 +6786,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return opening + estimatedProfit + journalEffect;
 
       case 'OWNER_EQUITY':
+        return opening + journalEffect;
+
+      case 'OWNER_DRAWINGS':
         return opening + journalEffect;
 
       case 'DINE_IN_REVENUE': {

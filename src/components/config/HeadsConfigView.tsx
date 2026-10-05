@@ -608,6 +608,8 @@ export const HeadsConfigView: React.FC = () => {
         return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Owner Capital</span>;
       case 'RETAINED_EARNINGS':
         return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200">Retained Earnings</span>;
+      case 'OWNER_DRAWINGS':
+        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">Owner Drawings</span>;
       case 'DINE_IN_REVENUE':
         return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">Dine-in Sales</span>;
       case 'DELIVERY_REVENUE':
@@ -1597,6 +1599,7 @@ export const HeadsConfigView: React.FC = () => {
                     <>
                       <option value="OWNER_EQUITY">Owner Equity & Capital</option>
                       <option value="RETAINED_EARNINGS">Retained Earnings</option>
+                      <option value="OWNER_DRAWINGS">Owner Drawings & Withdrawals (ADE Debit Nature)</option>
                     </>
                   )}
                   {coaForm.type === 'REVENUE' && (
