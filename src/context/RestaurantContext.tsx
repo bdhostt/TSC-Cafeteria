@@ -6657,9 +6657,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       const id = code || `ACC-${Date.now()}`;
       const systemRole = head.systemRole || getAccountSystemRole(head);
+      const nextList = [...currentList, { ...head, code, id, systemRole }].sort((a, b) =>
+        (a.code || '').localeCompare(b.code || '', undefined, { numeric: true, sensitivity: 'base' })
+      );
       return {
         ...prev,
-        chartOfAccounts: [...currentList, { ...head, code, id, systemRole }]
+        chartOfAccounts: nextList
       };
     });
   };
@@ -6685,7 +6688,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const merged = { ...h, ...updated };
         const systemRole = updated.systemRole !== undefined ? updated.systemRole : (merged.systemRole || getAccountSystemRole(merged));
         return { ...merged, systemRole };
-      });
+      }).sort((a, b) =>
+        (a.code || '').localeCompare(b.code || '', undefined, { numeric: true, sensitivity: 'base' })
+      );
 
       // Cascading updates for foreign-key-like references
       let updatedPaymentMethods = prev.paymentMethods;

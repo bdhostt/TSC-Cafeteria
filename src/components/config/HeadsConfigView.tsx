@@ -564,7 +564,9 @@ export const HeadsConfigView: React.FC = () => {
     }
   ];
 
-  const chartList = data.chartOfAccounts || [];
+  const chartList = [...(data.chartOfAccounts || [])].sort((a, b) => 
+    (a.code || '').localeCompare(b.code || '', undefined, { numeric: true, sensitivity: 'base' })
+  );
   const filteredAccounts = chartList.filter(acc => {
     const matchesType = coaFilter === 'ALL' || acc.type === coaFilter;
     const matchesSearch = !coaSearch || 

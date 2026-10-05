@@ -26,7 +26,9 @@ export const JournalEntryView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
-  const coa = data.chartOfAccounts || [];
+  const coa = [...(data.chartOfAccounts || [])].sort((a, b) =>
+    (a.code || '').localeCompare(b.code || '', undefined, { numeric: true, sensitivity: 'base' })
+  );
   const journalEntries = data.journalEntries || [];
 
   // Form State
