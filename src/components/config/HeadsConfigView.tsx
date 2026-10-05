@@ -99,6 +99,8 @@ export const HeadsConfigView: React.FC = () => {
       setActiveTab('printers');
     } else if (activeSubNav === 'templates') {
       setActiveTab('templates');
+    } else if (!activeSubNav) {
+      setActiveTab('profile');
     }
   }, [activeSubNav]);
 
@@ -570,112 +572,90 @@ export const HeadsConfigView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
-              <Settings className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                Master Configurations & Chart of Accounts
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Manage Floor Zones, Tables, Staff, Vendors, Categories, Expense Heads, and Financial Ledger Accounts with Add & Edit capability
-              </p>
+      {/* Top Header - Master Configurations & Hardware Setup (Hidden when viewing Payment Methods or Chart of Accounts) */}
+      {activeTab !== 'payments' && activeTab !== 'coa' && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
+                <Settings className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                  Master Configurations & Hardware Setup
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Manage Floor Zones, Tables, Staff, Vendors, Categories, Expense Heads, and Hardware Routing with Add & Edit capability
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* View Switcher Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
-          <button
-            type="button"
-            onClick={() => switchTab('profile')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'profile'
-                ? 'bg-[#004b9b] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>'Restaurant Profile & Logo'</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => switchTab('heads')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'heads'
-                ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>Master Heads (9 Modules)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => switchTab('coa')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'coa'
-                ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Chart of Accounts ({chartList.length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => switchTab('agents')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'agents'
-                ? 'bg-[#004b9b] text-white font-black shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Percent className="w-3.5 h-3.5" />
-            <span>Commission Agents / Delivery ({(data.commissionAgents || []).length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => switchTab('printers')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'printers'
-                ? 'bg-slate-900 text-amber-400 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Printers & Routing ({(data.printers || []).length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => switchTab('templates')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'templates'
-                ? 'bg-slate-900 text-amber-400 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Receipt className="w-3.5 h-3.5" />
-            <span>Bill & KOT Templates ({(data.printTemplates || []).length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => switchTab('payments')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'payments'
-                ? 'bg-slate-900 text-amber-400 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>Payment Methods ({(data.paymentMethods || DEFAULT_PAYMENT_METHODS).length})</span>
-          </button>
+          {/* View Switcher Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => switchTab('profile')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'profile'
+                  ? 'bg-[#004b9b] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>'Restaurant Profile & Logo'</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab('heads')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'heads'
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Master Heads (9 Modules)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab('agents')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'agents'
+                  ? 'bg-[#004b9b] text-white font-black shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Percent className="w-3.5 h-3.5" />
+              <span>Commission Agents / Delivery ({(data.commissionAgents || []).length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab('printers')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'printers'
+                  ? 'bg-slate-900 text-amber-400 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Printers & Routing ({(data.printers || []).length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab('templates')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'templates'
+                  ? 'bg-slate-900 text-amber-400 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Bill & KOT Templates ({(data.printTemplates || []).length})</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Restaurant Profile & Logo Tab */}
       {activeTab === 'profile' && (
@@ -1210,7 +1190,39 @@ export const HeadsConfigView: React.FC = () => {
 
       {/* Chart of Accounts Tab */}
       {activeTab === 'coa' && (
-        <div className="space-y-4">
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header & Main Actions */}
+          <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    {language === 'bn' ? 'চার্ট অব অ্যাকাউন্টস (COA)' : 'Chart of Accounts (COA)'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {language === 'bn'
+                      ? 'জেনারেল লেজার অ্যাকাউন্ট হেড, অ্যাসেট, লায়াবিলিটি, ইকুইটি, রাজস্ব ও খরচ হিসাব এবং লাইভ ব্যালেন্স'
+                      : 'Configure General Ledger accounts, assets, liabilities, equity, revenue, and expense heads with live balances'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenAddCoa}
+                className="px-4 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add New Account Head</span>
+              </button>
+            </div>
+          </div>
+
           {/* Summary Stat Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl shadow-xs">

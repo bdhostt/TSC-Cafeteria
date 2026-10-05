@@ -89,7 +89,7 @@ export const LauncherHomeView: React.FC<{ onOpenAiAssistant?: () => void }> = ({
     if (subNav) {
       navigateTo(tab, subNav, moduleId);
     } else {
-      setActiveTab(tab);
+      navigateTo(tab, '', moduleId);
       if (tab === 'pos') {
         setPosView('floor');
       }

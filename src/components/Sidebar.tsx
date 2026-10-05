@@ -541,7 +541,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
     if (item.subNav) {
       navigateTo(item.tabId, item.subNav);
     } else {
-      setActiveTab(item.tabId);
+      navigateTo(item.tabId, '');
       if (item.tabId === 'pos') {
         setPosView('floor');
       }
@@ -595,7 +595,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
           <button
             onClick={() => {
               if (canAccessTab('heads')) {
-                setActiveTab('heads');
+                navigateTo('heads', 'profile');
                 onCloseMobile();
               }
             }}
