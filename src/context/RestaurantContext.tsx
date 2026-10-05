@@ -22,6 +22,7 @@ import {
   DiscountType,
   AccountHead,
   AccountType,
+  AccountSystemRole,
   CustomerAdvance,
   AppUser,
   UserRole,
@@ -238,35 +239,130 @@ export const DEFAULT_USERS: AppUser[] = [
 
 export const DEFAULT_CHART_OF_ACCOUNTS: AccountHead[] = [
   // ASSETS (1000)
-  { id: '1010', code: '1010', name: 'Cash in Hand (POS Drawer)', type: 'ASSET', category: 'Current Assets', balance: 0 },
-  { id: '1020', code: '1020', name: 'Petty Cash Fund', type: 'ASSET', category: 'Current Assets', balance: 0 },
-  { id: '1030', code: '1030', name: 'Bank - City Bank A/C', type: 'ASSET', category: 'Bank Accounts', balance: 0 },
-  { id: '1040', code: '1040', name: 'bKash / Nagad Merchant A/C', type: 'ASSET', category: 'Mobile Banking', balance: 0 },
-  { id: '1050', code: '1050', name: 'Accounts Receivable (Customer Dues)', type: 'ASSET', category: 'Receivables', balance: 0 },
-  { id: '1060', code: '1060', name: 'Food & Beverage Inventory Asset', type: 'ASSET', category: 'Inventory Asset', balance: 0 },
+  { id: '1010', code: '1010', name: 'Cash in Hand (POS Drawer)', type: 'ASSET', category: 'Current Assets', systemRole: 'CASH', balance: 0 },
+  { id: '1020', code: '1020', name: 'Petty Cash Fund', type: 'ASSET', category: 'Current Assets', systemRole: 'PETTY_CASH', balance: 0 },
+  { id: '1030', code: '1030', name: 'Bank - City Bank A/C', type: 'ASSET', category: 'Bank Accounts', systemRole: 'BANK', balance: 0 },
+  { id: '1040', code: '1040', name: 'bKash / Nagad Merchant A/C', type: 'ASSET', category: 'Mobile Banking', systemRole: 'MOBILE_BANKING', balance: 0 },
+  { id: '1050', code: '1050', name: 'Accounts Receivable (Customer Dues)', type: 'ASSET', category: 'Receivables', systemRole: 'ACCOUNTS_RECEIVABLE', balance: 0 },
+  { id: '1060', code: '1060', name: 'Food & Beverage Inventory Asset', type: 'ASSET', category: 'Inventory Asset', systemRole: 'INVENTORY_ASSET', balance: 0 },
   
   // LIABILITIES (2000)
-  { id: '2010', code: '2010', name: 'Accounts Payable (Vendor Dues)', type: 'LIABILITY', category: 'Current Liabilities', balance: 0 },
-  { id: '2020', code: '2020', name: 'Customer Advance Deposits', type: 'LIABILITY', category: 'Advance Liabilities', balance: 0 },
-  { id: '2030', code: '2030', name: 'VAT & Tax Payable', type: 'LIABILITY', category: 'Statutory Liabilities', balance: 0 },
+  { id: '2010', code: '2010', name: 'Accounts Payable (Vendor Dues)', type: 'LIABILITY', category: 'Current Liabilities', systemRole: 'ACCOUNTS_PAYABLE', balance: 0 },
+  { id: '2020', code: '2020', name: 'Customer Advance Deposits', type: 'LIABILITY', category: 'Advance Liabilities', systemRole: 'CUSTOMER_ADVANCE', balance: 0 },
+  { id: '2030', code: '2030', name: 'VAT & Tax Payable', type: 'LIABILITY', category: 'Statutory Liabilities', systemRole: 'TAX_PAYABLE', balance: 0 },
 
   // EQUITY (3000)
-  { id: '3010', code: '3010', name: 'Owner Equity & Capital', type: 'EQUITY', category: 'Owner Equity', balance: 0 },
-  { id: '3020', code: '3020', name: 'Retained Earnings', type: 'EQUITY', category: 'Owner Equity', balance: 0 },
+  { id: '3010', code: '3010', name: 'Owner Equity & Capital', type: 'EQUITY', category: 'Owner Equity', systemRole: 'OWNER_EQUITY', balance: 0 },
+  { id: '3020', code: '3020', name: 'Retained Earnings', type: 'EQUITY', category: 'Owner Equity', systemRole: 'RETAINED_EARNINGS', balance: 0 },
 
   // REVENUE (4000)
-  { id: '4010', code: '4010', name: 'Dine-in Restaurant Sales', type: 'REVENUE', category: 'Food Sales Revenue', balance: 0 },
-  { id: '4020', code: '4020', name: 'Takeaway & Delivery Sales', type: 'REVENUE', category: 'Food Sales Revenue', balance: 0 },
-  { id: '4030', code: '4030', name: 'Beverage & Bar Counter Sales', type: 'REVENUE', category: 'Beverage Revenue', balance: 0 },
+  { id: '4010', code: '4010', name: 'Dine-in Restaurant Sales', type: 'REVENUE', category: 'Food Sales Revenue', systemRole: 'DINE_IN_REVENUE', balance: 0 },
+  { id: '4020', code: '4020', name: 'Takeaway & Delivery Sales', type: 'REVENUE', category: 'Food Sales Revenue', systemRole: 'DELIVERY_REVENUE', balance: 0 },
+  { id: '4030', code: '4030', name: 'Beverage & Bar Counter Sales', type: 'REVENUE', category: 'Beverage Revenue', systemRole: 'BEVERAGE_REVENUE', balance: 0 },
 
   // EXPENSES (5000 & 6000)
-  { id: '5010', code: '5010', name: 'COGS - Raw Meat & Poultry', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 0 },
-  { id: '5020', code: '5020', name: 'COGS - Grocery, Rice & Oil', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', balance: 0 },
-  { id: '6010', code: '6010', name: 'Kitchen Staff Salaries', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
-  { id: '6020', code: '6020', name: 'Floor Rent & Utilities', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
-  { id: '6030', code: '6030', name: 'Electricity & Gas Bill', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 },
-  { id: '6040', code: '6040', name: 'Cleaning & Consumables', type: 'EXPENSE', category: 'Operating Expenses', balance: 0 }
+  { id: '5010', code: '5010', name: 'COGS - Raw Meat & Poultry', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', systemRole: 'COGS', balance: 0 },
+  { id: '5020', code: '5020', name: 'COGS - Grocery, Rice & Oil', type: 'EXPENSE', category: 'Cost of Goods Sold (BOM)', systemRole: 'COGS', balance: 0 },
+  { id: '6010', code: '6010', name: 'Kitchen Staff Salaries', type: 'EXPENSE', category: 'Operating Expenses', systemRole: 'OPERATING_EXPENSE', balance: 0 },
+  { id: '6020', code: '6020', name: 'Floor Rent & Utilities', type: 'EXPENSE', category: 'Operating Expenses', systemRole: 'OPERATING_EXPENSE', balance: 0 },
+  { id: '6030', code: '6030', name: 'Electricity & Gas Bill', type: 'EXPENSE', category: 'Operating Expenses', systemRole: 'OPERATING_EXPENSE', balance: 0 },
+  { id: '6040', code: '6040', name: 'Cleaning & Consumables', type: 'EXPENSE', category: 'Operating Expenses', systemRole: 'OPERATING_EXPENSE', balance: 0 }
 ];
+
+export function getAccountSystemRole(acc: Partial<AccountHead> & { name?: string; code?: string; type?: AccountType; category?: string }): AccountSystemRole {
+  if (acc.systemRole) return acc.systemRole;
+
+  const normName = (acc.name || '').toLowerCase().trim();
+  const normCat = (acc.category || '').toLowerCase().trim();
+  const code = (acc.code || '').trim();
+
+  // 1. Statutory / Tax Liabilities (VAT, TAX, SD)
+  if (normName.includes('vat') || normName.includes('tax') || normCat.includes('statutory') || normCat.includes('tax') || normCat.includes('vat')) {
+    return 'TAX_PAYABLE';
+  }
+
+  // 2. Customer Advance Deposits
+  if (normCat.includes('advance') || normName.includes('customer advance') || normName.includes('advance deposit') || normName.includes('advance liability')) {
+    return 'CUSTOMER_ADVANCE';
+  }
+
+  // 3. Accounts Payable (Trade / Vendor Dues)
+  if (code === '2010' || normName.includes('accounts payable') || normName.includes('vendor due') || normName.includes('vendor payable') || normName.includes('trade payable') || normName.includes('supplier payable') || normName.includes('creditor')) {
+    return 'ACCOUNTS_PAYABLE';
+  }
+
+  // 4. Inventory Asset
+  if (code === '1060' || normCat.includes('inventory') || normName.includes('inventory asset') || normName.includes('raw material inventory') || normName.includes('stock asset')) {
+    return 'INVENTORY_ASSET';
+  }
+
+  // 5. Cash & Bank & MFS Assets
+  if (code === '1010' || normName.includes('cash in hand') || normName.includes('pos drawer') || normName.includes('cash drawer')) {
+    return 'CASH';
+  }
+  if (code === '1020' || normName.includes('petty cash')) {
+    return 'PETTY_CASH';
+  }
+  if (code === '1030' || normCat.includes('bank account') || (normName.includes('bank') && !normName.includes('bkash') && !normName.includes('nagad') && !normCat.includes('mobile'))) {
+    return 'BANK';
+  }
+  if (code === '1040' || normCat.includes('mobile banking') || normName.includes('bkash') || normName.includes('nagad') || normName.includes('mfs')) {
+    return 'MOBILE_BANKING';
+  }
+  if (code === '1050' || normCat.includes('receivable') || normName.includes('receivable') || normName.includes('customer due')) {
+    return 'ACCOUNTS_RECEIVABLE';
+  }
+
+  // 6. Equity
+  if (code === '3010' || normName.includes('owner equity') || normName.includes('owner capital') || normName.includes('capital')) {
+    return 'OWNER_EQUITY';
+  }
+  if (code === '3020' || normName.includes('retained earnings')) {
+    return 'RETAINED_EARNINGS';
+  }
+
+  // 7. Revenue
+  if (acc.type === 'REVENUE') {
+    if (code === '4010' || normName.includes('dine-in') || normName.includes('restaurant sales')) {
+      return 'DINE_IN_REVENUE';
+    }
+    if (code === '4020' || normName.includes('takeaway') || normName.includes('delivery')) {
+      return 'DELIVERY_REVENUE';
+    }
+    if (code === '4030' || normName.includes('beverage') || normName.includes('bar counter') || normName.includes('coffee')) {
+      return 'BEVERAGE_REVENUE';
+    }
+    return 'OPERATING_REVENUE';
+  }
+
+  // 8. Expenses
+  if (acc.type === 'EXPENSE') {
+    const isCogs = (code && code.startsWith('50')) ||
+      normCat.includes('cost of goods') ||
+      normCat.includes('bom') ||
+      normName.includes('cogs') ||
+      normName.includes('manual') ||
+      normName.includes('wastage') ||
+      normName.includes('spoilage');
+    if (isCogs) {
+      return 'COGS';
+    }
+    return 'OPERATING_EXPENSE';
+  }
+
+  // Fallbacks by code if user used default numbering
+  if (code === '2020') return 'CUSTOMER_ADVANCE';
+  if (code === '2030') return 'TAX_PAYABLE';
+
+  return 'STANDARD';
+}
+
+export function ensureAccountSystemRoles(accounts: AccountHead[]): AccountHead[] {
+  return (accounts || []).map(a => ({
+    ...a,
+    systemRole: a.systemRole || getAccountSystemRole(a)
+  }));
+}
 
 const DEFAULT_CUSTOMER_ADVANCES: CustomerAdvance[] = [
   {
@@ -1915,9 +2011,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             return inv;
           });
         }
+        const mergedCoa = parsed.chartOfAccounts 
+          ? ensureAccountSystemRoles(parsed.chartOfAccounts)
+          : DEFAULT_CHART_OF_ACCOUNTS;
         return { 
           ...DEFAULT_DATA, 
           ...parsed,
+          chartOfAccounts: mergedCoa,
           inventory: sanitizedInventory,
           businessDay,
           tables: mergedTables,
@@ -2240,6 +2340,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               : DEFAULT_PRINT_TEMPLATES;
           } else if (Date.now() - lastLocalEditTimeRef.current < 20000 && dataRef.current.printTemplates && dataRef.current.printTemplates.length > 0) {
             result.data.printTemplates = dataRef.current.printTemplates;
+          }
+          if (result.data.chartOfAccounts) {
+            result.data.chartOfAccounts = ensureAccountSystemRoles(result.data.chartOfAccounts);
           }
         }
         const serverStateStr = JSON.stringify(result.data);
@@ -6540,9 +6643,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return prev;
       }
       const id = code || `ACC-${Date.now()}`;
+      const systemRole = head.systemRole || getAccountSystemRole(head);
       return {
         ...prev,
-        chartOfAccounts: [...currentList, { ...head, code, id }]
+        chartOfAccounts: [...currentList, { ...head, code, id, systemRole }]
       };
     });
   };
@@ -6561,7 +6665,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       return {
         ...prev,
-        chartOfAccounts: currentList.map(h => h.id === id ? { ...h, ...updated } : h)
+        chartOfAccounts: currentList.map(h => {
+          if (h.id !== id) return h;
+          const merged = { ...h, ...updated };
+          const systemRole = updated.systemRole !== undefined ? updated.systemRole : (merged.systemRole || getAccountSystemRole(merged));
+          return { ...merged, systemRole };
+        })
       };
     });
   };
@@ -6594,110 +6703,95 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return sum + delta;
     }, 0);
 
+    const role = acc.systemRole || getAccountSystemRole(acc);
     const normName = (acc.name || '').toLowerCase();
-    const normCat = (acc.category || '').toLowerCase();
 
-    // 1. Raw Material Inventory Asset (matches category or name or code 1060)
-    const isInventoryAsset = normCat.includes('inventory') || normName.includes('inventory') || normName.includes('stock asset') || normName.includes('raw material inventory') || code === '1060';
-    if (isInventoryAsset && acc.type === 'ASSET') {
-      return opening + totalClosingStockVal + journalEffect;
-    }
+    switch (role) {
+      case 'INVENTORY_ASSET':
+        return opening + totalClosingStockVal + journalEffect;
 
-    // 2. Cash Drawer
-    if (code === '1010' || normName.includes('cash in hand') || normName.includes('drawer') || normName.includes('pos cash')) {
-      return cashDrawerBalance + journalEffect;
-    }
+      case 'CASH':
+        return cashDrawerBalance + journalEffect;
 
-    // 3. Petty Cash Fund
-    if (code === '1020' || normName.includes('petty cash')) {
-      return pettyCashBalance + journalEffect;
-    }
+      case 'PETTY_CASH':
+        return pettyCashBalance + journalEffect;
 
-    // 4. Bank A/C
-    if ((code === '1030' && !isInventoryAsset) || (acc.type === 'ASSET' && (normCat.includes('bank') || normName.includes('bank a/c')) && !normCat.includes('mobile') && !normName.includes('bkash') && !normName.includes('nagad'))) {
-      return bankTransferBalance + journalEffect;
-    }
+      case 'BANK':
+        return bankTransferBalance + journalEffect;
 
-    // 5. Mobile Banking / MFS (bKash / Nagad)
-    if (normCat.includes('mobile banking') || normName.includes('bkash') || normName.includes('nagad') || normName.includes('mfs') || (code === '1040' && !isInventoryAsset)) {
-      return bkashMerchantBalance + nagadMerchantBalance + journalEffect;
-    }
+      case 'MOBILE_BANKING':
+        return bkashMerchantBalance + nagadMerchantBalance + journalEffect;
 
-    // 6. Receivables (Customer Dues)
-    if (code === '1050' || normCat.includes('receivable') || normName.includes('receivable') || normName.includes('customer due')) {
-      return totalCustomerDue + journalEffect;
-    }
+      case 'ACCOUNTS_RECEIVABLE':
+        return totalCustomerDue + journalEffect;
 
-    // 7. Liabilities: Accounts Payable (Vendor Dues)
-    if (code === '2010' || normCat.includes('payable') || normName.includes('payable') || normName.includes('vendor due')) {
-      return totalVendorDue + journalEffect;
-    }
+      case 'ACCOUNTS_PAYABLE':
+        return totalVendorDue + journalEffect;
 
-    // 8. Liabilities: Customer Advance Deposits
-    if (code === '2020' || code === '2050' || normCat.includes('advance') || normName.includes('customer advance') || normName.includes('deposit')) {
-      return totalCustomerAdvances + journalEffect;
-    }
+      case 'CUSTOMER_ADVANCE':
+        return totalCustomerAdvances + journalEffect;
 
-    // 9. Statutory / Tax Liabilities
-    if (code === '2030' || normName.includes('vat') || normName.includes('tax')) {
-      return opening + journalEffect;
-    }
+      case 'TAX_PAYABLE':
+        return opening + journalEffect;
 
-    // 10. Equity: Retained Earnings
-    if (code === '3020' || normName.includes('retained earnings')) {
-      return opening + estimatedProfit + journalEffect;
-    }
+      case 'RETAINED_EARNINGS':
+        return opening + estimatedProfit + journalEffect;
 
-    // 11. Equity: Owner Equity & Capital
-    if (code === '3010' || normName.includes('capital') || normName.includes('owner equity')) {
-      return opening + journalEffect;
-    }
+      case 'OWNER_EQUITY':
+        return opening + journalEffect;
 
-    // 12. Revenue Accounts
-    if (code === '4010' || (acc.type === 'REVENUE' && (normName.includes('dine-in') || normName.includes('restaurant sales')))) {
-      const dineInSales = activeSalesList.filter(s => !s.channelOrAgent || s.channelOrAgent === 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
-      return opening + (dineInSales > 0 ? dineInSales : totalSales) + journalEffect;
-    }
-    if (code === '4020' || (acc.type === 'REVENUE' && (normName.includes('takeaway') || normName.includes('delivery')))) {
-      const deliverySales = activeSalesList.filter(s => s.channelOrAgent && s.channelOrAgent !== 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
-      return opening + deliverySales + journalEffect;
-    }
-    if (code === '4030' || (acc.type === 'REVENUE' && (normName.includes('beverage') || normName.includes('bar counter')))) {
-      const bevSales = activeSalesList.filter(s => 
-        (s.items || []).some(i => (i.department || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('coffee'))
-      ).reduce((sum, s) => sum + (s.total || 0), 0);
-      return opening + bevSales + journalEffect;
-    }
+      case 'DINE_IN_REVENUE': {
+        const dineInSales = activeSalesList.filter(s => !s.channelOrAgent || s.channelOrAgent === 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
+        return opening + (dineInSales > 0 ? dineInSales : totalSales) + journalEffect;
+      }
 
-    // 13. Expense Accounts
-    if (acc.type === 'EXPENSE') {
-      const isCogs = (code && code.startsWith('50')) || 
-        normCat.includes('cost of goods') || 
-        normCat.includes('bom') ||
-        normName.includes('cogs') ||
-        normName.includes('manual') ||
-        normName.includes('wastage') ||
-        normName.includes('spoilage');
+      case 'DELIVERY_REVENUE': {
+        const deliverySales = activeSalesList.filter(s => s.channelOrAgent && s.channelOrAgent !== 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
+        return opening + deliverySales + journalEffect;
+      }
 
-      if (isCogs) {
-        // Dynamic BOM & raw consumption cost matching per category & head (includes Recipe BOM, manual kitchen usage, and wastage)
+      case 'BEVERAGE_REVENUE': {
+        const bevSales = activeSalesList.filter(s => 
+          (s.items || []).some(i => (i.department || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('coffee'))
+        ).reduce((sum, s) => sum + (s.total || 0), 0);
+        return opening + bevSales + journalEffect;
+      }
+
+      case 'COGS': {
+        if (acc.code === '6050' || normName.includes('manual')) {
+          return opening + totalManualUsedCostVal + journalEffect;
+        }
+        if (normName.includes('wastage') || normName.includes('spoilage')) {
+          return opening + totalWastageCostVal + journalEffect;
+        }
         const cogsAmt = bomCostPerAccount[acc.code] ?? bomCostPerAccount[acc.id] ?? 0;
         return opening + cogsAmt + journalEffect;
       }
 
-      // Operating Expenses Matching - Deterministic 1-to-1 unique allocation (No double counting)
-      const chartAccounts = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
-      const headExpenses = (data.expenses || []).filter(e => {
-        const matched = resolveExpenseAccount(e, chartAccounts);
-        return matched && (matched.id === acc.id || matched.code === acc.code);
-      }).reduce((sum, e) => sum + (e.amount || 0), 0);
+      case 'OPERATING_EXPENSE': {
+        const chartAccounts = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+        const headExpenses = (data.expenses || []).filter(e => {
+          const matched = resolveExpenseAccount(e, chartAccounts);
+          return matched && (matched.id === acc.id || matched.code === acc.code);
+        }).reduce((sum, e) => sum + (e.amount || 0), 0);
+        return opening + headExpenses + journalEffect;
+      }
 
-      return opening + headExpenses + journalEffect;
+      case 'STANDARD':
+      default:
+        if (acc.type === 'REVENUE') {
+          return opening + totalSales + journalEffect;
+        }
+        if (acc.type === 'EXPENSE') {
+          const chartAccounts = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+          const headExpenses = (data.expenses || []).filter(e => {
+            const matched = resolveExpenseAccount(e, chartAccounts);
+            return matched && (matched.id === acc.id || matched.code === acc.code);
+          }).reduce((sum, e) => sum + (e.amount || 0), 0);
+          return opening + headExpenses + journalEffect;
+        }
+        return opening + journalEffect;
     }
-    if (acc.type === 'REVENUE') {
-      return opening + totalSales + journalEffect;
-    }
-    return opening + journalEffect;
   };
 
   const getMethodCollection = (methodOrId: PaymentMethodConfig | string): number => {

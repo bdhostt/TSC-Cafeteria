@@ -515,12 +515,32 @@ export interface StockInventoryRecord {
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
+export type AccountSystemRole =
+  | 'CASH'                // Cash Drawer (1010)
+  | 'PETTY_CASH'          // Petty Cash Fund (1020)
+  | 'BANK'                // Bank Accounts (1030)
+  | 'MOBILE_BANKING'      // Mobile Wallets (bKash/Nagad) (1040)
+  | 'ACCOUNTS_RECEIVABLE' // Customer Dues (1050)
+  | 'INVENTORY_ASSET'     // Raw Material / Stock Inventory (1060)
+  | 'ACCOUNTS_PAYABLE'    // Vendor / Supplier Dues (2010)
+  | 'CUSTOMER_ADVANCE'    // Customer Advance Deposits (2030 or 2020)
+  | 'TAX_PAYABLE'         // VAT, Tax, SD, Statutory Liabilities (2020 or 2030)
+  | 'OWNER_EQUITY'        // Owner's Capital (3010)
+  | 'RETAINED_EARNINGS'   // Retained Earnings (3020)
+  | 'DINE_IN_REVENUE'     // Dine-in Sales Revenue (4010)
+  | 'DELIVERY_REVENUE'    // Takeaway & Delivery Revenue (4020)
+  | 'BEVERAGE_REVENUE'    // Beverage & Bar Counter Sales (4030)
+  | 'COGS'                // Cost of Goods Sold (5010, 5020...)
+  | 'OPERATING_EXPENSE'   // Operating Expenses (6010, 6020...)
+  | 'STANDARD';           // General ledger / unclassified (strictly opening + journals)
+
 export interface AccountHead {
   id: string;
   code: string;
   name: string;
   type: AccountType;
   category: string;
+  systemRole?: AccountSystemRole;
   balance?: number;
 }
 

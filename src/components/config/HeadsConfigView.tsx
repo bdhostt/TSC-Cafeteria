@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useRestaurant, DEFAULT_PAYMENT_METHODS, getNextAccountCode, resolveExpenseAccount, CANONICAL_EXPENSE_HEAD_MAP } from '../../context/RestaurantContext';
-import { AccountHead, AccountType, RestaurantProfile, CommissionAgent } from '../../types';
+import { useRestaurant, DEFAULT_PAYMENT_METHODS, getNextAccountCode, resolveExpenseAccount, CANONICAL_EXPENSE_HEAD_MAP, getAccountSystemRole } from '../../context/RestaurantContext';
+import { AccountHead, AccountType, AccountSystemRole, RestaurantProfile, CommissionAgent } from '../../types';
 import { PrintersConfigView } from './PrintersConfigView';
 import { PrintTemplatesConfigView } from './PrintTemplatesConfigView';
 import { PaymentMethodsConfigView } from './PaymentMethodsConfigView';
@@ -213,12 +213,14 @@ export const HeadsConfigView: React.FC = () => {
     name: string;
     type: AccountType;
     category: string;
+    systemRole: AccountSystemRole;
     balance: number;
   }>({
     code: '',
     name: '',
     type: 'EXPENSE',
     category: 'Operating Expenses',
+    systemRole: 'OPERATING_EXPENSE',
     balance: 0
   });
 
@@ -318,6 +320,7 @@ export const HeadsConfigView: React.FC = () => {
   };
 
   // COA modal handlers
+
   const handleOpenAddCoa = () => {
     setEditingAccount(null);
     const autoCode = getNextAccountCode('EXPENSE', chartList, 'Operating Expenses');
@@ -326,6 +329,7 @@ export const HeadsConfigView: React.FC = () => {
       name: '',
       type: 'EXPENSE',
       category: 'Operating Expenses',
+      systemRole: 'OPERATING_EXPENSE',
       balance: 0
     });
     setIsCoaModalOpen(true);
@@ -338,6 +342,7 @@ export const HeadsConfigView: React.FC = () => {
       name: acc.name,
       type: acc.type,
       category: acc.category,
+      systemRole: acc.systemRole || getAccountSystemRole(acc),
       balance: acc.balance || 0
     });
     setIsCoaModalOpen(true);
@@ -350,11 +355,18 @@ export const HeadsConfigView: React.FC = () => {
       newType === 'EQUITY' ? 'Owner Equity' :
       newType === 'REVENUE' ? 'Food Sales Revenue' : 'Operating Expenses';
     const autoCode = getNextAccountCode(newType, chartList, defaultCat);
+    const defaultRole: AccountSystemRole = 
+      newType === 'ASSET' ? 'STANDARD' :
+      newType === 'LIABILITY' ? 'STANDARD' :
+      newType === 'EQUITY' ? 'OWNER_EQUITY' :
+      newType === 'REVENUE' ? 'DINE_IN_REVENUE' : 'OPERATING_EXPENSE';
+
     setCoaForm(prev => ({
       ...prev,
       type: newType,
       category: defaultCat,
-      code: autoCode
+      code: autoCode,
+      systemRole: defaultRole
     }));
   };
 
@@ -382,6 +394,7 @@ export const HeadsConfigView: React.FC = () => {
         name: trimmedName,
         type: coaForm.type,
         category: coaForm.category.trim(),
+        systemRole: coaForm.systemRole,
         balance: Number(coaForm.balance) || 0
       });
     } else {
@@ -390,6 +403,7 @@ export const HeadsConfigView: React.FC = () => {
         name: trimmedName,
         type: coaForm.type,
         category: coaForm.category.trim(),
+        systemRole: coaForm.systemRole,
         balance: Number(coaForm.balance) || 0
       });
     }
@@ -722,7 +736,7 @@ export const HeadsConfigView: React.FC = () => {
                     <h4 className="font-extrabold text-white text-base tracking-tight">{profileForm.name || 'Restaurant Name'}</h4>
                     <p className="text-xs text-amber-400 font-medium">{profileForm.tagline || 'Tagline'}</p>
                     <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold border border-slate-700">
-                      {profileForm.logoUrl ? 'Custom Image Logo Active' : `Preset: ${profileForm.presetIcon.toUpperCase()}`}
+                      {profileForm.logoUrl ? 'Custom Image Logo Active' : `Preset: ${(profileForm.presetIcon || 'flame').toUpperCase()}`}
                     </span>
                   </div>
                 </div>
@@ -1339,7 +1353,19 @@ export const HeadsConfigView: React.FC = () => {
                             {acc.code}
                           </td>
                           <td className="py-3 px-4 font-bold text-slate-900">
-                            {acc.name}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{acc.name}</span>
+                              {(() => {
+                                const role = acc.systemRole || getAccountSystemRole(acc);
+                                if (role === 'TAX_PAYABLE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">VAT / Tax</span>;
+                                if (role === 'ACCOUNTS_PAYABLE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Vendor Dues</span>;
+                                if (role === 'CUSTOMER_ADVANCE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Customer Advance</span>;
+                                if (role === 'ACCOUNTS_RECEIVABLE') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Customer Dues</span>;
+                                if (role === 'INVENTORY_ASSET') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">Inventory</span>;
+                                if (role === 'CASH') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Cash Drawer</span>;
+                                return null;
+                              })()}
+                            </div>
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             {getAccountTypeBadge(acc.type)}
@@ -1505,6 +1531,58 @@ export const HeadsConfigView: React.FC = () => {
                     className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  System Role (ERP Ledger Linkage)
+                </label>
+                <select
+                  value={coaForm.systemRole}
+                  onChange={e => setCoaForm(prev => ({ ...prev, systemRole: e.target.value as AccountSystemRole }))}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                >
+                  <option value="STANDARD">Standard General Ledger (Strictly Journals & Opening)</option>
+                  {coaForm.type === 'LIABILITY' && (
+                    <>
+                      <option value="ACCOUNTS_PAYABLE">Accounts Payable (Vendor / Supplier Dues)</option>
+                      <option value="TAX_PAYABLE">VAT & Tax Payable (Statutory Liabilities)</option>
+                      <option value="CUSTOMER_ADVANCE">Customer Advance Deposits</option>
+                    </>
+                  )}
+                  {coaForm.type === 'ASSET' && (
+                    <>
+                      <option value="CASH">Cash in Hand (POS Drawer)</option>
+                      <option value="PETTY_CASH">Petty Cash Fund</option>
+                      <option value="BANK">Bank Account</option>
+                      <option value="MOBILE_BANKING">Mobile Banking (bKash / Nagad)</option>
+                      <option value="ACCOUNTS_RECEIVABLE">Accounts Receivable (Customer Dues)</option>
+                      <option value="INVENTORY_ASSET">Food & Beverage Inventory Asset</option>
+                    </>
+                  )}
+                  {coaForm.type === 'EQUITY' && (
+                    <>
+                      <option value="OWNER_EQUITY">Owner Equity & Capital</option>
+                      <option value="RETAINED_EARNINGS">Retained Earnings</option>
+                    </>
+                  )}
+                  {coaForm.type === 'REVENUE' && (
+                    <>
+                      <option value="DINE_IN_REVENUE">Dine-in Sales Revenue</option>
+                      <option value="DELIVERY_REVENUE">Takeaway & Delivery Sales</option>
+                      <option value="BEVERAGE_REVENUE">Beverage & Bar Counter Sales</option>
+                    </>
+                  )}
+                  {coaForm.type === 'EXPENSE' && (
+                    <>
+                      <option value="COGS">Cost of Goods Sold (Recipe BOM / COGS)</option>
+                      <option value="OPERATING_EXPENSE">Operating Expense</option>
+                    </>
+                  )}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Determines the automated live accounting logic without relying on fragile name matching.
+                </p>
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useRestaurant } from '../../context/RestaurantContext';
+import { useRestaurant, getAccountSystemRole } from '../../context/RestaurantContext';
 import { ReportFilters, DatePreset, exportCsvHelper } from './ReportFilters';
 import { 
   Users, 
@@ -411,7 +411,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
           });
         }
       });
-    } else if (activeHead.id === '1050') {
+    } else if (activeHead.id === '1050' || (activeHead.systemRole || getAccountSystemRole(activeHead)) === 'ACCOUNTS_RECEIVABLE') {
       // Accounts Receivable
       data.sales.forEach(s => {
         if (!matchesDate(s.date)) return;
@@ -438,7 +438,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
           });
         }
       });
-    } else if (activeHead.id === '2010') {
+    } else if (activeHead.id === '2010' || (activeHead.systemRole || getAccountSystemRole(activeHead)) === 'ACCOUNTS_PAYABLE') {
       // Accounts Payable
       data.purchases.forEach(p => {
         if (p.status === 'DRAFT') return;

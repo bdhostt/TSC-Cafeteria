@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useRestaurant, isSaleActive, resolveExpenseAccount, DEFAULT_CHART_OF_ACCOUNTS, computeCogsBomAllocation } from '../../context/RestaurantContext';
+import { useRestaurant, isSaleActive, resolveExpenseAccount, DEFAULT_CHART_OF_ACCOUNTS, computeCogsBomAllocation, getAccountSystemRole } from '../../context/RestaurantContext';
+import { AccountSystemRole } from '../../types';
 import { ReportFilters, DatePreset, exportCsvHelper } from './ReportFilters';
 import { 
   Scale, 
@@ -46,26 +47,20 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
     // Sort accounts numerically by code (1010, 1020, 1030, etc.)
     coaList.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
 
-    // Fast lookup helpers for standard account heads
+    // Fast lookup helpers for standard account heads via System Roles
     const getAccountByCode = (code: string) => coaList.find(a => a.code === code || a.id === code);
-    const getAccountByKeyword = (type: string, keywords: string[]) => {
-      return coaList.find(a => {
-        if (a.type !== type) return false;
-        const norm = (a.name + ' ' + (a.category || '')).toLowerCase();
-        return keywords.some(k => norm.includes(k.toLowerCase()));
-      });
-    };
+    const getAccountByRole = (role: AccountSystemRole) => coaList.find(a => (a.systemRole || getAccountSystemRole(a)) === role);
 
-    const cashAcc = getAccountByKeyword('ASSET', ['cash in hand', 'drawer', 'cash']) || getAccountByCode('1010') || coaList.find(a => a.type === 'ASSET');
-    const pettyCashAcc = getAccountByKeyword('ASSET', ['petty cash', 'petty']) || getAccountByCode('1020') || cashAcc;
-    const bankAcc = getAccountByKeyword('ASSET', ['bank a/c', 'bank', 'city bank']) || getAccountByCode('1030') || cashAcc;
-    const mfsAcc = getAccountByKeyword('ASSET', ['bkash', 'nagad', 'mobile banking', 'mfs']) || getAccountByCode('1040') || bankAcc;
-    const arAcc = getAccountByKeyword('ASSET', ['receivable', 'customer due', 'due']) || getAccountByCode('1050') || coaList.find(a => a.type === 'ASSET');
-    const invAcc = getAccountByKeyword('ASSET', ['inventory', 'raw material inventory', 'stock']) || getAccountByCode('1060') || coaList.find(a => a.type === 'ASSET');
-    const apAcc = getAccountByKeyword('LIABILITY', ['payable', 'vendor', 'creditor']) || getAccountByCode('2010') || coaList.find(a => a.type === 'LIABILITY');
-    const advanceAcc = getAccountByKeyword('LIABILITY', ['advance', 'customer advance', 'deposit']) || getAccountByCode('2020') || getAccountByCode('2050') || coaList.find(a => a.type === 'LIABILITY');
-    const dineInRevAcc = getAccountByCode('4010') || getAccountByKeyword('REVENUE', ['dine-in', 'sales', 'revenue']) || coaList.find(a => a.type === 'REVENUE');
-    const deliveryRevAcc = getAccountByCode('4020') || getAccountByKeyword('REVENUE', ['delivery', 'takeaway']) || dineInRevAcc;
+    const cashAcc = getAccountByRole('CASH') || getAccountByCode('1010') || coaList.find(a => a.type === 'ASSET');
+    const pettyCashAcc = getAccountByRole('PETTY_CASH') || getAccountByCode('1020') || cashAcc;
+    const bankAcc = getAccountByRole('BANK') || getAccountByCode('1030') || cashAcc;
+    const mfsAcc = getAccountByRole('MOBILE_BANKING') || getAccountByCode('1040') || bankAcc;
+    const arAcc = getAccountByRole('ACCOUNTS_RECEIVABLE') || getAccountByCode('1050') || coaList.find(a => a.type === 'ASSET');
+    const invAcc = getAccountByRole('INVENTORY_ASSET') || getAccountByCode('1060') || coaList.find(a => a.type === 'ASSET');
+    const apAcc = getAccountByRole('ACCOUNTS_PAYABLE') || getAccountByCode('2010') || coaList.find(a => a.type === 'LIABILITY');
+    const advanceAcc = getAccountByRole('CUSTOMER_ADVANCE') || getAccountByCode('2020') || getAccountByCode('2030') || coaList.find(a => a.type === 'LIABILITY');
+    const dineInRevAcc = getAccountByRole('DINE_IN_REVENUE') || getAccountByCode('4010') || coaList.find(a => a.type === 'REVENUE');
+    const deliveryRevAcc = getAccountByRole('DELIVERY_REVENUE') || getAccountByCode('4020') || dineInRevAcc;
 
     // Movement tracking for each account code
     const movements: Record<string, { priorDr: number; priorCr: number; periodDr: number; periodCr: number }> = {};
