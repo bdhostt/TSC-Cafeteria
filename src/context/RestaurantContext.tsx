@@ -282,8 +282,8 @@ export function getAccountSystemRole(acc: Partial<AccountHead> & { name?: string
     return 'TAX_PAYABLE';
   }
 
-  // 2. Customer Advance Deposits
-  if (normCat.includes('advance') || normName.includes('customer advance') || normName.includes('advance deposit') || normName.includes('advance liability')) {
+  // 2. Customer Advance Deposits (Strictly Liability)
+  if ((acc.type === 'LIABILITY' || !acc.type) && (normName.includes('customer advance') || normName.includes('advance deposit') || normName.includes('advance liability') || (normCat.includes('advance') && !normName.includes('staff') && !normCat.includes('staff')))) {
     return 'CUSTOMER_ADVANCE';
   }
 
@@ -307,7 +307,7 @@ export function getAccountSystemRole(acc: Partial<AccountHead> & { name?: string
   if (code === '1030' || normCat.includes('bank account') || (normName.includes('bank') && !normName.includes('bkash') && !normName.includes('nagad') && !normCat.includes('mobile'))) {
     return 'BANK';
   }
-  if (code === '1040' || normCat.includes('mobile banking') || normName.includes('bkash') || normName.includes('nagad') || normName.includes('mfs')) {
+  if ((code === '1040' && (normCat.includes('mobile') || normName.includes('bkash') || normName.includes('nagad') || normName.includes('mfs'))) || normCat.includes('mobile banking') || normName.includes('bkash') || normName.includes('nagad') || normName.includes('mfs')) {
     return 'MOBILE_BANKING';
   }
   if (code === '1050' || normCat.includes('receivable') || normName.includes('receivable') || normName.includes('customer due')) {

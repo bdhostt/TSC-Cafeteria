@@ -584,48 +584,124 @@ export const HeadsConfigView: React.FC = () => {
     }
   };
 
-  const getAccountSystemRoleBadge = (role: AccountSystemRole) => {
-    switch (role) {
-      case 'CASH':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Cash Drawer</span>;
-      case 'PETTY_CASH':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">Petty Cash</span>;
-      case 'BANK':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Bank A/C</span>;
-      case 'MOBILE_BANKING':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 border border-pink-200">MFS / Wallet</span>;
-      case 'ACCOUNTS_RECEIVABLE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">Customer Dues</span>;
-      case 'INVENTORY_ASSET':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">Stock Inventory</span>;
-      case 'ACCOUNTS_PAYABLE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Vendor Dues</span>;
-      case 'CUSTOMER_ADVANCE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Customer Advance</span>;
-      case 'TAX_PAYABLE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">VAT / Tax</span>;
-      case 'OWNER_EQUITY':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Owner Capital</span>;
-      case 'RETAINED_EARNINGS':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200">Retained Earnings</span>;
-      case 'OWNER_DRAWINGS':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">Owner Drawings</span>;
-      case 'DINE_IN_REVENUE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">Dine-in Sales</span>;
-      case 'DELIVERY_REVENUE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-300">Delivery Sales</span>;
-      case 'BEVERAGE_REVENUE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-300">Beverage Sales</span>;
-      case 'OPERATING_REVENUE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">Sales Revenue</span>;
-      case 'COGS':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200">BOM / COGS</span>;
-      case 'OPERATING_EXPENSE':
-        return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">Operating Expense</span>;
-      case 'STANDARD':
-      default:
-        return null;
+  // Dynamic Soft Color Badge for Categories / Non-System Role Heads
+  const getDynamicCategoryBadgeStyle = (category: string) => {
+    const norm = (category || '').toLowerCase().trim();
+    if (norm.includes('staff') || norm.includes('advance') || norm.includes('employee')) {
+      return 'bg-violet-50 text-violet-700 border-violet-200';
     }
+    if (norm.includes('current asset')) {
+      return 'bg-sky-50 text-sky-700 border-sky-200';
+    }
+    if (norm.includes('fixed') || norm.includes('depreciation') || norm.includes('equipment') || norm.includes('property')) {
+      return 'bg-zinc-100 text-zinc-700 border-zinc-200';
+    }
+    if (norm.includes('liability') || norm.includes('payable') || norm.includes('due') || norm.includes('loan')) {
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    }
+    if (norm.includes('equity') || norm.includes('capital') || norm.includes('retained')) {
+      return 'bg-purple-50 text-purple-700 border-purple-200';
+    }
+    if (norm.includes('revenue') || norm.includes('sales') || norm.includes('income')) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    }
+    if (norm.includes('salary') || norm.includes('payroll') || norm.includes('wage')) {
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    }
+    if (norm.includes('rent') || norm.includes('utility') || norm.includes('electricity') || norm.includes('gas') || norm.includes('water')) {
+      return 'bg-teal-50 text-teal-700 border-teal-200';
+    }
+    if (norm.includes('tax') || norm.includes('vat') || norm.includes('statutory')) {
+      return 'bg-rose-50 text-rose-700 border-rose-200';
+    }
+
+    const DYNAMIC_PALETTES = [
+      'bg-violet-50 text-violet-700 border-violet-200',
+      'bg-sky-50 text-sky-700 border-sky-200',
+      'bg-teal-50 text-teal-700 border-teal-200',
+      'bg-indigo-50 text-indigo-700 border-indigo-200',
+      'bg-cyan-50 text-cyan-700 border-cyan-200',
+      'bg-emerald-50 text-emerald-700 border-emerald-200',
+      'bg-amber-50 text-amber-700 border-amber-200',
+      'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+      'bg-rose-50 text-rose-700 border-rose-200',
+      'bg-slate-100 text-slate-700 border-slate-200',
+    ];
+
+    let hash = 0;
+    for (let i = 0; i < norm.length; i++) {
+      hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % DYNAMIC_PALETTES.length;
+    return DYNAMIC_PALETTES[idx];
+  };
+
+  const getAccountBadge = (acc: AccountHead | (Partial<AccountHead> & { name?: string; category?: string; systemRole?: AccountSystemRole; type?: AccountType })) => {
+    const role = acc.systemRole || getAccountSystemRole(acc as AccountHead);
+
+    // 1. Specific automated ERP system role
+    if (role && role !== 'STANDARD') {
+      switch (role) {
+        case 'CASH':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Cash Drawer</span>;
+        case 'PETTY_CASH':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">Petty Cash</span>;
+        case 'BANK':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Bank A/C</span>;
+        case 'MOBILE_BANKING':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 border border-pink-200">MFS / Wallet</span>;
+        case 'ACCOUNTS_RECEIVABLE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">Customer Dues</span>;
+        case 'INVENTORY_ASSET':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">Stock Inventory</span>;
+        case 'ACCOUNTS_PAYABLE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Vendor Dues</span>;
+        case 'CUSTOMER_ADVANCE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Customer Advance</span>;
+        case 'TAX_PAYABLE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">VAT / Tax</span>;
+        case 'OWNER_EQUITY':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Owner Capital</span>;
+        case 'RETAINED_EARNINGS':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200">Retained Earnings</span>;
+        case 'OWNER_DRAWINGS':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">Owner Drawings</span>;
+        case 'DINE_IN_REVENUE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">Dine-in Sales</span>;
+        case 'DELIVERY_REVENUE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-300">Delivery Sales</span>;
+        case 'BEVERAGE_REVENUE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-300">Beverage Sales</span>;
+        case 'OPERATING_REVENUE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">Sales Revenue</span>;
+        case 'COGS':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200">BOM / COGS</span>;
+        case 'OPERATING_EXPENSE':
+          return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">Operating Expense</span>;
+      }
+    }
+
+    // 2. If STANDARD (or unlinked), dynamically generate soft color badge from Category
+    const categoryLabel = (acc.category || '').trim();
+    if (categoryLabel) {
+      const style = getDynamicCategoryBadgeStyle(categoryLabel);
+      return (
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${style}`}>
+          {categoryLabel}
+        </span>
+      );
+    }
+
+    // 3. Fallback for unclassified general accounts
+    return (
+      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+        General Ledger
+      </span>
+    );
+  };
+
+  const getAccountSystemRoleBadge = (role: AccountSystemRole, category?: string) => {
+    return getAccountBadge({ systemRole: role, category } as any);
   };
 
   return (
@@ -1399,7 +1475,7 @@ export const HeadsConfigView: React.FC = () => {
                           <td className="py-3 px-4 font-bold text-slate-900">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span>{acc.name}</span>
-                              {getAccountSystemRoleBadge(acc.systemRole || getAccountSystemRole(acc))}
+                              {getAccountBadge(acc)}
                             </div>
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
@@ -1620,6 +1696,16 @@ export const HeadsConfigView: React.FC = () => {
                 <p className="text-[10px] text-slate-500 mt-1">
                   Determines the automated live accounting logic without relying on fragile name matching.
                 </p>
+
+                <div className="mt-2.5 p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-500">Live Account Badge:</span>
+                  <div className="flex items-center gap-1.5">
+                    {getAccountBadge({ ...coaForm, id: 'preview' })}
+                    <span className="text-[10px] text-slate-400">
+                      {coaForm.systemRole === 'STANDARD' ? '(Auto from Category)' : '(System Role)'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
