@@ -1468,6 +1468,8 @@ interface RestaurantContextType {
     totalBomUsedQty: number;
     totalManualUsedVal: number;
     totalManualUsedQty: number;
+    totalProductionCost: number;
+    totalCogsVal: number;
     lowStockCount: number;
     negativeStockCount: number;
     estimatedProfit: number;
@@ -1738,43 +1740,39 @@ export function computeCogsBomAllocation(
   masterItems: RawMasterItem[],
   autoBomUsageMap: Record<number, number>,
   rawItemRates: Record<number, number>,
-  chartOfAccounts: AccountHead[]
+  chartOfAccounts: AccountHead[],
+  manualUsageMap?: Record<number, number>,
+  wastageUsageMap?: Record<number, number>
 ): Record<string, number> {
-  const bomAccounts = chartOfAccounts.filter(a => {
+  const chartAccounts = chartOfAccounts || [];
+
+  // Dedicated accounts for manual kitchen use or kitchen wastage if explicitly configured
+  const dedicatedManualAcc = chartAccounts.find(a => 
+    a.type === 'EXPENSE' && (a.name || '').toLowerCase().includes('manual')
+  );
+  const dedicatedWastageAcc = chartAccounts.find(a => 
+    a.type === 'EXPENSE' && ((a.name || '').toLowerCase().includes('wastage') || (a.name || '').toLowerCase().includes('spoilage'))
+  );
+
+  const bomAccounts = chartAccounts.filter(a => {
     if (a.type !== 'EXPENSE') return false;
     const c = a.code || '';
     const n = (a.name || '').toLowerCase();
     const cat = (a.category || '').toLowerCase();
     const isC = c.startsWith('50') || cat.includes('cost of goods') || cat.includes('bom') || n.includes('cogs');
     if (!isC) return false;
-    if (c === '6050' || n.includes('manual') || n.includes('wastage') || n.includes('spoilage')) return false;
+    if (dedicatedManualAcc && (a.id === dedicatedManualAcc.id || a.code === dedicatedManualAcc.code)) return false;
+    if (dedicatedWastageAcc && (a.id === dedicatedWastageAcc.id || a.code === dedicatedWastageAcc.code)) return false;
     return true;
   });
 
   const result: Record<string, number> = {};
-  bomAccounts.forEach(a => {
+  chartAccounts.forEach(a => {
     result[a.id] = 0;
     result[a.code] = 0;
   });
 
-  if (bomAccounts.length === 0) return result;
-
-  // If there's only 1 BOM account in the entire system, it receives 100% of all BOM cost
-  let totalBom = 0;
-  masterItems.forEach(item => {
-    const qty = autoBomUsageMap[item.id] || 0;
-    const rate = rawItemRates[item.id] || Number(item.defaultRate) || 0;
-    totalBom += (qty * rate);
-  });
-
-  if (bomAccounts.length === 1) {
-    const single = bomAccounts[0];
-    result[single.id] = totalBom;
-    if (single.code && single.code !== single.id) {
-      result[single.code] = totalBom;
-    }
-    return result;
-  }
+  if (bomAccounts.length === 0 && !dedicatedManualAcc && !dedicatedWastageAcc) return result;
 
   // Helper to match account name against category or raw item name
   const matchesCategoryOrName = (acc: AccountHead, rawCategory: string, rawItemName: string): boolean => {
@@ -1814,23 +1812,57 @@ export function computeCogsBomAllocation(
     return n.includes('raw material') || n.includes('general') || n === 'cogs' || n === 'cost of goods sold';
   }) || bomAccounts[0];
 
-  // Distribute BOM cost for each raw item
+  // Distribute costs for each raw item
   masterItems.forEach(item => {
-    const qty = autoBomUsageMap[item.id] || 0;
-    if (qty <= 0) return;
+    const bomQty = autoBomUsageMap[item.id] || 0;
+    const manualQty = (manualUsageMap && manualUsageMap[item.id]) || 0;
+    const wasteQty = (wastageUsageMap && wastageUsageMap[item.id]) || 0;
+
     const rate = rawItemRates[item.id] || Number(item.defaultRate) || 0;
-    const itemCost = qty * rate;
-    if (itemCost <= 0) return;
+    if (rate <= 0) return;
 
     const cat = (item.category || '').trim();
 
-    // Priority 1: Specific account matching category (exclude generic generalAcc)
-    const specificAcc = bomAccounts.filter(a => a.id !== generalAcc.id).find(a => matchesCategoryOrName(a, cat, item.name || ''));
+    // Specific category account or general fallback
+    const specificAcc = (bomAccounts.length > 1 && generalAcc)
+      ? bomAccounts.filter(a => a.id !== generalAcc.id).find(a => matchesCategoryOrName(a, cat, item.name || ''))
+      : undefined;
 
-    const targetAcc = specificAcc || generalAcc;
-    result[targetAcc.id] = (result[targetAcc.id] || 0) + itemCost;
-    if (targetAcc.code && targetAcc.code !== targetAcc.id) {
-      result[targetAcc.code] = (result[targetAcc.code] || 0) + itemCost;
+    const targetAcc = specificAcc || generalAcc || bomAccounts[0];
+
+    // 1. Auto Recipe BOM Cost (from POS Sales)
+    if (bomQty > 0 && targetAcc) {
+      const bomCost = bomQty * rate;
+      result[targetAcc.id] = (result[targetAcc.id] || 0) + bomCost;
+      if (targetAcc.code && targetAcc.code !== targetAcc.id) {
+        result[targetAcc.code] = (result[targetAcc.code] || 0) + bomCost;
+      }
+    }
+
+    // 2. Manual Kitchen Usage Cost
+    // If a dedicated account with 'manual' exists in COA, route to it; otherwise route to category COGS account
+    if (manualQty > 0) {
+      const manualCost = manualQty * rate;
+      const destAcc = dedicatedManualAcc || targetAcc;
+      if (destAcc) {
+        result[destAcc.id] = (result[destAcc.id] || 0) + manualCost;
+        if (destAcc.code && destAcc.code !== destAcc.id) {
+          result[destAcc.code] = (result[destAcc.code] || 0) + manualCost;
+        }
+      }
+    }
+
+    // 3. Kitchen Wastage / Spoilage Cost
+    // If a dedicated account with 'wastage' exists in COA, route to it; otherwise route to category COGS account
+    if (wasteQty > 0) {
+      const wasteCost = wasteQty * rate;
+      const destAcc = dedicatedWastageAcc || targetAcc;
+      if (destAcc) {
+        result[destAcc.id] = (result[destAcc.id] || 0) + wasteCost;
+        if (destAcc.code && destAcc.code !== destAcc.id) {
+          result[destAcc.code] = (result[destAcc.code] || 0) + wasteCost;
+        }
+      }
     }
   });
 
@@ -2685,12 +2717,24 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     totalClosingStockVal += closingVal;
   });
 
+  // Build usage maps for manual kitchen used and wastage
+  const manualUsageMap: Record<number, number> = {};
+  const wastageUsageMap: Record<number, number> = {};
+  data.inventory.forEach(inv => {
+    const mQty = inv.manualUsed !== undefined ? Number(inv.manualUsed) : (Number(inv.used) || 0);
+    if (mQty > 0) manualUsageMap[inv.id] = mQty;
+    const wQty = Number(inv.wastage) || 0;
+    if (wQty > 0) wastageUsageMap[inv.id] = wQty;
+  });
+
   // Dynamic BOM cost distribution across Chart of Accounts heads
   const bomCostPerAccount = computeCogsBomAllocation(
     data.masterItems,
     autoBomUsageMap,
     rawItemRatesMap,
-    data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS
+    data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS,
+    manualUsageMap,
+    wastageUsageMap
   );
 
   const totalProductionCost = totalBomCostVal + totalManualUsedCostVal + totalWastageCostVal;
@@ -6630,17 +6674,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const isCogs = (code && code.startsWith('50')) || 
         normCat.includes('cost of goods') || 
         normCat.includes('bom') ||
-        normName.includes('cogs');
+        normName.includes('cogs') ||
+        normName.includes('manual') ||
+        normName.includes('wastage') ||
+        normName.includes('spoilage');
 
       if (isCogs) {
-        if (code === '6050' || normName.includes('manual')) {
-          return opening + totalManualUsedCostVal + journalEffect;
-        }
-        if (normName.includes('wastage') || normName.includes('spoilage')) {
-          return opening + totalWastageCostVal + journalEffect;
-        }
-
-        // Dynamic BOM cost matching per category & head
+        // Dynamic BOM & raw consumption cost matching per category & head (includes Recipe BOM, manual kitchen usage, and wastage)
         const cogsAmt = bomCostPerAccount[acc.code] ?? bomCostPerAccount[acc.id] ?? 0;
         return opening + cogsAmt + journalEffect;
       }
@@ -7255,6 +7295,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         totalBomUsedQty,
         totalManualUsedVal: totalManualUsedCostVal,
         totalManualUsedQty,
+        totalProductionCost,
+        totalCogsVal: totalProductionCost,
         lowStockCount,
         negativeStockCount,
         estimatedProfit,

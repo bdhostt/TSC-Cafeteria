@@ -1388,7 +1388,7 @@ export const StockValuationView: React.FC = () => {
                             min="0"
                             value={editManualUsed}
                             onChange={e => {
-                              const val = parseFloat(e.target.value) || 0;
+                              const val = Math.max(0, Math.abs(parseFloat(e.target.value) || 0));
                               setEditManualUsed(val);
                               editValuesRef.current.manualUsed = val;
                             }}
@@ -1422,7 +1422,7 @@ export const StockValuationView: React.FC = () => {
                             min="0"
                             value={editWastage}
                             onChange={e => {
-                              const val = parseFloat(e.target.value) || 0;
+                              const val = Math.max(0, Math.abs(parseFloat(e.target.value) || 0));
                               setEditWastage(val);
                               editValuesRef.current.wastage = val;
                             }}

@@ -1249,15 +1249,22 @@ export const HeadsConfigView: React.FC = () => {
               <div className="text-[10px] text-emerald-700 mt-0.5">POS Dine-in & Delivery gross</div>
             </div>
 
-            <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl shadow-xs">
-              <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Live Total Expenses</div>
-              <div className="text-xl font-black text-rose-950 mt-1">
-                ৳ {(metrics.totalBomCostVal + metrics.totalExpenses).toLocaleString()}
-              </div>
-              <div className="text-[10px] text-rose-700 mt-0.5">
-                COGS: ৳{metrics.totalBomCostVal.toLocaleString()} | OpEx: ৳{metrics.totalExpenses.toLocaleString()}
-              </div>
-            </div>
+            {(() => {
+              const liveCogs = metrics.totalBomCostVal + (metrics.totalManualUsedVal || 0) + (metrics.totalWastageCostVal || 0);
+              const liveOpEx = metrics.totalExpenses;
+              const liveTotalExpenses = liveCogs + liveOpEx;
+              return (
+                <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl shadow-xs">
+                  <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Live Total Expenses</div>
+                  <div className="text-xl font-black text-rose-950 mt-1">
+                    ৳ {liveTotalExpenses.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-rose-700 mt-0.5">
+                    COGS: ৳{liveCogs.toLocaleString()} | OpEx: ৳{liveOpEx.toLocaleString()}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Controls Bar */}

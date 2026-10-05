@@ -319,6 +319,16 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       });
     });
 
+    // Build usage maps for manual kitchen used and wastage
+    const periodManualUsageMap: Record<number, number> = {};
+    const periodWastageUsageMap: Record<number, number> = {};
+    data.inventory.forEach(inv => {
+      const mUsed = inv.manualUsed !== undefined ? Number(inv.manualUsed) : (Number(inv.used) || 0);
+      const wUsed = Number(inv.wastage) || 0;
+      if (mUsed > 0) periodManualUsageMap[inv.id] = mUsed;
+      if (wUsed > 0) periodWastageUsageMap[inv.id] = wUsed;
+    });
+
     // Dynamic BOM Cost distribution matching COA heads
     const priorAllocation = computeCogsBomAllocation(data.masterItems, priorBomUsageMap, rawRatesMap, coaList);
     let totalPriorBom = 0;
@@ -333,7 +343,14 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       postEntry(invAcc?.code || '1060', 0, totalPriorBom, true);
     }
 
-    const periodAllocation = computeCogsBomAllocation(data.masterItems, periodBomUsageMap, rawRatesMap, coaList);
+    const periodAllocation = computeCogsBomAllocation(
+      data.masterItems,
+      periodBomUsageMap,
+      rawRatesMap,
+      coaList,
+      periodManualUsageMap,
+      periodWastageUsageMap
+    );
     let totalPeriodBom = 0;
     coaList.filter(a => a.type === 'EXPENSE').forEach(acc => {
       const amt = periodAllocation[acc.id] || 0;
@@ -563,16 +580,19 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       });
     });
 
-    // Direct Wastage / Spoilage
+    // Direct Kitchen Manual Usage & Wastage
+    let manualKitchenCost = 0;
     let wastageCost = 0;
     data.inventory.forEach(inv => {
-      if (inv.used > 0) {
-        const raw = data.masterItems.find(r => r.id === inv.id);
-        wastageCost += inv.used * (inv.rate || raw?.defaultRate || 0);
-      }
+      const raw = data.masterItems.find(r => r.id === inv.id);
+      const rate = inv.rate || raw?.defaultRate || rawRateLookup[inv.id] || 0;
+      const mUsed = inv.manualUsed !== undefined ? Number(inv.manualUsed) : (Number(inv.used) || 0);
+      const wUsed = Number(inv.wastage) || 0;
+      if (mUsed > 0) manualKitchenCost += mUsed * rate;
+      if (wUsed > 0) wastageCost += wUsed * rate;
     });
 
-    const totalCostOfSales = cogsRawCost + wastageCost;
+    const totalCostOfSales = cogsRawCost + manualKitchenCost + wastageCost;
     const grossProfit = netRevenue - totalCostOfSales;
     const grossProfitMargin = netRevenue > 0 ? ((grossProfit / netRevenue) * 100).toFixed(1) : '0';
 
@@ -600,6 +620,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       totalDiscounts,
       netRevenue,
       cogsRawCost,
+      manualKitchenCost,
       wastageCost,
       totalCostOfSales,
       grossProfit,
@@ -622,8 +643,9 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
     let closingInventoryVal = 0;
     data.masterItems.forEach(item => {
       const inv = data.inventory.find(i => i.id === item.id);
-      const open = inv ? inv.open : 0;
-      const used = inv ? inv.used : 0;
+      const open = inv ? Number(inv.open) || 0 : 0;
+      const manualUsed = inv ? (inv.manualUsed !== undefined ? Number(inv.manualUsed) : (Number(inv.used) || 0)) : 0;
+      const wastage = inv ? Number(inv.wastage) || 0 : 0;
       let inward = 0;
       data.purchases.forEach(p => {
         if (p.status !== 'DRAFT') {
@@ -646,7 +668,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
           }
         });
       });
-      const stock = Math.max(0, open + inward - bomOut - used);
+      const stock = Math.max(0, open + inward - bomOut - manualUsed - wastage);
       closingInventoryVal += stock * (inv?.rate || item.defaultRate || 0);
     });
 
