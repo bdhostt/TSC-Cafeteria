@@ -140,7 +140,10 @@ export const HeadsConfigView: React.FC = () => {
     phone: data.restaurantProfile?.phone || '+880 1756-007600',
     email: data.restaurantProfile?.email || 'bdhosttpos@gmail.com',
     binOrVat: data.restaurantProfile?.binOrVat || '0029381-01',
-    currencySymbol: data.restaurantProfile?.currencySymbol || '৳'
+    currencySymbol: data.restaurantProfile?.currencySymbol || '৳',
+    vatPercent: data.restaurantProfile?.vatPercent ?? 5,
+    vatMode: data.restaurantProfile?.vatMode || 'inclusive',
+    enableVat: data.restaurantProfile?.enableVat ?? true
   });
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -1056,7 +1059,7 @@ export const HeadsConfigView: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      'Currency Symbol'
+                      {language === 'bn' ? 'মুদ্রা প্রতীক' : 'Currency Symbol'}
                     </label>
                     <div className="relative">
                       <DollarSign className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1071,6 +1074,129 @@ export const HeadsConfigView: React.FC = () => {
                   </div>
                 </div>
 
+                {/* VAT & Tax Dynamic Configuration Card */}
+                <div className="mt-4 p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-amber-600 text-white shadow-xs">
+                        <Percent className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-xs text-amber-950">
+                          {language === 'bn' ? 'ভ্যাট ও ট্যাক্স সেটিংস (Chart of Accounts সংযুক্ত)' : 'VAT & Tax Configuration (COA Linked)'}
+                        </h4>
+                        <p className="text-[10px] text-amber-800">
+                          {language === 'bn' 
+                            ? 'সেলস হওয়ার সাথে সাথে স্বয়ংক্রিয়ভাবে VAT & Tax Payable (2020) লেজারে ক্রেডিট হবে'
+                            : 'Automatically credits VAT & Tax Payable (2020) liability account on sales settlement'}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox"
+                        checked={profileForm.enableVat ?? true}
+                        onChange={e => setProfileForm(prev => ({ ...prev, enableVat: e.target.checked }))}
+                        className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-amber-900">
+                        {language === 'bn' ? 'অটো ভ্যাট চালু' : 'Auto-VAT Active'}
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-200/80">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        {language === 'bn' ? 'ভ্যাট পার্সেন্টেজ (%)' : 'VAT Rate / Percentage (%)'}
+                      </label>
+                      <div className="relative">
+                        <Percent className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={profileForm.vatPercent ?? 5}
+                          onChange={e => setProfileForm(prev => ({ ...prev, vatPercent: parseFloat(e.target.value) || 0 }))}
+                          placeholder="5"
+                          className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-1.5 mt-1.5">
+                        {[0, 5, 7.5, 10, 15].map(pct => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => setProfileForm(prev => ({ ...prev, vatPercent: pct, enableVat: pct > 0 }))}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                              (profileForm.vatPercent ?? 5) === pct
+                                ? 'bg-amber-600 text-white border-amber-700'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        {language === 'bn' ? 'ভ্যাট গণনা পদ্ধতি' : 'VAT Calculation Mode'}
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm(prev => ({ ...prev, vatMode: 'inclusive' }))}
+                          className={`p-2 rounded-xl border text-left transition cursor-pointer ${
+                            (profileForm.vatMode || 'inclusive') === 'inclusive'
+                              ? 'bg-amber-100/80 border-amber-600 text-amber-950 font-bold shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="text-xs font-bold">Inclusive (অন্তর্ভুক্ত)</div>
+                          <div className="text-[9px] opacity-80 leading-tight">মূল্যের ভেতর ভ্যাট ধরা হবে (NBR Standard)</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setProfileForm(prev => ({ ...prev, vatMode: 'exclusive' }))}
+                          className={`p-2 rounded-xl border text-left transition cursor-pointer ${
+                            (profileForm.vatMode || 'inclusive') === 'exclusive'
+                              ? 'bg-amber-100/80 border-amber-600 text-amber-950 font-bold shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="text-xs font-bold">Exclusive (অতিরিক্ত)</div>
+                          <div className="text-[9px] opacity-80 leading-tight">বিলের ওপর আলাদা ভ্যাট যোগ হবে</div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Simulation Info */}
+                  <div className="p-2.5 bg-white/80 border border-amber-200/90 rounded-xl text-[11px] text-amber-900 flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold">লাইভ উদাহরণ (৳১০০ সেল): </span>
+                      {(profileForm.vatMode || 'inclusive') === 'inclusive' ? (
+                        <span>
+                          Sales Revenue (4010) = ৳{((100 * 100) / (100 + (profileForm.vatPercent ?? 5))).toFixed(2)} | 
+                          <strong className="text-rose-700 ml-1">VAT Payable (2020) = ৳{(100 - (100 * 100) / (100 + (profileForm.vatPercent ?? 5))).toFixed(2)}</strong>
+                        </span>
+                      ) : (
+                        <span>
+                          Total Bill = ৳{(100 + 100 * (profileForm.vatPercent ?? 5) / 100).toFixed(2)} | 
+                          <strong className="text-rose-700 ml-1">VAT Payable (2020) = ৳{(100 * (profileForm.vatPercent ?? 5) / 100).toFixed(2)}</strong>
+                        </span>
+                      )}
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase">
+                      COA Linked
+                    </span>
+                  </div>
+                </div>
+
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
                   <button
                     type="submit"
@@ -1078,7 +1204,7 @@ export const HeadsConfigView: React.FC = () => {
                     className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>'Save Restaurant Profile & Logo'</span>
+                    <span>{language === 'bn' ? 'প্রোফাইল ও ভ্যাট সেটিংস সংরক্ষণ করুন' : 'Save Restaurant Profile & Tax Settings'}</span>
                   </button>
                 </div>
               </div>

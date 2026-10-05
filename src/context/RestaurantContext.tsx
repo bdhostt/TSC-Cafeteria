@@ -762,7 +762,10 @@ export const DEFAULT_RESTAURANT_PROFILE: RestaurantProfile = {
   email: "bdhosttpos@gmail.com",
   binOrVat: "0029381-01",
   currencySymbol: "৳",
-  outletSecurityKey: "BDHOSTT-2026"
+  outletSecurityKey: "BDHOSTT-2026",
+  vatPercent: 5,
+  vatMode: "inclusive",
+  enableVat: true
 };
 
 export const DEFAULT_EMPLOYEES: Employee[] = [
@@ -2844,8 +2847,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     wastageUsageMap
   );
 
+  // Total VAT collected / payable from active sales (COA TAX_PAYABLE)
+  const currentVatPct = Number(data.restaurantProfile?.vatPercent ?? DEFAULT_RESTAURANT_PROFILE.vatPercent ?? 5);
+  const isVatGloballyEnabled = Boolean(data.restaurantProfile?.enableVat ?? (currentVatPct > 0));
+  const currentVatMode = data.restaurantProfile?.vatMode || 'inclusive';
+
+  const totalSalesVAT = activeSalesList.reduce((sum, s) => {
+    if (typeof s.vatVal === 'number' && s.vatVal >= 0) return sum + s.vatVal;
+    if (isVatGloballyEnabled && currentVatPct > 0) {
+      if (currentVatMode === 'exclusive') {
+        return sum + Math.round(((s.subtotal || s.total) * currentVatPct) / 100 * 100) / 100;
+      } else {
+        return sum + Math.round(((s.total * currentVatPct) / (100 + currentVatPct)) * 100) / 100;
+      }
+    }
+    return sum;
+  }, 0);
+
+  const netSalesRevenue = Math.max(0, totalSales - totalSalesVAT);
   const totalProductionCost = totalBomCostVal + totalManualUsedCostVal + totalWastageCostVal;
-  const estimatedProfit = totalSales - (totalProductionCost + totalExpenses);
+  const estimatedProfit = netSalesRevenue - (totalProductionCost + totalExpenses);
 
   const payCash = activeSalesList.reduce((sum, s) => sum + (s.cash || 0), 0);
   const payCard = activeSalesList.reduce((sum, s) => sum + (s.card || 0), 0);
@@ -4400,7 +4421,25 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const discDeduction = table.discountType === 'percent' 
       ? (subtotal * table.discountVal) / 100 
       : table.discountVal;
-    const netTotal = Math.round(Math.max(0, subtotal - discDeduction));
+    const baseAfterDiscount = Math.max(0, subtotal - discDeduction);
+
+    const profile = data.restaurantProfile || DEFAULT_RESTAURANT_PROFILE;
+    const vatPct = Number(profile.vatPercent ?? 5);
+    const isVatEnabled = Boolean(profile.enableVat ?? (vatPct > 0));
+    const vatMode = profile.vatMode || 'inclusive';
+
+    let billVatVal = 0;
+    let netTotal = Math.round(baseAfterDiscount);
+
+    if (isVatEnabled && vatPct > 0) {
+      if (vatMode === 'exclusive') {
+        billVatVal = Math.round(((baseAfterDiscount * vatPct) / 100) * 100) / 100;
+        netTotal = Math.round(baseAfterDiscount + billVatVal);
+      } else {
+        billVatVal = Math.round(((baseAfterDiscount * vatPct) / (100 + vatPct)) * 100) / 100;
+        netTotal = Math.round(baseAfterDiscount);
+      }
+    }
 
     const commissionAmount = agent ? Math.round((subtotal * agent.commissionPercent) / 100) : 0;
     const netRestaurantRevenue = Math.max(0, netTotal - commissionAmount);
@@ -4435,6 +4474,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       discountDeduction: discDeduction,
       discountType: table.discountType,
       discountVal: table.discountVal,
+      vatVal: billVatVal,
+      vatPercent: isVatEnabled ? vatPct : 0,
+      vatMode,
       netTotal,
       isSettled: false,
       receiptType: 'BILL',
@@ -4531,7 +4573,25 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const discDeduction = table.discountType === 'percent' 
       ? (subtotal * table.discountVal) / 100 
       : table.discountVal;
-    const netTotal = Math.round(Math.max(0, subtotal - discDeduction));
+    const baseAfterDiscount = Math.max(0, subtotal - discDeduction);
+
+    const profile = data.restaurantProfile || DEFAULT_RESTAURANT_PROFILE;
+    const vatPercent = Number(profile.vatPercent ?? 5);
+    const isVatEnabled = Boolean(profile.enableVat ?? (vatPercent > 0));
+    const vatMode = profile.vatMode || 'inclusive';
+
+    let vatVal = 0;
+    let netTotal = Math.round(baseAfterDiscount);
+
+    if (isVatEnabled && vatPercent > 0) {
+      if (vatMode === 'exclusive') {
+        vatVal = Math.round(((baseAfterDiscount * vatPercent) / 100) * 100) / 100;
+        netTotal = Math.round(baseAfterDiscount + vatVal);
+      } else {
+        vatVal = Math.round(((baseAfterDiscount * vatPercent) / (100 + vatPercent)) * 100) / 100;
+        netTotal = Math.round(baseAfterDiscount);
+      }
+    }
 
     const commissionPercent = agent ? agent.commissionPercent : 0;
     const commissionAmount = agent ? Math.round((subtotal * commissionPercent) / 100) : 0;
@@ -4624,6 +4684,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       subtotal: subtotal,
       discountVal: table.discountVal,
       discountType: table.discountType,
+      vatVal: vatVal,
+      vatPercent: isVatEnabled ? vatPercent : 0,
+      vatMode,
       details: `${table.name} [Zone: ${table.zone || 'Floor 1'}] (W: ${assignedWaiter || 'N/A'}${agent ? `, Ch: ${agent.name}` : ''}): ${itemSummary}`,
       items: JSON.parse(JSON.stringify(table.cart)),
       cash: cashRetained,
@@ -4706,6 +4769,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       discountDeduction: discDeduction,
       discountType: table.discountType,
       discountVal: table.discountVal,
+      vatVal: vatVal,
+      vatPercent: isVatEnabled ? vatPercent : 0,
+      vatMode,
       netTotal,
       paymentBreakdown: {
         cash: cashRetained,
@@ -6785,7 +6851,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return totalCustomerAdvances + journalEffect;
 
       case 'TAX_PAYABLE':
-        return opening + journalEffect;
+        return opening + totalSalesVAT + journalEffect;
 
       case 'RETAINED_EARNINGS':
         return opening + estimatedProfit + journalEffect;
@@ -6797,24 +6863,39 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return opening + journalEffect;
 
       case 'DINE_IN_REVENUE': {
-        const dineInSales = activeSalesList.filter(s => !s.channelOrAgent || s.channelOrAgent === 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
-        return opening + (dineInSales > 0 ? dineInSales : totalSales) + journalEffect;
+        const dineInSales = activeSalesList.filter(s => !s.channelOrAgent || s.channelOrAgent === 'dine_in').reduce((sum, s) => {
+          const sVat = (typeof s.vatVal === 'number' && s.vatVal >= 0)
+            ? s.vatVal 
+            : (isVatGloballyEnabled && currentVatPct > 0 ? Math.round(((s.total * currentVatPct) / (100 + currentVatPct)) * 100) / 100 : 0);
+          return sum + (s.total || 0) - sVat;
+        }, 0);
+        return opening + (dineInSales > 0 ? dineInSales : netSalesRevenue) + journalEffect;
       }
 
       case 'DELIVERY_REVENUE': {
-        const deliverySales = activeSalesList.filter(s => s.channelOrAgent && s.channelOrAgent !== 'dine_in').reduce((sum, s) => sum + (s.total || 0), 0);
+        const deliverySales = activeSalesList.filter(s => s.channelOrAgent && s.channelOrAgent !== 'dine_in').reduce((sum, s) => {
+          const sVat = (typeof s.vatVal === 'number' && s.vatVal >= 0)
+            ? s.vatVal 
+            : (isVatGloballyEnabled && currentVatPct > 0 ? Math.round(((s.total * currentVatPct) / (100 + currentVatPct)) * 100) / 100 : 0);
+          return sum + (s.total || 0) - sVat;
+        }, 0);
         return opening + deliverySales + journalEffect;
       }
 
       case 'BEVERAGE_REVENUE': {
         const bevSales = activeSalesList.filter(s => 
           (s.items || []).some(i => (i.department || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('beverage') || (i.category || '').toLowerCase().includes('coffee'))
-        ).reduce((sum, s) => sum + (s.total || 0), 0);
+        ).reduce((sum, s) => {
+          const sVat = (typeof s.vatVal === 'number' && s.vatVal >= 0)
+            ? s.vatVal 
+            : (isVatGloballyEnabled && currentVatPct > 0 ? Math.round(((s.total * currentVatPct) / (100 + currentVatPct)) * 100) / 100 : 0);
+          return sum + (s.total || 0) - sVat;
+        }, 0);
         return opening + bevSales + journalEffect;
       }
 
       case 'OPERATING_REVENUE': {
-        return opening + totalSales + journalEffect;
+        return opening + netSalesRevenue + journalEffect;
       }
 
       case 'COGS': {
@@ -6840,7 +6921,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       case 'STANDARD':
       default:
         if (acc.type === 'REVENUE') {
-          return opening + totalSales + journalEffect;
+          return opening + netSalesRevenue + journalEffect;
         }
         if (acc.type === 'EXPENSE') {
           const chartAccounts = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;

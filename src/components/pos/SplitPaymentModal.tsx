@@ -46,7 +46,25 @@ export const SplitPaymentModal: React.FC = () => {
   const discDeduction = activeSettlingTable.discountType === 'percent' 
     ? (subtotal * activeSettlingTable.discountVal) / 100 
     : activeSettlingTable.discountVal;
-  const netTotal = Math.round(Math.max(0, subtotal - discDeduction));
+  const baseAfterDiscount = Math.max(0, subtotal - discDeduction);
+
+  const profile = data.restaurantProfile;
+  const vatPct = Number(profile?.vatPercent ?? 5);
+  const isVatEnabled = Boolean(profile?.enableVat ?? (vatPct > 0));
+  const vatMode = profile?.vatMode || 'inclusive';
+
+  let modalVatVal = 0;
+  let netTotal = Math.round(baseAfterDiscount);
+
+  if (isVatEnabled && vatPct > 0) {
+    if (vatMode === 'exclusive') {
+      modalVatVal = Math.round(((baseAfterDiscount * vatPct) / 100) * 100) / 100;
+      netTotal = Math.round(baseAfterDiscount + modalVatVal);
+    } else {
+      modalVatVal = Math.round(((baseAfterDiscount * vatPct) / (100 + vatPct)) * 100) / 100;
+      netTotal = Math.round(baseAfterDiscount);
+    }
+  }
 
   const totalEntered = paymentMethods.reduce((sum, m) => sum + (Number(splitAmounts[m.id]) || 0), 0);
   const remaining = Math.max(0, netTotal - totalEntered);
@@ -186,6 +204,11 @@ export const SplitPaymentModal: React.FC = () => {
             {discDeduction > 0 && (
               <div className="text-[11px] text-emerald-400">
                 Discount: ৳{discDeduction.toLocaleString()} (Subtotal: ৳{subtotal.toLocaleString()})
+              </div>
+            )}
+            {isVatEnabled && vatPct > 0 && (
+              <div className="text-[11px] text-blue-200">
+                VAT ({vatPct}% {vatMode === 'inclusive' ? 'Included' : 'Extra'}): ৳{modalVatVal.toFixed(2)}
               </div>
             )}
           </div>

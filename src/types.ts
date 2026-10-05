@@ -432,6 +432,8 @@ export interface SaleRecord {
   discountVal?: number;
   discountType?: DiscountType;
   vatVal?: number;
+  vatPercent?: number;
+  vatMode?: 'inclusive' | 'exclusive';
   netRestaurantRevenue?: number; // total - commission
   appliedPromo?: string;
   cash: number;
@@ -685,6 +687,9 @@ export interface RestaurantProfile {
   binOrVat?: string;
   currencySymbol?: string;
   outletSecurityKey?: string; // Branch invite code for staff sign-up (e.g. BANANI-2026)
+  vatPercent?: number; // Dynamic VAT rate (e.g. 5, 7.5, 10, 15, 0)
+  vatMode?: 'inclusive' | 'exclusive'; // default 'inclusive'
+  enableVat?: boolean; // toggle auto-VAT on/off
 }
 
 export interface AppData {
@@ -752,6 +757,9 @@ export interface PrintableReceipt {
   discountDeduction: number;
   discountType: DiscountType;
   discountVal: number;
+  vatVal?: number;
+  vatPercent?: number;
+  vatMode?: 'inclusive' | 'exclusive';
   netTotal: number;
   netRestaurantRevenue?: number;
   paymentBreakdown?: {

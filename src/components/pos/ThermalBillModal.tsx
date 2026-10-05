@@ -718,6 +718,10 @@ export const ThermalBillModal: React.FC = () => {
         : 'Discount:';
       lines.push(line2Col(discLbl, `-${Number(printableReceipt.discountDeduction).toFixed(2)}`, width));
     }
+    if (printableReceipt.vatVal && printableReceipt.vatVal > 0) {
+      const vatLbl = `VAT (${printableReceipt.vatPercent || 5}% ${printableReceipt.vatMode === 'inclusive' ? 'Inc' : 'Ext'}):`;
+      lines.push(line2Col(vatLbl, `${printableReceipt.vatMode === 'exclusive' ? '+' : ''}${Number(printableReceipt.vatVal).toFixed(2)}`, width));
+    }
     lines.push(divider);
     lines.push(line2Col('TOTAL PAYABLE:', Number(printableReceipt.netTotal).toFixed(2), width));
 
@@ -1369,6 +1373,17 @@ export const ThermalBillModal: React.FC = () => {
                     <span className="font-mono font-semibold">- ৳{Number(printableReceipt.discountDeduction).toFixed(2)}</span>
                   </div>
                 )}
+
+                {printableReceipt.vatVal && printableReceipt.vatVal > 0 ? (
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>
+                      VAT ({printableReceipt.vatPercent || 5}% {printableReceipt.vatMode === 'inclusive' ? 'Included' : 'Extra'}):
+                    </span>
+                    <span className="font-mono font-semibold">
+                      {printableReceipt.vatMode === 'exclusive' ? '+ ' : ''}৳{Number(printableReceipt.vatVal).toFixed(2)}
+                    </span>
+                  </div>
+                ) : null}
 
                 <div className="flex justify-between items-center text-sm font-extrabold text-slate-900 pt-1.5 border-t border-slate-300">
                   <span>Net Total:</span>

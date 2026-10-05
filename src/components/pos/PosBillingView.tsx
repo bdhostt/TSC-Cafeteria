@@ -409,7 +409,25 @@ export const PosBillingView: React.FC = () => {
   const discountDeduction = activeTable?.discountType === 'percent'
     ? (subtotal * (activeTable?.discountVal || 0)) / 100
     : (activeTable?.discountVal || 0);
-  const netTotal = Math.round(Math.max(0, subtotal - discountDeduction));
+  const baseAfterDiscount = Math.max(0, subtotal - discountDeduction);
+
+  const profile = data.restaurantProfile;
+  const vatPct = Number(profile?.vatPercent ?? 5);
+  const isVatEnabled = Boolean(profile?.enableVat ?? (vatPct > 0));
+  const vatMode = profile?.vatMode || 'inclusive';
+
+  let cartVatVal = 0;
+  let netTotal = Math.round(baseAfterDiscount);
+
+  if (isVatEnabled && vatPct > 0) {
+    if (vatMode === 'exclusive') {
+      cartVatVal = Math.round(((baseAfterDiscount * vatPct) / 100) * 100) / 100;
+      netTotal = Math.round(baseAfterDiscount + cartVatVal);
+    } else {
+      cartVatVal = Math.round(((baseAfterDiscount * vatPct) / (100 + vatPct)) * 100) / 100;
+      netTotal = Math.round(baseAfterDiscount);
+    }
+  }
   const cartTotalQty = activeTable?.cart?.reduce((sum, item) => sum + item.qty, 0) || 0;
 
   // Filtered floor plan tables
@@ -1458,6 +1476,15 @@ export const PosBillingView: React.FC = () => {
                   <div className="flex justify-between text-emerald-700 font-medium text-[11px]">
                     <span>Discount:</span>
                     <span>- ৳{discountDeduction.toLocaleString()}</span>
+                  </div>
+                )}
+
+                {isVatEnabled && vatPct > 0 && (
+                  <div className="flex justify-between text-slate-500 font-medium text-[11px]">
+                    <span>VAT ({vatPct}% {vatMode === 'inclusive' ? 'Included' : 'Extra'}):</span>
+                    <span className="font-semibold font-mono text-slate-700">
+                      {vatMode === 'exclusive' ? '+ ' : ''}৳{cartVatVal.toFixed(2)}
+                    </span>
                   </div>
                 )}
 
