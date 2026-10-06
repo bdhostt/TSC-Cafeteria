@@ -7003,6 +7003,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }).reduce((sum, e) => sum + (e.amount || 0), 0);
           return opening + headExpenses + journalEffect;
         }
+        if (acc.type === 'ASSET') {
+          const chartAccounts = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+          const assetExpenses = (data.expenses || []).filter(e => {
+            const matched = resolveExpenseAccount(e, chartAccounts);
+            return matched && (matched.id === acc.id || matched.code === acc.code);
+          }).reduce((sum, e) => sum + (e.amount || 0), 0);
+          return opening + assetExpenses + journalEffect;
+        }
         return opening + journalEffect;
     }
   };
