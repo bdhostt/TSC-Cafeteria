@@ -11,7 +11,8 @@ import {
   UserCheck,
   Coins, 
   Zap,
-  Building
+  Building,
+  QrCode
 } from 'lucide-react';
 
 export const SplitPaymentModal: React.FC = () => {
@@ -110,6 +111,7 @@ export const SplitPaymentModal: React.FC = () => {
   const getMethodIcon = (m: PaymentMethodConfig) => {
     const nameLower = (m.name + ' ' + (m.providerName || '')).toLowerCase();
     if (m.type === 'CASH') return <Banknote className="w-4 h-4 text-emerald-600" />;
+    if (m.type === 'BANGLA_QR') return <QrCode className="w-4 h-4 text-purple-600" />;
     if (m.type === 'MFS') {
       if (nameLower.includes('nagad')) return <Smartphone className="w-4 h-4 text-orange-600" />;
       return <Smartphone className="w-4 h-4 text-pink-600" />;
@@ -123,6 +125,7 @@ export const SplitPaymentModal: React.FC = () => {
   const getMethodButtonColor = (m: PaymentMethodConfig) => {
     const nameLower = (m.name + ' ' + (m.providerName || '')).toLowerCase();
     if (m.type === 'CASH') return 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-800';
+    if (m.type === 'BANGLA_QR') return 'bg-purple-50 hover:bg-purple-100 border-purple-300 text-purple-900';
     if (m.type === 'MFS') {
       if (nameLower.includes('nagad')) return 'bg-orange-50 hover:bg-orange-100 border-orange-300 text-orange-800';
       return 'bg-pink-50 hover:bg-pink-100 border-pink-300 text-pink-800';

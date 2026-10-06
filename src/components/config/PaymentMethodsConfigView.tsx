@@ -697,14 +697,17 @@ export const PaymentMethodsConfigView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => updatePaymentMethod(m.id, { isActive: !m.isActive })}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold transition cursor-pointer border ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold transition-all cursor-pointer border shadow-2xs ${
                             m.isActive
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-                              : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+                              : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200 hover:border-slate-400'
                           }`}
-                          title="Click to toggle active status"
+                          title={m.isActive ? (language === 'bn' ? 'ক্লিক করে মেথডটি বন্ধ (Inactive) করুন' : 'Click to deactivate (Hide from POS)') : (language === 'bn' ? 'ক্লিক করে মেথডটি চালু (Active) করুন' : 'Click to activate (Show in POS)')}
                         >
-                          {m.isActive ? '✓ Active' : '✕ Disabled'}
+                          <span className={`w-2 h-2 rounded-full transition-transform ${
+                            m.isActive ? 'bg-emerald-500 ring-2 ring-emerald-300' : 'bg-slate-400'
+                          }`} />
+                          <span>{m.isActive ? (language === 'bn' ? 'সক্রিয় (Active)' : 'Active') : (language === 'bn' ? 'নিষ্ক্রিয় (Inactive)' : 'Inactive')}</span>
                         </button>
                       </td>
 
