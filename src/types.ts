@@ -114,7 +114,7 @@ export interface PrintTemplate {
   isActive: boolean;
 }
 
-export type PaymentMethodType = 'CASH' | 'CARD' | 'MFS' | 'BANK' | 'CREDIT' | 'OTHER';
+export type PaymentMethodType = 'CASH' | 'CARD' | 'MFS' | 'BANK' | 'CREDIT' | 'OTHER' | 'BANGLA_QR';
 
 export interface PaymentMethodConfig {
   id: string;

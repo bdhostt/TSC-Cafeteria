@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   Star,
   Sliders,
-  DollarSign
+  DollarSign,
+  QrCode
 } from 'lucide-react';
 
 export interface PaymentTypeOption {
@@ -96,6 +97,18 @@ export const PAYMENT_TYPE_OPTIONS: PaymentTypeOption[] = [
     activeBorderClass: 'border-amber-500 ring-2 ring-amber-400 bg-amber-50/70 text-amber-950'
   },
   {
+    type: 'BANGLA_QR',
+    label: 'Bangla QR (Universal QR)',
+    bnLabel: 'বাংলা কিউআর (সর্বজনীন কিউআর)',
+    subTitle: 'bKash, Nagad, Rocket, Cards & All Bank Apps',
+    bnSubTitle: 'বিকাশ, নগদ, রকেট, কার্ড ও সকল ব্যাংক অ্যাপ কিউআর',
+    defaultProvider: 'Bangla QR',
+    defaultLedgerCode: '1030',
+    badgeClass: 'bg-purple-100 text-purple-800 border-purple-300',
+    borderClass: 'border-slate-200 hover:border-purple-300',
+    activeBorderClass: 'border-purple-500 ring-2 ring-purple-400 bg-purple-50/70 text-purple-950'
+  },
+  {
     type: 'OTHER',
     label: 'Other Digital Gateway',
     bnLabel: 'অন্যান্য গেটওয়ে',
@@ -149,6 +162,7 @@ export const PaymentMethodsConfigView: React.FC = () => {
   const typeCounts: Record<string, number> = {
     ALL: paymentMethods.length,
     CASH: paymentMethods.filter(m => m.type === 'CASH').length,
+    BANGLA_QR: paymentMethods.filter(m => m.type === 'BANGLA_QR').length,
     MFS: paymentMethods.filter(m => m.type === 'MFS').length,
     CARD: paymentMethods.filter(m => m.type === 'CARD').length,
     BANK: paymentMethods.filter(m => m.type === 'BANK').length,
@@ -269,6 +283,8 @@ export const PaymentMethodsConfigView: React.FC = () => {
     switch (type) {
       case 'CASH':
         return <Banknote className={`${iconClass} text-emerald-600`} />;
+      case 'BANGLA_QR':
+        return <QrCode className={`${iconClass} text-purple-600`} />;
       case 'MFS':
         return <Smartphone className={`${iconClass} text-pink-600`} />;
       case 'CARD':
@@ -288,6 +304,8 @@ export const PaymentMethodsConfigView: React.FC = () => {
     switch (type) {
       case 'CASH':
         return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Cash</span>;
+      case 'BANGLA_QR':
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Bangla QR</span>;
       case 'MFS':
         return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>MFS / Mobile</span>;
       case 'CARD':

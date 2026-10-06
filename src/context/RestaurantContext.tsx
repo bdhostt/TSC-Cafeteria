@@ -2973,9 +2973,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const isExpenseBank = (m?: string) => {
     if (!m) return false;
     const norm = m.toLowerCase().trim();
-    if (norm.includes('bank') || norm.includes('card')) return true;
+    if (norm.includes('bank') || norm.includes('card') || norm.includes('qr')) return true;
     const cfg = getMethodConfig(m);
-    return cfg?.type === 'BANK' || cfg?.type === 'CARD';
+    return cfg?.type === 'BANK' || cfg?.type === 'CARD' || cfg?.type === 'BANGLA_QR';
   };
   const isExpenseBkash = (m?: string) => {
     if (!m) return false;
@@ -3008,7 +3008,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const cfg = getMethodConfig(method);
     if (cfg) {
       if (cfg.type === 'CASH') return 'CASH';
-      if (cfg.type === 'BANK' || cfg.type === 'CARD') return 'BANK';
+      if (cfg.type === 'BANK' || cfg.type === 'CARD' || cfg.type === 'BANGLA_QR') return 'BANK';
       if (cfg.type === 'MFS') {
         if (cfg.name.toLowerCase().includes('nagad')) return 'NAGAD';
         return 'BKASH';
@@ -3016,7 +3016,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     const m = method.toUpperCase();
     if (m === 'CASH') return 'CASH';
-    if (m === 'BANK' || m === 'CARD') return 'BANK';
+    if (m === 'BANK' || m === 'CARD' || m.includes('QR')) return 'BANK';
     if (m === 'NAGAD') return 'NAGAD';
     if (m === 'BKASH') return 'BKASH';
     return 'CASH';
@@ -3045,7 +3045,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const norm = (m || '').toLowerCase().trim();
     if (norm === 'bank transfer' || norm === 'bank') return true;
     const cfg = getMethodConfig(m);
-    return cfg?.type === 'BANK' || cfg?.type === 'CARD';
+    return cfg?.type === 'BANK' || cfg?.type === 'CARD' || cfg?.type === 'BANGLA_QR';
   };
   const isChequeMethod = (m: string) => {
     const norm = (m || '').toLowerCase().trim();
@@ -7090,7 +7090,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (methodObj.type === 'CARD') {
         return payCard || 0;
       }
-      if (methodObj.type === 'BANK') {
+      if (methodObj.type === 'BANK' || methodObj.type === 'BANGLA_QR') {
         return bankTransferBalance || 0;
       }
       if (methodObj.type === 'CREDIT') {
