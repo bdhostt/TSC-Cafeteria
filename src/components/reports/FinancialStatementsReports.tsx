@@ -143,10 +143,27 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       }
 
       // Dr Digital / Card / MFS Collections
-      if (s.paymentBreakdown) {
-        Object.entries(s.paymentBreakdown).forEach(([mId, amt]) => {
-          if (amt > 0 && mId.toLowerCase() !== 'cash') {
-            const code = getPaymentAccountCode(mId, bankAcc?.code || '1030');
+      if (s.paymentBreakdown && typeof s.paymentBreakdown === 'object') {
+        const handledMethodKeys = new Set<string>();
+        const methods = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : [];
+
+        Object.entries(s.paymentBreakdown).forEach(([mKey, rawAmt]) => {
+          const amt = Number(rawAmt) || 0;
+          if (amt <= 0 || mKey === 'byMethod') return;
+          const normKey = mKey.toLowerCase().trim();
+          if (normKey === 'cash' || normKey === 'due') return;
+
+          const matchedCfg = methods.find(m => m.id.toLowerCase() === normKey || m.name.toLowerCase() === normKey);
+          if (matchedCfg) {
+            if (!handledMethodKeys.has(matchedCfg.id)) {
+              handledMethodKeys.add(matchedCfg.id);
+              handledMethodKeys.add(matchedCfg.name.toLowerCase());
+              const code = getPaymentAccountCode(matchedCfg.id, bankAcc?.code || '1030');
+              postEntry(code, amt, 0, isPrior);
+            }
+          } else if (!handledMethodKeys.has(normKey)) {
+            handledMethodKeys.add(normKey);
+            const code = getPaymentAccountCode(mKey, bankAcc?.code || '1030');
             postEntry(code, amt, 0, isPrior);
           }
         });

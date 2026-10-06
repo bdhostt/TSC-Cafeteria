@@ -2868,18 +2868,91 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const totalProductionCost = totalBomCostVal + totalManualUsedCostVal + totalWastageCostVal;
   const estimatedProfit = netSalesRevenue - (totalProductionCost + totalExpenses);
 
-  const payCash = activeSalesList.reduce((sum, s) => sum + (s.cash || 0), 0);
-  const payCard = activeSalesList.reduce((sum, s) => sum + (s.card || 0), 0);
-  const payBkash = activeSalesList.reduce((sum, s) => sum + (s.bkash || 0), 0);
-  const payNagad = activeSalesList.reduce((sum, s) => sum + (s.nagad || 0), 0);
+  const methodList = (data.paymentMethods && data.paymentMethods.length > 0) ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
+  const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
 
   // Helper to find configured payment method
   const getMethodConfig = (m?: string): PaymentMethodConfig | undefined => {
     if (!m) return undefined;
-    const list = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
+    const list = (data.paymentMethods && data.paymentMethods.length > 0) ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
     const norm = m.toLowerCase().trim();
     return list.find(pm => pm.id.toLowerCase() === norm || pm.name.toLowerCase() === norm || norm.includes(pm.id.toLowerCase()) || norm.includes(pm.name.toLowerCase()));
   };
+
+  const hasDedicatedMfsHead = coaList.some(a => (a.systemRole || getAccountSystemRole(a)) === 'MOBILE_BANKING' || a.code === '1040');
+
+  let payCash = 0;
+  let payCard = 0;
+  let payBkash = 0;
+  let payNagad = 0;
+
+  activeSalesList.forEach(s => {
+    if (s.paymentBreakdown && typeof s.paymentBreakdown === 'object') {
+      const handledMethodKeys = new Set<string>();
+      Object.entries(s.paymentBreakdown).forEach(([key, rawAmt]) => {
+        const amt = Number(rawAmt) || 0;
+        if (amt <= 0 || key === 'byMethod') return;
+        const normKey = key.toLowerCase().trim();
+
+        const matched = methodList.find(m => m.id.toLowerCase() === normKey || m.name.toLowerCase() === normKey);
+        if (matched) {
+          if (!handledMethodKeys.has(matched.id)) {
+            handledMethodKeys.add(matched.id);
+            handledMethodKeys.add(matched.name.toLowerCase());
+
+            let targetRole: AccountSystemRole | undefined = undefined;
+            if (matched.ledgerAccountId) {
+              const linkedAcc = coaList.find(a => a.code === matched.ledgerAccountId || a.id === matched.ledgerAccountId);
+              if (linkedAcc) {
+                targetRole = linkedAcc.systemRole || getAccountSystemRole(linkedAcc);
+              }
+            }
+
+            if (targetRole === 'BANK' || matched.type === 'BANK' || matched.type === 'CARD') {
+              payCard += amt;
+            } else if (targetRole === 'CASH' || matched.type === 'CASH') {
+              payCash += amt;
+            } else if (targetRole === 'MOBILE_BANKING' || matched.type === 'MFS') {
+              if (hasDedicatedMfsHead) {
+                const mNorm = `${matched.id} ${matched.name} ${matched.providerName || ''}`.toLowerCase();
+                if (mNorm.includes('nagad')) payNagad += amt;
+                else payBkash += amt;
+              } else {
+                // If no dedicated MFS account head in Chart of Accounts, settle into primary Bank Account
+                payCard += amt;
+              }
+            } else {
+              payCard += amt;
+            }
+          }
+        } else if (!handledMethodKeys.has(normKey)) {
+          handledMethodKeys.add(normKey);
+          if (normKey === 'cash') payCash += amt;
+          else if (normKey === 'card') payCard += amt;
+          else if (normKey === 'nagad') {
+            if (hasDedicatedMfsHead) payNagad += amt;
+            else payCard += amt;
+          } else if (normKey === 'bkash') {
+            if (hasDedicatedMfsHead) payBkash += amt;
+            else payCard += amt;
+          } else if (normKey === 'due') {
+            // Customer credit receivable
+          } else {
+            payCard += amt;
+          }
+        }
+      });
+    } else {
+      payCash += (s.cash || 0);
+      if (hasDedicatedMfsHead) {
+        payCard += (s.card || 0);
+        payBkash += (s.bkash || 0);
+        payNagad += (s.nagad || 0);
+      } else {
+        payCard += (s.card || 0) + (s.bkash || 0) + (s.nagad || 0);
+      }
+    }
+  });
 
   // Payment Account Live Balances (Cash Drawer, Bank Transfer, Cheque, bKash Merchant, Nagad Merchant, Petty Cash)
   const isExpenseCash = (m?: string) => {
@@ -2997,7 +3070,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const vendorPayBkash = data.payments.filter(p => isBkashMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
   const vendorPayNagad = data.payments.filter(p => isNagadMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
   const getOpeningBalance = (roleOrCode: string, fallbackKeywords: string[] = []): number => {
     // 1. Dynamic ERP System Role mapping
     const matchByRole = coaList.find(a => (a.systemRole || getAccountSystemRole(a)) === roleOrCode);
