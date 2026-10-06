@@ -48,7 +48,7 @@ async function initDatabase() {
         await RestaurantStateModel.findOneAndUpdate(
           { stateKey: STATE_KEY },
           { stateKey: STATE_KEY, data: cachedState, timestamp: Date.now() },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
         isLoadedFromMongo = true;
         console.log("🌱 Seeded initial restaurant state into MongoDB from local backup.");
@@ -1782,7 +1782,7 @@ async function startServer() {
             await RestaurantStateModel.findOneAndUpdate(
               { stateKey: STATE_KEY },
               { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
-              { upsert: true, new: true }
+              { upsert: true, returnDocument: 'after' }
             );
             isLoadedFromMongo = true;
           } catch (err: any) {
