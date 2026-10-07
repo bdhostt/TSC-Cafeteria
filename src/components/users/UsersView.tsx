@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRestaurant, DEFAULT_ROLE_PERMISSIONS, DEFAULT_USERS, DEFAULT_ORDER_EDIT_PERMISSIONS } from '../../context/RestaurantContext';
 import { AppUser, UserRole, ActiveTab } from '../../types';
 import { 
@@ -14,7 +14,9 @@ import {
   Phone, 
   Layers,
   Save,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  X
 } from 'lucide-react';
 
 const ROLE_DEFINITIONS: Array<{ role: UserRole; title: string; desc: string; color: string }> = [
@@ -59,6 +61,21 @@ export const UsersView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'roles'>('users');
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | UserRole>('ALL');
+
+  const filteredUsers = useMemo(() => {
+    return usersList.filter(user => {
+      const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q || 
+        user.name.toLowerCase().includes(q) ||
+        user.username.toLowerCase().includes(q) ||
+        (user.email && user.email.toLowerCase().includes(q)) ||
+        (user.phone && user.phone.includes(q));
+      return matchesRole && matchesSearch;
+    });
+  }, [usersList, roleFilter, searchQuery]);
 
   // Form State
   const [formData, setFormData] = useState<{
@@ -253,124 +270,227 @@ export const UsersView: React.FC = () => {
 
       {/* TAB 1: USERS DIRECTORY */}
       {activeSubTab === 'users' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {usersList.map(user => {
-              const isCurrent = currentUser?.id === user.id;
-              const roleDef = ROLE_DEFINITIONS.find(r => r.role === user.role);
-
-              return (
-                <div 
-                  key={user.id}
-                  className={`bg-white rounded-2xl border p-4 shadow-xs transition hover:shadow-md flex flex-col justify-between ${
-                    isCurrent ? 'border-purple-400 ring-2 ring-purple-400/20' : 'border-slate-200'
-                  }`}
+        <div className="space-y-3">
+          {/* Search & Filter Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search staff by name, username, phone..."
+                className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                 >
-                  <div>
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-[#004b9b] text-white font-black text-base flex items-center justify-center shadow-xs">
-                          {user.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-black text-slate-900 leading-snug">{user.name}</h3>
-                            {isCurrent && (
-                              <span className="text-[10px] font-extrabold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md">
-                                Current
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {(['ALL', 'ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'CHEF'] as const).map(role => {
+                const isSelected = roleFilter === role;
+                const count = role === 'ALL' ? usersList.length : usersList.filter(u => u.role === role).length;
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setRoleFilter(role)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                      isSelected
+                        ? 'bg-purple-600 text-white shadow-2xs'
+                        : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>{role}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Ultra-Slim Enterprise Table View (Like Image 2) */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="py-2.5 px-3">Operator / Staff</th>
+                    <th className="py-2.5 px-3">System Role</th>
+                    <th className="py-2.5 px-3">Contact (Phone / Email)</th>
+                    <th className="py-2.5 px-3 text-center">Security PIN</th>
+                    <th className="py-2.5 px-3 text-center">Modules</th>
+                    <th className="py-2.5 px-3 text-center">Order Edit / Void</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-8 text-slate-400 text-xs font-semibold">
+                        No operators found matching your filter
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map(user => {
+                      const isCurrent = currentUser?.id === user.id;
+                      const roleDef = ROLE_DEFINITIONS.find(r => r.role === user.role);
+                      const canEditOrder = user.role === 'ADMIN' || user.role === 'MANAGER' || Boolean(user.canEditSubmittedOrders);
+
+                      return (
+                        <tr
+                          key={user.id}
+                          className={`hover:bg-slate-50/90 transition select-none group cursor-pointer ${
+                            isCurrent ? 'bg-purple-50/30' : ''
+                          }`}
+                          onDoubleClick={() => handleOpenEdit(user)}
+                        >
+                          {/* 1. Operator / Staff Name + Username */}
+                          <td className="py-2 px-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-[#004b9b] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                                {user.name.charAt(0)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5 leading-tight">
+                                  <span className="truncate">{user.name}</span>
+                                  {isCurrent && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-800 shrink-0">
+                                      Current
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-mono leading-none mt-0.5">
+                                  @{user.username}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 2. System Role Badge */}
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            <span className={`inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${
+                              roleDef ? roleDef.color : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </td>
+
+                          {/* 3. Contact (Phone / Email) */}
+                          <td className="py-2 px-3 text-slate-600 whitespace-nowrap font-medium text-[11px]">
+                            <div className="flex flex-col">
+                              {user.phone ? (
+                                <span className="font-mono text-slate-700">{user.phone}</span>
+                              ) : (
+                                <span className="text-slate-400 text-[10px]">No phone</span>
+                              )}
+                              {user.email && (
+                                <span className="text-[10px] text-slate-400 truncate max-w-[170px] font-mono">
+                                  {user.email}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 4. Security PIN */}
+                          <td className="py-2 px-3 text-center whitespace-nowrap font-mono text-[11px]">
+                            {user.pinOrPassword ? (
+                              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                                ••••
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px]">None</span>
+                            )}
+                          </td>
+
+                          {/* 5. Modules Access */}
+                          <td className="py-2 px-3 text-center whitespace-nowrap">
+                            {user.role === 'ADMIN' ? (
+                              <span className="text-purple-700 font-extrabold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 text-[10px]">
+                                All (Full)
+                              </span>
+                            ) : (
+                              <span className="text-slate-600 font-semibold bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+                                {(user.permissions || []).length} modules
                               </span>
                             )}
-                          </div>
-                          <p className="text-xs text-slate-500 font-mono">@{user.username}</p>
-                        </div>
-                      </div>
+                          </td>
 
-                      <span className={`text-[10px] font-extrabold uppercase px-2 py-1 rounded-lg border ${
-                        roleDef ? roleDef.color : 'bg-slate-100 text-slate-700 border-slate-200'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </div>
+                          {/* 6. Order Edit / Cancel Permission */}
+                          <td className="py-2 px-3 text-center whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              canEditOrder
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              <span>{canEditOrder ? '✓ Allowed' : 'Locked'}</span>
+                            </span>
+                          </td>
 
-                    {/* Details */}
-                    <div className="mt-4 space-y-2 text-xs border-t border-slate-100 pt-3">
-                      {user.email && (
-                        <div className="flex items-center justify-between text-slate-600">
-                          <span className="flex items-center gap-1.5 text-slate-400 font-medium">
-                            <span className="text-slate-400">@</span> Email:
-                          </span>
-                          <span className="font-mono text-[11px] text-slate-700 font-semibold">{user.email}</span>
-                        </div>
-                      )}
+                          {/* 7. Status */}
+                          <td className="py-2 px-3 text-center whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold">
+                              <span className={`w-2 h-2 rounded-full ${
+                                user.isActive !== false ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-slate-300'
+                              }`} />
+                              <span className={user.isActive !== false ? 'text-emerald-700 text-[10px]' : 'text-slate-400 text-[10px]'}>
+                                {user.isActive !== false ? 'Active' : 'Inactive'}
+                              </span>
+                            </span>
+                          </td>
 
-                      {user.phone && (
-                        <div className="flex items-center justify-between text-slate-600">
-                          <span className="flex items-center gap-1.5 text-slate-400 font-medium">
-                            <Phone className="w-3.5 h-3.5" /> Phone:
-                          </span>
-                          <span className="font-medium text-slate-700">{user.phone}</span>
-                        </div>
-                      )}
+                          {/* 8. Actions */}
+                          <td className="py-2 px-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(user)}
+                                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="Edit user"
+                              >
+                                <Edit3 className="w-3 h-3 text-slate-500" />
+                                <span>Edit</span>
+                              </button>
 
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span className="flex items-center gap-1.5 text-slate-400 font-medium">
-                          <Key className="w-3.5 h-3.5" /> PIN / Password:
-                        </span>
-                        <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-800 font-bold">
-                          {user.pinOrPassword ? '••••' : 'No PIN'}
-                        </span>
-                      </div>
+                              {user.id !== 'USR-01' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteUser(user.id)}
+                                  className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                                  title="Delete user"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              ) : (
+                                <span className="w-5" />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span className="flex items-center gap-1.5 text-slate-400 font-medium">
-                          <Layers className="w-3.5 h-3.5" /> Allowed Modules:
-                        </span>
-                        <span className="font-bold text-slate-800">
-                          {user.role === 'ADMIN' ? 'All (Unrestricted)' : `${(user.permissions || []).length} modules`}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span className="flex items-center gap-1.5 text-slate-400 font-medium">
-                          <Shield className="w-3.5 h-3.5" /> Cancel/Edit Order:
-                        </span>
-                        <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
-                          (user.role === 'ADMIN' || user.role === 'MANAGER' || user.canEditSubmittedOrders)
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {(user.role === 'ADMIN' || user.role === 'MANAGER' || user.canEditSubmittedOrders) ? 'Allowed' : 'Locked (Read-Only)'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => handleOpenEdit(user)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                      title="Edit User Profile & Permissions"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>Edit User</span>
-                    </button>
-
-                    {user.id !== 'USR-01' && (
-                      <button
-                        onClick={() => deleteUser(user.id)}
-                        className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                        title="Delete User"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {/* Bottom summary strip */}
+            <div className="py-2 px-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+              <span>Showing {filteredUsers.length} of {usersList.length} staff accounts</span>
+              <span className="text-[10px] text-slate-400">Double-click any row to edit</span>
+            </div>
           </div>
         </div>
       )}
