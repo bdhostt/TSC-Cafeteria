@@ -7,7 +7,6 @@ import {
   Edit3,
   Trash2,
   CheckCircle2,
-  Check,
   X,
   Smartphone,
   Banknote,
@@ -809,56 +808,32 @@ export const PaymentMethodsConfigView: React.FC = () => {
                 />
               </div>
 
-              {/* Payment Type Selection (Visual Cards Marking) */}
+              {/* Payment Type Selection (Standard Dropdown Select) */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-black text-slate-800">
-                    {language === 'bn' ? 'পেমেন্ট টাইপ মার্ক করুন (Mark Payment Type) *' : 'Mark Payment Type *'}
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    {language === 'bn' ? 'পেমেন্ট টাইপ (Payment Type) *' : 'Payment Type *'}
                   </label>
-                  <span className="text-[10px] font-bold text-slate-500">
+                  <span className="text-[10px] font-semibold text-slate-400">
                     {language === 'bn' ? 'টাইপ ভিত্তিক ফিল্টারিং ও লেজার সংযোগ' : 'Type-based POS filtering & ledger mapping'}
                   </span>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {PAYMENT_TYPE_OPTIONS.map(opt => {
-                    const isSelected = formType === opt.type;
-                    return (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        onClick={() => handleSelectType(opt.type)}
-                        className={`p-2.5 rounded-xl border text-left transition relative cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? opt.activeBorderClass
-                            : `${opt.borderClass} bg-slate-50/60 hover:bg-slate-100/70`
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <div className="p-1.5 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
-                            {getTypeIcon(opt.type, 'w-3.5 h-3.5')}
-                          </div>
-                          {isSelected ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-[#004b9b] text-white">
-                              <Check className="w-2.5 h-2.5" />
-                              <span>Marked</span>
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-semibold text-slate-400">Select</span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-extrabold text-[11px] leading-tight">
-                            {language === 'bn' ? opt.bnLabel : opt.label}
-                          </div>
-                          <div className="text-[9px] text-slate-500 mt-0.5 line-clamp-1 leading-snug">
-                            {language === 'bn' ? opt.bnSubTitle : opt.subTitle}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <select
+                  value={formType}
+                  onChange={e => handleSelectType(e.target.value as PaymentMethodType)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#004b9b] font-medium text-slate-800 cursor-pointer"
+                >
+                  {PAYMENT_TYPE_OPTIONS.map(opt => (
+                    <option key={opt.type} value={opt.type}>
+                      {language === 'bn' ? opt.bnLabel : opt.label} ({opt.subTitle})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {language === 'bn'
+                    ? 'টাইপ পরিবর্তন করলে ডিফল্ট প্রোভাইডার ও লেজার হেড স্বয়ংক্রিয়ভাবে আপডেট হবে'
+                    : 'Changing type auto-fills suggested provider and linked ledger head'}
+                </p>
               </div>
 
               {/* Provider Name */}
