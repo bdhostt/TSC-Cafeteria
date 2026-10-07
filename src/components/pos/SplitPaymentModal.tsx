@@ -241,16 +241,19 @@ export const SplitPaymentModal: React.FC = () => {
             {paymentMethods.map(m => {
               const colorCls = getMethodButtonColor(m);
               const icon = getMethodIcon(m);
+              const isDue = m.type === 'CREDIT' || m.name.toLowerCase().includes('due');
+              const label = isDue ? 'Full Due' : `Full ${m.name}`;
               return (
                 <button
                   key={m.id}
                   type="button"
                   id={`preset-all-${m.id}`}
                   onClick={() => handleFillAll(m.id)}
+                  title={`Full ${m.name}`}
                   className={`py-2 px-1 text-center border rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer ${colorCls}`}
                 >
                   {icon}
-                  <span className="truncate max-w-full">Full {m.name}</span>
+                  <span className="truncate max-w-full">{label}</span>
                 </button>
               );
             })}
