@@ -620,6 +620,25 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       totalOpEx += e.amount;
     });
 
+    // Journal adjustments to Operating Expenses
+    (data.journalEntries || []).forEach(j => {
+      if (!matchesDate(j.date)) return;
+      const coa = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+      const debitAcc = coa.find(a => a.id === j.debitAccountId || a.code === j.debitAccountId);
+      const creditAcc = coa.find(a => a.id === j.creditAccountId || a.code === j.creditAccountId);
+
+      if (debitAcc?.type === 'EXPENSE') {
+        const headName = debitAcc.name || 'Expense Adjustment';
+        expenseBreakdown[headName] = (expenseBreakdown[headName] || 0) + j.amount;
+        totalOpEx += j.amount;
+      }
+      if (creditAcc?.type === 'EXPENSE') {
+        const headName = creditAcc.name || 'Expense Adjustment';
+        expenseBreakdown[headName] = (expenseBreakdown[headName] || 0) - j.amount;
+        totalOpEx -= j.amount;
+      }
+    });
+
     const operatingProfitEbitda = grossProfit - totalOpEx;
     const operatingMargin = netRevenue > 0 ? ((operatingProfitEbitda / netRevenue) * 100).toFixed(1) : '0';
 
@@ -650,7 +669,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       netProfit,
       netProfitMargin
     };
-  }, [data.sales, data.inventory, data.expenses, data.masterItems, data.menuItems, startDate, endDate]);
+  }, [data.sales, data.inventory, data.expenses, data.masterItems, data.menuItems, data.journalEntries, data.chartOfAccounts, startDate, endDate]);
 
   // --- 16. BALANCE SHEET (AS PER IFRS - STATEMENT OF FINANCIAL POSITION) ---
   const ifrsBalanceSheetData = useMemo(() => {
@@ -722,6 +741,29 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       else bankBalance += adv.amount;
     });
 
+    // Journal Entries Effect on Cash, Bank, AR, AP
+    (data.journalEntries || []).forEach(j => {
+      const isDrCash = j.debitAccountId === '1010' || j.debitAccountName?.includes('1010');
+      const isCrCash = j.creditAccountId === '1010' || j.creditAccountName?.includes('1010');
+      if (isDrCash) cashBalance += j.amount;
+      if (isCrCash) cashBalance -= j.amount;
+
+      const isDrBank = j.debitAccountId === '1030' || j.debitAccountId === '1040' || j.debitAccountName?.includes('1030') || j.debitAccountName?.includes('1040');
+      const isCrBank = j.creditAccountId === '1030' || j.creditAccountId === '1040' || j.creditAccountName?.includes('1030') || j.creditAccountName?.includes('1040');
+      if (isDrBank) bankBalance += j.amount;
+      if (isCrBank) bankBalance -= j.amount;
+
+      const isDrAr = j.debitAccountId === '1050' || j.debitAccountName?.includes('1050');
+      const isCrAr = j.creditAccountId === '1050' || j.creditAccountName?.includes('1050');
+      if (isDrAr) arBalance += j.amount;
+      if (isCrAr) arBalance -= j.amount;
+
+      const isDrAp = j.debitAccountId === '2010' || j.debitAccountName?.includes('2010');
+      const isCrAp = j.creditAccountId === '2010' || j.creditAccountName?.includes('2010');
+      if (isDrAp) apBalance -= j.amount;
+      if (isCrAp) apBalance += j.amount;
+    });
+
     const totalCurrentAssets = Math.max(0, cashBalance) + Math.max(0, bankBalance) + Math.max(0, arBalance) + Math.round(closingInventoryVal);
     const nonCurrentAssets = 250000; // Kitchen plant, cold rooms, POS hardware
     const totalAssets = totalCurrentAssets + nonCurrentAssets;
@@ -764,7 +806,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       totalEquity,
       totalEquityAndLiabilities
     };
-  }, [data.masterItems, data.inventory, data.purchases, data.sales, data.payments, data.expenses, data.customerAdvances, ifrsPnlData.netProfit]);
+  }, [data.masterItems, data.inventory, data.purchases, data.sales, data.payments, data.expenses, data.customerAdvances, data.journalEntries, ifrsPnlData.netProfit]);
 
   // --- 17. CASH FLOW STATEMENT (AS PER IFRS - IAS 7) ---
   const ifrsCashFlowData = useMemo(() => {

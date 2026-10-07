@@ -225,7 +225,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
   const dayBookData = useMemo(() => {
     const entries: Array<{
       date: string;
-      type: 'POS Sales' | 'Due Collection' | 'Purchase Bill' | 'Supplier Payment' | 'Expense Voucher' | 'Customer Advance';
+      type: 'POS Sales' | 'Due Collection' | 'Purchase Bill' | 'Supplier Payment' | 'Expense Voucher' | 'Customer Advance' | 'Journal Voucher';
       voucherNo: string;
       party: string;
       details: string;
@@ -322,6 +322,34 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
       });
     });
 
+    // 6. Double-Entry Journal Vouchers
+    (data.journalEntries || []).forEach(j => {
+      if (!matchesDate(j.date)) return;
+
+      const isDrCashOrBank = j.debitAccountId === '1010' || j.debitAccountId === '1020' || j.debitAccountId === '1030' || j.debitAccountId === '1040' ||
+                             (j.debitAccountName && (j.debitAccountName.includes('1010') || j.debitAccountName.includes('1030') || j.debitAccountName.includes('1040')));
+      const isCrCashOrBank = j.creditAccountId === '1010' || j.creditAccountId === '1020' || j.creditAccountId === '1030' || j.creditAccountId === '1040' ||
+                             (j.creditAccountName && (j.creditAccountName.includes('1010') || j.creditAccountName.includes('1030') || j.creditAccountName.includes('1040')));
+
+      let inflow = 0;
+      let outflow = 0;
+      if (isDrCashOrBank && !isCrCashOrBank) {
+        inflow = j.amount;
+      } else if (isCrCashOrBank && !isDrCashOrBank) {
+        outflow = j.amount;
+      }
+
+      entries.push({
+        date: j.date,
+        type: 'Journal Voucher',
+        voucherNo: j.voucherNo,
+        party: `Dr: ${j.debitAccountName} / Cr: ${j.creditAccountName}`,
+        details: `Journal Voucher Entry: Dr [${j.debitAccountName}] / Cr [${j.creditAccountName}] - ${j.narration}${j.referenceNo ? ` (Ref: ${j.referenceNo})` : ''}`,
+        inflow,
+        outflow
+      });
+    });
+
     // Sort chronologically (most recent first)
     entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -335,7 +363,7 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
         r.type.toLowerCase().includes(q)
       );
     });
-  }, [data.sales, data.purchases, data.payments, data.expenses, data.customerAdvances, startDate, endDate, searchQuery]);
+  }, [data.sales, data.purchases, data.payments, data.expenses, data.customerAdvances, data.journalEntries, startDate, endDate, searchQuery]);
 
   // --- 12. LEDGER REPORT (HEAD-WISE GENERAL LEDGER) ---
   const generalLedgerData = useMemo(() => {
@@ -344,175 +372,317 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
     if (!activeHead) return { head: null, entries: [], opening: 0, totalDebit: 0, totalCredit: 0, closing: 0 };
 
     const openingBalance = activeHead.balance || 0;
-    const entries: Array<{
+    const rawTxList: Array<{
       date: string;
       docNo: string;
       particulars: string;
       debit: number;
       credit: number;
-      balance: number;
     }> = [];
 
-    let currentBalance = openingBalance;
-
-    // Route transactions based on account type
     const activeRole = activeHead.systemRole || getAccountSystemRole(activeHead);
+    const isDebitNormal = activeHead.type === 'ASSET' || activeHead.type === 'EXPENSE' || activeRole === 'OWNER_DRAWINGS';
+
+    // 1. Cash / Petty Cash transactions
     if (activeRole === 'CASH' || activeRole === 'PETTY_CASH' || activeHead.id === '1010' || activeHead.id === '1020') {
-      // Cash in Hand
       data.sales.forEach(s => {
         if (!matchesDate(s.date)) return;
-        if (s.cash > 0) {
-          currentBalance += s.cash;
-          entries.push({
+        if ((s.cash || 0) > 0) {
+          rawTxList.push({
             date: s.date,
             docNo: s.invoiceNo,
             particulars: `POS Cash Sales Revenue`,
             debit: s.cash,
-            credit: 0,
-            balance: currentBalance
+            credit: 0
           });
         }
-        if (s.dueCollected > 0) {
-          currentBalance += s.dueCollected;
-          entries.push({
+        if ((s.dueCollected || 0) > 0) {
+          rawTxList.push({
             date: s.date,
             docNo: `COL-${s.id}`,
             particulars: `Customer Due Collection (${s.dueCollectedFrom || ''})`,
             debit: s.dueCollected,
-            credit: 0,
-            balance: currentBalance
+            credit: 0
+          });
+        }
+      });
+
+      (data.customerAdvances || []).forEach(adv => {
+        if (!matchesDate(adv.date)) return;
+        if (adv.method === 'CASH' && (adv.amount || 0) > 0) {
+          rawTxList.push({
+            date: adv.date,
+            docNo: `ADV-${adv.id}`,
+            particulars: `Customer Advance Deposit (${adv.customer})`,
+            debit: adv.amount,
+            credit: 0
           });
         }
       });
 
       data.expenses.forEach(e => {
         if (!matchesDate(e.date)) return;
-        currentBalance -= e.amount;
-        entries.push({
-          date: e.date,
-          docNo: `EXP-${e.id}`,
-          particulars: `Expense: ${e.head} (${e.note || ''})`,
-          debit: 0,
-          credit: e.amount,
-          balance: currentBalance
-        });
+        const eMethod = (e.paymentMethod || '').toLowerCase();
+        const isPetty = eMethod.includes('petty');
+        if ((activeRole === 'PETTY_CASH' && isPetty) || (activeRole !== 'PETTY_CASH' && (eMethod === 'cash' || !eMethod))) {
+          rawTxList.push({
+            date: e.date,
+            docNo: `EXP-${e.id}`,
+            particulars: `Expense: ${e.head} (${e.note || ''})`,
+            debit: 0,
+            credit: e.amount
+          });
+        }
+      });
+
+      data.purchases.forEach(p => {
+        if (p.status === 'DRAFT' || !matchesDate(p.date)) return;
+        const paid = p.paid ?? (p.paymentType === 'CASH' ? p.total : 0);
+        if (p.paymentType === 'CASH' && paid > 0 && activeRole !== 'PETTY_CASH') {
+          rawTxList.push({
+            date: p.date,
+            docNo: p.billNo,
+            particulars: `Cash Purchase for ${p.vendor}`,
+            debit: 0,
+            credit: paid
+          });
+        }
       });
 
       data.payments.forEach(p => {
         if (!matchesDate(p.date)) return;
-        if (p.method === 'CASH') {
-          currentBalance -= p.amount;
-          entries.push({
+        if (p.method === 'CASH' && (p.amount || 0) > 0 && activeRole !== 'PETTY_CASH') {
+          rawTxList.push({
             date: p.date,
             docNo: `PAY-${p.id}`,
             particulars: `Supplier Payment to ${p.vendor}`,
             debit: 0,
-            credit: p.amount,
-            balance: currentBalance
+            credit: p.amount
           });
         }
       });
-    } else if (activeRole === 'ACCOUNTS_RECEIVABLE' || activeHead.id === '1050') {
-      // Accounts Receivable
+    }
+
+    // 2. Bank & Digital / MFS Accounts
+    else if (activeRole === 'BANK' || activeRole === 'MOBILE_BANKING' || activeHead.id === '1030' || activeHead.id === '1040') {
       data.sales.forEach(s => {
         if (!matchesDate(s.date)) return;
-        if (s.dueGiven > 0) {
-          currentBalance += s.dueGiven;
-          entries.push({
+        if (activeRole === 'BANK' && (s.card || 0) > 0) {
+          rawTxList.push({
+            date: s.date,
+            docNo: s.invoiceNo,
+            particulars: `POS Card / Digital Sales Settlement`,
+            debit: s.card,
+            credit: 0
+          });
+        }
+        if (activeRole === 'MOBILE_BANKING') {
+          const mfsAmt = (s.bkash || 0) + (s.nagad || 0);
+          if (mfsAmt > 0) {
+            rawTxList.push({
+              date: s.date,
+              docNo: s.invoiceNo,
+              particulars: `POS Mobile Banking (bKash/Nagad) Inflow`,
+              debit: mfsAmt,
+              credit: 0
+            });
+          }
+        }
+      });
+
+      (data.customerAdvances || []).forEach(adv => {
+        if (!matchesDate(adv.date)) return;
+        if (adv.method !== 'CASH' && (adv.amount || 0) > 0) {
+          rawTxList.push({
+            date: adv.date,
+            docNo: `ADV-${adv.id}`,
+            particulars: `Advance Booking Deposit (${adv.customer}) - ${adv.method}`,
+            debit: adv.amount,
+            credit: 0
+          });
+        }
+      });
+
+      data.expenses.forEach(e => {
+        if (!matchesDate(e.date)) return;
+        const eMethod = (e.paymentMethod || '').toLowerCase();
+        if (eMethod !== 'cash' && !eMethod.includes('petty')) {
+          rawTxList.push({
+            date: e.date,
+            docNo: `EXP-${e.id}`,
+            particulars: `Operating Expense: ${e.head} (${e.paymentMethod})`,
+            debit: 0,
+            credit: e.amount
+          });
+        }
+      });
+
+      data.payments.forEach(p => {
+        if (!matchesDate(p.date)) return;
+        if (p.method !== 'CASH' && (p.amount || 0) > 0) {
+          rawTxList.push({
+            date: p.date,
+            docNo: `PAY-${p.id}`,
+            particulars: `Bank/MFS Supplier Settlement to ${p.vendor}`,
+            debit: 0,
+            credit: p.amount
+          });
+        }
+      });
+    }
+
+    // 3. Accounts Receivable (Customer Dues)
+    else if (activeRole === 'ACCOUNTS_RECEIVABLE' || activeHead.id === '1050') {
+      data.sales.forEach(s => {
+        if (!matchesDate(s.date)) return;
+        if ((s.dueGiven || 0) > 0) {
+          rawTxList.push({
             date: s.date,
             docNo: s.invoiceNo,
             particulars: `Credit Dining Sale to ${s.dueCustomer || 'Customer'}`,
             debit: s.dueGiven,
-            credit: 0,
-            balance: currentBalance
+            credit: 0
           });
         }
-        if (s.dueCollected > 0) {
-          currentBalance -= s.dueCollected;
-          entries.push({
+        if ((s.dueCollected || 0) > 0) {
+          rawTxList.push({
             date: s.date,
             docNo: `COL-${s.id}`,
             particulars: `Due Collection from ${s.dueCollectedFrom || 'Customer'}`,
             debit: 0,
-            credit: s.dueCollected,
-            balance: currentBalance
+            credit: s.dueCollected
           });
         }
       });
-    } else if (activeRole === 'ACCOUNTS_PAYABLE' || activeHead.id === '2010') {
-      // Accounts Payable
+    }
+
+    // 4. Accounts Payable (Vendor Dues)
+    else if (activeRole === 'ACCOUNTS_PAYABLE' || activeHead.id === '2010') {
       data.purchases.forEach(p => {
-        if (p.status === 'DRAFT') return;
-        if (!matchesDate(p.date)) return;
+        if (p.status === 'DRAFT' || !matchesDate(p.date)) return;
         const paid = p.paid ?? (p.paymentType === 'CASH' ? p.total : 0);
         const due = Math.max(0, p.total - paid);
         if (due > 0) {
-          currentBalance += due;
-          entries.push({
+          rawTxList.push({
             date: p.date,
             docNo: p.billNo,
             particulars: `Credit Purchase Inward from ${p.vendor}`,
             debit: 0,
-            credit: due,
-            balance: currentBalance
+            credit: due
           });
         }
       });
 
       data.payments.forEach(pay => {
         if (!matchesDate(pay.date)) return;
-        currentBalance -= pay.amount;
-        entries.push({
+        rawTxList.push({
           date: pay.date,
           docNo: `PAY-${pay.id}`,
           particulars: `Settlement Paid to ${pay.vendor}`,
           debit: pay.amount,
-          credit: 0,
-          balance: currentBalance
-        });
-      });
-    } else if (activeHead.type === 'REVENUE') {
-      // Sales Revenue
-      data.sales.forEach(s => {
-        if (!matchesDate(s.date)) return;
-        currentBalance += s.total;
-        entries.push({
-          date: s.date,
-          docNo: s.invoiceNo,
-          particulars: `Food & Beverage Dine-in Sales (${s.details})`,
-          debit: 0,
-          credit: s.total,
-          balance: currentBalance
-        });
-      });
-    } else if (activeHead.type === 'EXPENSE') {
-      // Expense Head
-      data.expenses.forEach(e => {
-        if (!matchesDate(e.date)) return;
-        currentBalance += e.amount;
-        entries.push({
-          date: e.date,
-          docNo: `EXP-${e.id}`,
-          particulars: `Operating Expense: ${e.head} - ${e.note || ''}`,
-          debit: e.amount,
-          credit: 0,
-          balance: currentBalance
+          credit: 0
         });
       });
     }
 
-    const totalDebit = entries.reduce((s, r) => s + r.debit, 0);
-    const totalCredit = entries.reduce((s, r) => s + r.credit, 0);
+    // 5. Revenue Accounts
+    else if (activeHead.type === 'REVENUE') {
+      data.sales.forEach(s => {
+        if (!matchesDate(s.date)) return;
+        rawTxList.push({
+          date: s.date,
+          docNo: s.invoiceNo,
+          particulars: `Food & Beverage Dine-in Sales (${s.details || 'Sales'})`,
+          debit: 0,
+          credit: s.total
+        });
+      });
+    }
+
+    // 6. Expense Accounts
+    else if (activeHead.type === 'EXPENSE') {
+      data.expenses.forEach(e => {
+        if (!matchesDate(e.date)) return;
+        const matched = (e.accountId === activeHead.id || e.accountCode === activeHead.code || e.head === activeHead.name);
+        if (matched) {
+          rawTxList.push({
+            date: e.date,
+            docNo: `EXP-${e.id}`,
+            particulars: `Operating Expense: ${e.head} - ${e.note || ''}`,
+            debit: e.amount,
+            credit: 0
+          });
+        }
+      });
+    }
+
+    // 7. General Assets (e.g. Staff Advances, Fixed Assets) - check disbursements allocated to asset head
+    else if (activeHead.type === 'ASSET') {
+      data.expenses.forEach(e => {
+        if (!matchesDate(e.date)) return;
+        const matched = (e.accountId === activeHead.id || e.accountCode === activeHead.code || e.head === activeHead.name);
+        if (matched) {
+          rawTxList.push({
+            date: e.date,
+            docNo: `EXP-${e.id}`,
+            particulars: `Disbursement / Advance: ${e.head} - ${e.note || ''}`,
+            debit: e.amount,
+            credit: 0
+          });
+        }
+      });
+    }
+
+    // 8. DOUBLE-ENTRY JOURNAL VOUCHERS (Integrated across ALL account heads!)
+    (data.journalEntries || []).forEach(j => {
+      if (!matchesDate(j.date)) return;
+      const isDr = j.debitAccountId === activeHead.id || j.debitAccountId === activeHead.code;
+      const isCr = j.creditAccountId === activeHead.id || j.creditAccountId === activeHead.code;
+      if (isDr) {
+        rawTxList.push({
+          date: j.date,
+          docNo: j.voucherNo,
+          particulars: `Journal Voucher (JV): ${j.narration} [Cr: ${j.creditAccountName}]`,
+          debit: j.amount,
+          credit: 0
+        });
+      }
+      if (isCr) {
+        rawTxList.push({
+          date: j.date,
+          docNo: j.voucherNo,
+          particulars: `Journal Voucher (JV): ${j.narration} [Dr: ${j.debitAccountName}]`,
+          debit: 0,
+          credit: j.amount
+        });
+      }
+    });
+
+    // Calculate chronological running balance accurately
+    let running = openingBalance;
+    const processedEntries = rawTxList
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(tx => {
+        if (isDebitNormal) {
+          running += (tx.debit - tx.credit);
+        } else {
+          running += (tx.credit - tx.debit);
+        }
+        return { ...tx, balance: running };
+      });
+
+    const totalDebit = processedEntries.reduce((s, r) => s + r.debit, 0);
+    const totalCredit = processedEntries.reduce((s, r) => s + r.credit, 0);
 
     return {
       head: activeHead,
-      entries: entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      entries: [...processedEntries].reverse(),
       opening: openingBalance,
       totalDebit,
       totalCredit,
-      closing: currentBalance
+      closing: running
     };
-  }, [data.chartOfAccounts, selectedLedgerHead, data.sales, data.purchases, data.payments, data.expenses, startDate, endDate]);
+  }, [data.chartOfAccounts, selectedLedgerHead, data.sales, data.purchases, data.payments, data.expenses, data.journalEntries, data.customerAdvances, startDate, endDate]);
 
   // --- 13. RECEIPT & PAYMENT REPORT (CASH & BANK BOOK) ---
   const receiptPaymentData = useMemo(() => {
@@ -1085,7 +1255,8 @@ export const ReceivablesRegistersReports: React.FC<SubReportProps> = ({ reportTy
                             row.type === 'Due Collection' ? 'bg-teal-100 text-teal-800' :
                             row.type === 'Purchase Bill' ? 'bg-blue-100 text-blue-800' :
                             row.type === 'Supplier Payment' ? 'bg-amber-100 text-amber-800' :
-                            row.type === 'Expense Voucher' ? 'bg-rose-100 text-rose-800' : 'bg-purple-100 text-purple-800'
+                            row.type === 'Expense Voucher' ? 'bg-rose-100 text-rose-800' :
+                            row.type === 'Journal Voucher' ? 'bg-indigo-100 text-indigo-800' : 'bg-purple-100 text-purple-800'
                           }`}>
                             {row.type}
                           </span>

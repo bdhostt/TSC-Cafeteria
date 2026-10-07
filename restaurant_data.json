@@ -671,7 +671,20 @@
         "isPaid": true
       }
     ],
-    "journalEntries": [],
+    "journalEntries": [
+      {
+        "voucherNo": "JV-2026-001",
+        "date": "2026-10-07",
+        "debitAccountId": "6190",
+        "debitAccountName": "1040 - Staff  Advance",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand",
+        "amount": 20,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-9005",
+        "id": "jv-1791350322313"
+      }
+    ],
     "tables": [
       {
         "id": "T-01",
@@ -4555,5 +4568,5 @@
       "CHEF": false
     }
   },
-  "timestamp": 1791349729685
+  "timestamp": 1791351241959
 }

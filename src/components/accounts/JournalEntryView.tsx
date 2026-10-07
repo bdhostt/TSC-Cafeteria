@@ -18,22 +18,34 @@ import {
   FileCheck,
   Scale,
   X,
-  Check
+  Check,
+  Pencil
 } from 'lucide-react';
 
 export const JournalEntryView: React.FC = () => {
-  const { data, addJournalEntry, deleteJournalEntry, language } = useRestaurant();
+  const { data, addJournalEntry, editJournalEntry, deleteJournalEntry, language } = useRestaurant();
   const [search, setSearch] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [printingEntry, setPrintingEntry] = useState<JournalEntry | null>(null);
 
   const coa = [...(data.chartOfAccounts || [])].sort((a, b) =>
     (a.code || '').localeCompare(b.code || '', undefined, { numeric: true, sensitivity: 'base' })
   );
   const journalEntries = data.journalEntries || [];
 
+  const getNextVoucherNo = () => {
+    const year = new Date().getFullYear();
+    const maxSeq = (data.journalEntries || []).reduce((max, j) => {
+      const match = j.voucherNo?.match(/-(\d+)$/);
+      return match ? Math.max(max, parseInt(match[1], 10)) : max;
+    }, 0);
+    return `JV-${year}-${(maxSeq + 1).toString().padStart(3, '0')}`;
+  };
+
   // Form State
   const [form, setForm] = useState({
-    voucherNo: `JV-${new Date().getFullYear()}-${(journalEntries.length + 1).toString().padStart(3, '0')}`,
+    voucherNo: getNextVoucherNo(),
     date: new Date().toISOString().split('T')[0],
     debitAccountId: coa.find(c => c.type === 'EXPENSE')?.id || coa[0]?.id || '5010',
     creditAccountId: coa.find(c => c.type === 'ASSET')?.id || coa[1]?.id || '1010',
@@ -43,8 +55,9 @@ export const JournalEntryView: React.FC = () => {
   });
 
   const handleOpenAdd = () => {
+    setEditingId(null);
     setForm({
-      voucherNo: `JV-${new Date().getFullYear()}-${(journalEntries.length + 1).toString().padStart(3, '0')}`,
+      voucherNo: getNextVoucherNo(),
       date: new Date().toISOString().split('T')[0],
       debitAccountId: coa.find(c => c.type === 'EXPENSE')?.id || coa[0]?.id || '5010',
       creditAccountId: coa.find(c => c.type === 'ASSET')?.id || coa[1]?.id || '1010',
@@ -55,26 +68,40 @@ export const JournalEntryView: React.FC = () => {
     setIsNewModalOpen(true);
   };
 
+  const handleOpenEdit = (j: JournalEntry) => {
+    setEditingId(j.id);
+    setForm({
+      voucherNo: j.voucherNo,
+      date: j.date,
+      debitAccountId: j.debitAccountId,
+      creditAccountId: j.creditAccountId,
+      amount: j.amount,
+      narration: j.narration,
+      referenceNo: j.referenceNo || ''
+    });
+    setIsNewModalOpen(true);
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (form.amount <= 0) {
       alert('Please enter a valid debit/credit amount greater than 0.');
       return;
     }
-    const debitAcc = coa.find(c => c.id === form.debitAccountId);
-    const creditAcc = coa.find(c => c.id === form.creditAccountId);
+    const debitAcc = coa.find(c => c.id === form.debitAccountId || c.code === form.debitAccountId);
+    const creditAcc = coa.find(c => c.id === form.creditAccountId || c.code === form.creditAccountId);
 
     if (!debitAcc || !creditAcc) {
       alert('Please select both Debit and Credit account heads.');
       return;
     }
 
-    if (debitAcc.id === creditAcc.id) {
+    if (debitAcc.id === creditAcc.id || debitAcc.code === creditAcc.code) {
       alert('Debit and Credit account cannot be the same.');
       return;
     }
 
-    addJournalEntry({
+    const payload = {
       voucherNo: form.voucherNo,
       date: form.date,
       debitAccountId: debitAcc.id,
@@ -84,9 +111,16 @@ export const JournalEntryView: React.FC = () => {
       amount: Number(form.amount),
       narration: form.narration,
       referenceNo: form.referenceNo
-    });
+    };
+
+    if (editingId) {
+      editJournalEntry(editingId, payload);
+    } else {
+      addJournalEntry(payload);
+    }
 
     setIsNewModalOpen(false);
+    setEditingId(null);
   };
 
   const filteredEntries = journalEntries.filter(j => 
@@ -222,17 +256,36 @@ export const JournalEntryView: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete journal entry ${j.voucherNo}?`)) {
-                            deleteJournalEntry(j.id);
-                          }
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                        title="Delete entry"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setPrintingEntry(j)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition cursor-pointer"
+                          title="Print / View Voucher Slip"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(j)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                          title="Edit voucher"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Delete journal entry ${j.voucherNo}?`)) {
+                              deleteJournalEntry(j.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="Delete entry"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -242,16 +295,16 @@ export const JournalEntryView: React.FC = () => {
         </div>
       </div>
 
-      {/* New Journal Voucher Modal */}
+      {/* New / Edit Journal Voucher Modal */}
       {isNewModalOpen && (
         <div className="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-emerald-600" />
-                Create New Journal Voucher
+                {editingId ? 'Edit Journal Voucher' : 'Create New Journal Voucher'}
               </h3>
-              <button onClick={() => setIsNewModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setIsNewModalOpen(false); setEditingId(null); }} className="p-1 text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -350,19 +403,116 @@ export const JournalEntryView: React.FC = () => {
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsNewModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
+                  onClick={() => { setIsNewModalOpen(false); setEditingId(null); }}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 shadow-md shadow-emerald-500/20 flex items-center gap-1.5"
+                  className="px-5 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Check className="w-4 h-4" /> Save Journal Voucher
+                  <Check className="w-4 h-4" /> {editingId ? 'Update Journal Voucher' : 'Save Journal Voucher'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Voucher Slip Modal */}
+      {printingEntry && (
+        <div className="fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 print:hidden">
+              <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-indigo-600" /> Official Voucher Slip Preview
+              </span>
+              <button onClick={() => setPrintingEntry(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Formal Voucher Slip Content */}
+            <div className="border border-slate-300 rounded-xl p-5 bg-white space-y-4">
+              <div className="text-center border-b pb-3 border-slate-200">
+                <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">
+                  {data.restaurantProfile?.name || 'BD HOSTT RESTAURANT & ERP'}
+                </h2>
+                <div className="inline-block mt-1 px-3 py-0.5 bg-slate-900 text-white text-[11px] font-extrabold uppercase rounded-full">
+                  Journal Voucher (JV)
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 text-xs text-slate-600">
+                <div>
+                  <span className="font-semibold text-slate-400 block text-[10px] uppercase">Voucher No:</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm">{printingEntry.voucherNo}</span>
+                </div>
+                <div className="text-right">
+                  <span className="font-semibold text-slate-400 block text-[10px] uppercase">Date:</span>
+                  <span className="font-mono font-bold text-slate-900">{printingEntry.date}</span>
+                </div>
+                {printingEntry.referenceNo && (
+                  <div className="col-span-2 mt-1">
+                    <span className="font-semibold text-slate-400 text-[10px] uppercase">Ref / Cheque #: </span>
+                    <span className="font-mono font-bold text-slate-800">{printingEntry.referenceNo}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Debit & Credit Ledger Block */}
+              <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                <div className="bg-slate-50 px-3 py-1.5 font-bold text-slate-600 grid grid-cols-12 border-b border-slate-200">
+                  <span className="col-span-8">Particulars (Account Heads)</span>
+                  <span className="col-span-4 text-right">Amount (৳)</span>
+                </div>
+                <div className="p-3 space-y-2">
+                  <div className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-50/60 p-2 rounded-md">
+                    <span>Dr: {printingEntry.debitAccountName}</span>
+                    <span className="font-mono text-sm">৳{printingEntry.amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-teal-800 font-bold bg-teal-50/60 p-2 rounded-md">
+                    <span>Cr: {printingEntry.creditAccountName}</span>
+                    <span className="font-mono text-sm">৳{printingEntry.amount.toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="bg-slate-100 px-3 py-2 font-black text-slate-900 flex justify-between border-t border-slate-200">
+                  <span>Total Voucher Value:</span>
+                  <span className="font-mono text-sm">৳{printingEntry.amount.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Narration */}
+              <div className="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                <span className="font-bold text-slate-500 block text-[10px] uppercase">Narration / Description:</span>
+                <p className="text-slate-800 italic mt-0.5">{printingEntry.narration}</p>
+              </div>
+
+              {/* Signature Blocks */}
+              <div className="grid grid-cols-3 gap-2 pt-6 text-[10px] text-center font-bold text-slate-500">
+                <div className="border-t border-slate-300 pt-1">Prepared By</div>
+                <div className="border-t border-slate-300 pt-1">Checked By</div>
+                <div className="border-t border-slate-300 pt-1">Authorized Signatory</div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPrintingEntry(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-5 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-500 shadow-md shadow-indigo-500/20 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-4 h-4" /> Print Voucher Slip
+              </button>
+            </div>
           </div>
         </div>
       )}

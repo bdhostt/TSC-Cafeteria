@@ -1528,6 +1528,7 @@ interface RestaurantContextType {
 
   // Accounting Journal Entries
   addJournalEntry: (entry: Omit<JournalEntry, 'id'>) => void;
+  editJournalEntry: (id: string, entry: Partial<JournalEntry>) => void;
   deleteJournalEntry: (id: string) => void;
 
   // Chart of Accounts (COA)
@@ -6776,6 +6777,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
+  const editJournalEntry = (id: string, updated: Partial<JournalEntry>) => {
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => ({
+      ...prev,
+      journalEntries: (prev.journalEntries || DEFAULT_JOURNAL_ENTRIES).map(j =>
+        j.id === id ? { ...j, ...updated } : j
+      )
+    }));
+  };
+
   const deleteJournalEntry = (id: string) => {
     setData(prev => ({
       ...prev,
@@ -6847,10 +6858,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (prev.journalEntries) {
           updatedJournalEntries = prev.journalEntries.map(j => ({
             ...j,
-            debitAccountId: j.debitAccountId === oldCode ? newCode : j.debitAccountId,
-            creditAccountId: j.creditAccountId === oldCode ? newCode : j.creditAccountId,
-            debitAccountName: (j.debitAccountId === oldCode || j.debitAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.debitAccountName,
-            creditAccountName: (j.creditAccountId === oldCode || j.creditAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.creditAccountName
+            debitAccountId: (j.debitAccountId === oldCode || j.debitAccountId === id) ? newCode : j.debitAccountId,
+            creditAccountId: (j.creditAccountId === oldCode || j.creditAccountId === id) ? newCode : j.creditAccountId,
+            debitAccountName: (j.debitAccountId === oldCode || j.debitAccountId === id || j.debitAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.debitAccountName,
+            creditAccountName: (j.creditAccountId === oldCode || j.creditAccountId === id || j.creditAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.creditAccountName
           }));
         }
       }
@@ -7562,6 +7573,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       editLeaveType,
       deleteLeaveType,
       addJournalEntry,
+      editJournalEntry,
       deleteJournalEntry,
       addConfigItem,
       editConfigItem,
@@ -7620,12 +7632,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         payBkash,
         payNagad,
         paymentAccountBalances: {
-          cashDrawer: cashDrawerBalance,
-          pettyCash: pettyCashBalance,
-          bankTransfer: bankTransferBalance,
+          cashDrawer: getMethodLiveBalance('cash') || cashDrawerBalance,
+          pettyCash: getMethodLiveBalance('petty_cash') || pettyCashBalance,
+          bankTransfer: getMethodLiveBalance('bank_transfer') || bankTransferBalance,
           cheque: chequeBalance,
-          bkashMerchant: bkashMerchantBalance,
-          nagadMerchant: nagadMerchantBalance
+          bkashMerchant: getMethodLiveBalance('bkash_merchant') || bkashMerchantBalance,
+          nagadMerchant: getMethodLiveBalance('nagad_merchant') || nagadMerchantBalance
         },
         freeTablesCount,
         occupiedTablesCount,
