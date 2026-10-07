@@ -583,7 +583,7 @@ export const UsersView: React.FC = () => {
                   type="text"
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Tanvir Ahmed"
+                  placeholder="e.g. Sajib Khan"
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
                   required
                 />
@@ -596,7 +596,7 @@ export const UsersView: React.FC = () => {
                     type="text"
                     value={formData.username}
                     onChange={e => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="e.g. tanvir"
+                    placeholder="e.g. sajib"
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     required
                   />
