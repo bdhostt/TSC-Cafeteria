@@ -58,7 +58,8 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
     const arAcc = getAccountByRole('ACCOUNTS_RECEIVABLE') || getAccountByCode('1050') || coaList.find(a => a.type === 'ASSET');
     const invAcc = getAccountByRole('INVENTORY_ASSET') || getAccountByCode('1060') || coaList.find(a => a.type === 'ASSET');
     const apAcc = getAccountByRole('ACCOUNTS_PAYABLE') || getAccountByCode('2010') || coaList.find(a => a.type === 'LIABILITY');
-    const advanceAcc = getAccountByRole('CUSTOMER_ADVANCE') || getAccountByCode('2020') || getAccountByCode('2030') || coaList.find(a => a.type === 'LIABILITY');
+    const advanceAcc = getAccountByRole('CUSTOMER_ADVANCE') || getAccountByCode('2030') || getAccountByCode('2020') || coaList.find(a => a.type === 'LIABILITY');
+    const taxAcc = getAccountByRole('TAX_PAYABLE') || getAccountByCode('2020') || getAccountByCode('2030');
     const dineInRevAcc = getAccountByRole('DINE_IN_REVENUE') || getAccountByCode('4010') || coaList.find(a => a.type === 'REVENUE');
     const deliveryRevAcc = getAccountByRole('DELIVERY_REVENUE') || getAccountByCode('4020') || dineInRevAcc;
 
@@ -92,6 +93,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       if (norm === 'BKASH' || norm === 'NAGAD' || norm === 'MFS' || norm === 'ROCKET' || norm === 'UPAY') return mfsAcc?.code || '1040';
       if (norm === 'BANK' || norm === 'CARD' || norm === 'CHEQUE' || norm === 'POS') return bankAcc?.code || '1030';
       if (norm === 'CREDIT' || norm === 'DUE') return arAcc?.code || '1050';
+      if (norm === 'ADVANCE' || norm.includes('ADVANCE')) return advanceAcc?.code || '2030';
 
       const directAcc = coaList.find(a => a.code === methodIdOrName || a.id === methodIdOrName);
       if (directAcc) return directAcc.code;
@@ -128,8 +130,17 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
         revCode = deliveryRevAcc.code;
       }
 
-      // Cr Revenue Gross
-      postEntry(revCode, 0, gross, isPrior);
+      // VAT calculation for the sale
+      const vatVal = (typeof s.vatVal === 'number' && s.vatVal >= 0) ? s.vatVal : 0;
+      const netRev = Math.max(0, gross - disc - vatVal);
+
+      // Cr Revenue (Net Sales Revenue)
+      postEntry(revCode, 0, netRev, isPrior);
+
+      // Cr VAT & Tax Payable (Statutory Liabilities)
+      if (vatVal > 0) {
+        postEntry(taxAcc?.code || '2020', 0, vatVal, isPrior);
+      }
 
       // Dr Sales Discount (contra-revenue)
       if (disc > 0) {
@@ -151,7 +162,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
           const amt = Number(rawAmt) || 0;
           if (amt <= 0 || mKey === 'byMethod') return;
           const normKey = mKey.toLowerCase().trim();
-          if (normKey === 'cash' || normKey === 'due') return;
+          if (normKey === 'cash' || normKey === 'due' || normKey === 'advance' || normKey.includes('advance') || normKey === 'credit') return;
 
           const matchedCfg = methods.find(m => m.id.toLowerCase() === normKey || m.name.toLowerCase() === normKey);
           if (matchedCfg) {
@@ -171,6 +182,12 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
         if ((s.card || 0) > 0) postEntry(getPaymentAccountCode('card_pos', bankAcc?.code || '1030'), s.card || 0, 0, isPrior);
         if ((s.bkash || 0) > 0) postEntry(getPaymentAccountCode('bkash_merchant', mfsAcc?.code || '1040'), s.bkash || 0, 0, isPrior);
         if ((s.nagad || 0) > 0) postEntry(getPaymentAccountCode('nagad_merchant', mfsAcc?.code || '1040'), s.nagad || 0, 0, isPrior);
+      }
+
+      // Dr Customer Advance Adjustment (deducting from Customer Advance Deposits liability)
+      const advAdjusted = s.advanceAdjusted || (s.paymentBreakdown?.advance ? Number(s.paymentBreakdown.advance) : 0);
+      if (advAdjusted > 0) {
+        postEntry(advanceAcc?.code || '2030', advAdjusted, 0, isPrior);
       }
 
       // Dr Accounts Receivable (Customer Due Incurred)
@@ -274,7 +291,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       postEntry(advFundCode, amt, 0, isPrior);
 
       // Cr Customer Advance Deposits
-      postEntry(advanceAcc?.code || '2020', 0, amt, isPrior);
+      postEntry(advanceAcc?.code || '2030', 0, amt, isPrior);
     });
 
     // 7. Process Recipe BOM Food Cost (COGS & Raw Material Inventory Consumption)
@@ -779,7 +796,9 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
 
     let advanceLiabilities = 0;
     (data.customerAdvances || []).forEach(adv => {
-      if (adv.status === 'ACTIVE') advanceLiabilities += adv.amount;
+      if (adv.status === 'ACTIVE') {
+        advanceLiabilities += Math.max(0, (adv.amount || 0) - (adv.adjustedAmount || 0));
+      }
     });
 
     const totalCurrentLiabilities = apBalance + advanceLiabilities;
