@@ -162,10 +162,19 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
           const amt = Number(rawAmt) || 0;
           if (amt <= 0 || mKey === 'byMethod') return;
           const normKey = mKey.toLowerCase().trim();
-          if (normKey === 'cash' || normKey === 'due' || normKey === 'advance' || normKey.includes('advance') || normKey === 'credit') return;
+          if (
+            normKey === 'cash' || 
+            normKey === 'due' || 
+            normKey === 'advance' || 
+            normKey.includes('advance') || 
+            normKey === 'credit' || 
+            normKey.includes('due') || 
+            normKey.includes('credit')
+          ) return;
 
           const matchedCfg = methods.find(m => m.id.toLowerCase() === normKey || m.name.toLowerCase() === normKey);
           if (matchedCfg) {
+            if (matchedCfg.type === 'CREDIT' || matchedCfg.type === 'CASH') return;
             if (!handledMethodKeys.has(matchedCfg.id)) {
               handledMethodKeys.add(matchedCfg.id);
               handledMethodKeys.add(matchedCfg.name.toLowerCase());
