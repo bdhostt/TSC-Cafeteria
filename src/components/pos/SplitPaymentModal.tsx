@@ -12,11 +12,20 @@ import {
   Coins, 
   Zap,
   Building,
-  QrCode
+  QrCode,
+  Users
 } from 'lucide-react';
 
 export const SplitPaymentModal: React.FC = () => {
-  const { activeSettlingTable, closeSettleModal, settlePayment, data, setTableCustomer, setTableWaiter } = useRestaurant();
+  const { 
+    activeSettlingTable, 
+    closeSettleModal, 
+    settlePayment, 
+    data, 
+    setTableCustomer, 
+    setTableWaiter,
+    getCustomerAvailableAdvance 
+  } = useRestaurant();
 
   const paymentMethods: PaymentMethodConfig[] = (
     data.paymentMethods && data.paymentMethods.length > 0 
@@ -25,6 +34,8 @@ export const SplitPaymentModal: React.FC = () => {
   ).filter(m => m.isActive !== false);
 
   const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
+  const [advanceInputAmt, setAdvanceInputAmt] = useState<number>(0);
+  const [isCustomCustomerInput, setIsCustomCustomerInput] = useState<boolean>(false);
   const [selectedWaiter, setSelectedWaiter] = useState<string>(
     activeSettlingTable?.waiter && activeSettlingTable.waiter !== 'Staff' && activeSettlingTable.waiter !== 'N/A'
       ? activeSettlingTable.waiter
@@ -67,16 +78,45 @@ export const SplitPaymentModal: React.FC = () => {
     }
   }
 
-  const totalEntered = paymentMethods.reduce((sum, m) => sum + (Number(splitAmounts[m.id]) || 0), 0);
+  const effectiveCustomer = (selectedCustomer.trim() || activeSettlingTable.customer || '').trim();
+  const isWalkIn = !effectiveCustomer || effectiveCustomer.toLowerCase().includes('walk-in');
+  const availableAdvance = !isWalkIn && getCustomerAvailableAdvance ? getCustomerAvailableAdvance(effectiveCustomer) : 0;
+
+  // Auto-suggest available advance if customer has advance and no payment entered yet
+  useEffect(() => {
+    if (availableAdvance > 0 && advanceInputAmt === 0) {
+      const hasAnySplit = Object.values(splitAmounts).some(v => Number(v) > 0);
+      if (!hasAnySplit) {
+        setAdvanceInputAmt(Math.min(netTotal, availableAdvance));
+      }
+    }
+  }, [availableAdvance, netTotal]);
+
+  const totalEntered = paymentMethods.reduce((sum, m) => sum + (Number(splitAmounts[m.id]) || 0), 0) + advanceInputAmt;
   const remaining = Math.max(0, netTotal - totalEntered);
   const changeReturn = Math.max(0, totalEntered - netTotal);
 
   const handleFillAll = (mId: string) => {
+    setAdvanceInputAmt(0);
     const next: Record<string, number> = {};
     paymentMethods.forEach(m => {
       next[m.id] = m.id === mId ? netTotal : 0;
     });
     setSplitAmounts(next);
+  };
+
+  const handleApplyAdvance = (customAmt?: number) => {
+    const amtToUse = customAmt !== undefined ? customAmt : Math.min(netTotal, availableAdvance);
+    setAdvanceInputAmt(amtToUse);
+    if (amtToUse >= netTotal) {
+      setSplitAmounts({});
+    } else {
+      const rem = netTotal - amtToUse;
+      const cashMethod = paymentMethods.find(m => m.type === 'CASH');
+      if (cashMethod) {
+        setSplitAmounts({ [cashMethod.id]: rem });
+      }
+    }
   };
 
   const creditMethod = paymentMethods.find(m => m.type === 'CREDIT');
@@ -94,8 +134,16 @@ export const SplitPaymentModal: React.FC = () => {
       setTableWaiter(activeSettlingTable.id, finalWaiter);
     }
 
+    const finalCustomer = (selectedCustomer.trim() || activeSettlingTable.customer || '').trim();
+    if (advanceInputAmt > 0) {
+      if (!finalCustomer || finalCustomer.toLowerCase().includes('walk-in')) {
+        alert('Please select a customer with registered advance deposit to adjust advance!');
+        return;
+      }
+      setTableCustomer(activeSettlingTable.id, finalCustomer);
+    }
+
     if (creditEntered > 0) {
-      const finalCustomer = selectedCustomer.trim() || activeSettlingTable.customer;
       if (!finalCustomer || finalCustomer.toLowerCase().includes('walk-in')) {
         alert('Please select or specify a registered customer name for due/credit sales!');
         return;
@@ -103,9 +151,15 @@ export const SplitPaymentModal: React.FC = () => {
       setTableCustomer(activeSettlingTable.id, finalCustomer);
     }
 
-    settlePayment(activeSettlingTable.id, {
-      byMethod: splitAmounts
-    }, finalWaiter);
+    settlePayment(
+      activeSettlingTable.id, 
+      {
+        byMethod: splitAmounts,
+        advance: advanceInputAmt
+      }, 
+      finalWaiter,
+      finalCustomer || undefined
+    );
   };
 
   const getMethodIcon = (m: PaymentMethodConfig) => {
@@ -153,7 +207,7 @@ export const SplitPaymentModal: React.FC = () => {
             <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
               <span>Order Taker: <strong className="text-slate-800 font-bold">{activeSettlingTable.orderCreatedBy || 'Staff'} {activeSettlingTable.orderCreatedRole ? `(${activeSettlingTable.orderCreatedRole})` : ''}</strong></span>
               <span>• Waiter: <strong className="text-[#004b9b] font-bold">{currentWaiterDisplay && currentWaiterDisplay !== 'Staff' && currentWaiterDisplay !== 'N/A' ? currentWaiterDisplay : 'Not Assigned'}</strong></span>
-              <span>• Customer: <strong className="text-slate-800 font-semibold">{selectedCustomer || activeSettlingTable.customer || 'Walk-in Customer'}</strong></span>
+              <span>• Customer: <strong className="text-slate-800 font-semibold">{effectiveCustomer || 'Walk-in Customer'}</strong></span>
             </p>
           </div>
           <button
@@ -165,37 +219,128 @@ export const SplitPaymentModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Assigned Waiter Selection Bar */}
-        <div className="mt-3 p-2 px-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-            <UserCheck className="w-4 h-4 text-[#004b9b]" />
-            <span>Assigned Waiter:</span>
-            {currentWaiterDisplay && currentWaiterDisplay !== 'Staff' && currentWaiterDisplay !== 'N/A' ? (
-              <span className="text-xs font-extrabold text-[#004b9b] bg-blue-100 px-2 py-0.5 rounded-md">
-                {currentWaiterDisplay}
-              </span>
+        {/* Assigned Waiter & Customer Quick Link Bar */}
+        <div className="mt-3 p-2 px-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1 text-xs font-bold text-slate-700 shrink-0">
+              <UserCheck className="w-3.5 h-3.5 text-[#004b9b]" />
+              <span>Waiter:</span>
+            </div>
+            <select
+              id="settle-select-waiter"
+              value={selectedWaiter}
+              onChange={e => {
+                const w = e.target.value;
+                setSelectedWaiter(w);
+                if (w) setTableWaiter(activeSettlingTable.id, w);
+              }}
+              className="flex-1 max-w-[160px] px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#004b9b] cursor-pointer truncate"
+            >
+              <option value="">-- Choose Waiter --</option>
+              {(data.waiters || []).map(w => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1 text-xs font-bold text-slate-700 shrink-0">
+              <Users className="w-3.5 h-3.5 text-purple-600" />
+              <span>Customer:</span>
+            </div>
+            {isCustomCustomerInput ? (
+              <div className="flex items-center gap-1 flex-1 max-w-[190px]">
+                <input
+                  type="text"
+                  value={selectedCustomer}
+                  onChange={e => {
+                    const c = e.target.value;
+                    setSelectedCustomer(c);
+                  }}
+                  placeholder="Type customer name..."
+                  className="w-full px-2 py-1 bg-white border border-purple-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-600"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsCustomCustomerInput(false)}
+                  className="text-[10px] text-slate-500 hover:text-slate-800 underline shrink-0 cursor-pointer"
+                  title="Back to customer list"
+                >
+                  List
+                </button>
+              </div>
             ) : (
-              <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                Not Assigned
-              </span>
+              <select
+                id="settle-select-customer"
+                value={selectedCustomer}
+                onChange={e => {
+                  if (e.target.value === '__TYPE_NEW__') {
+                    setIsCustomCustomerInput(true);
+                    setSelectedCustomer('');
+                    setAdvanceInputAmt(0);
+                    return;
+                  }
+                  const c = e.target.value;
+                  setSelectedCustomer(c);
+                  if (c) setTableCustomer(activeSettlingTable.id, c);
+                  const cAdv = c && getCustomerAvailableAdvance ? getCustomerAvailableAdvance(c) : 0;
+                  if (cAdv > 0) {
+                    setAdvanceInputAmt(Math.min(netTotal, cAdv));
+                    setSplitAmounts({});
+                  } else {
+                    setAdvanceInputAmt(0);
+                  }
+                }}
+                className="flex-1 max-w-[190px] px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-600 cursor-pointer truncate"
+              >
+                <option value="">Walk-in Customer</option>
+                {(data.customers || []).map(c => {
+                  const cAdv = getCustomerAvailableAdvance(c);
+                  return (
+                    <option key={c} value={c}>
+                      {c} {cAdv > 0 ? `(💰 Adv: ৳${cAdv.toLocaleString()})` : ''}
+                    </option>
+                  );
+                })}
+                <option value="__TYPE_NEW__">+ Type New Customer...</option>
+              </select>
             )}
           </div>
-          <select
-            id="settle-select-waiter"
-            value={selectedWaiter}
-            onChange={e => {
-              const w = e.target.value;
-              setSelectedWaiter(w);
-              if (w) setTableWaiter(activeSettlingTable.id, w);
-            }}
-            className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#004b9b] cursor-pointer"
-          >
-            <option value="">-- Choose Waiter --</option>
-            {(data.waiters || []).map(w => (
-              <option key={w} value={w}>{w}</option>
-            ))}
-          </select>
         </div>
+
+        {/* Customer Advance Available Notification Card */}
+        {availableAdvance > 0 && (
+          <div className="mt-2.5 p-3 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 bg-emerald-600 text-white rounded-lg shrink-0 shadow-xs">
+                <Coins className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-extrabold text-emerald-950">Customer Advance Available</span>
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-extrabold text-[10px]">
+                    Account 2030 (Liability)
+                  </span>
+                </div>
+                <div className="text-[11px] text-emerald-800 font-medium truncate">
+                  {effectiveCustomer} has <strong className="text-emerald-950 font-black">৳ {availableAdvance.toLocaleString()}</strong> advance deposit balance
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              id="btn-apply-advance-header"
+              onClick={() => handleApplyAdvance(Math.min(netTotal, availableAdvance))}
+              className="shrink-0 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-lg shadow-sm transition flex items-center gap-1 cursor-pointer"
+              title="Auto-fill advance deduction"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Adjust ৳{Math.min(netTotal, availableAdvance).toLocaleString()}</span>
+            </button>
+          </div>
+        )}
 
         {/* Bill Summary Banner */}
         <div className="my-4 p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-inner">
@@ -212,6 +357,11 @@ export const SplitPaymentModal: React.FC = () => {
             {isVatEnabled && vatPct > 0 && (
               <div className="text-[11px] text-blue-200">
                 VAT ({vatPct}% {vatMode === 'inclusive' ? 'Included' : 'Extra'}): ৳{modalVatVal.toFixed(2)}
+              </div>
+            )}
+            {advanceInputAmt > 0 && (
+              <div className="text-[11px] text-emerald-300 font-bold">
+                Advance Deducted: ৳{advanceInputAmt.toLocaleString()}
               </div>
             )}
           </div>
@@ -238,6 +388,20 @@ export const SplitPaymentModal: React.FC = () => {
             <span>1-Click Full Payment Shortcut</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            {availableAdvance > 0 && (
+              <button
+                type="button"
+                id="preset-all-advance"
+                onClick={() => handleApplyAdvance(Math.min(netTotal, availableAdvance))}
+                title={`Adjust Advance (Max ৳${availableAdvance.toLocaleString()})`}
+                className="py-2 px-1 text-center border rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer bg-emerald-100 hover:bg-emerald-200 border-emerald-400 text-emerald-950 shadow-xs"
+              >
+                <Coins className="w-4 h-4 text-emerald-700" />
+                <span className="truncate max-w-full">
+                  {availableAdvance >= netTotal ? 'Full Advance' : `Adv ৳${availableAdvance.toLocaleString()}`}
+                </span>
+              </button>
+            )}
             {paymentMethods.map(m => {
               const colorCls = getMethodButtonColor(m);
               const icon = getMethodIcon(m);
@@ -262,6 +426,65 @@ export const SplitPaymentModal: React.FC = () => {
 
         {/* Multi-Split Payment Form */}
         <form onSubmit={handleSettle} className="space-y-3">
+          {/* Customer Advance Adjustment Field */}
+          {availableAdvance > 0 && (
+            <div className="p-3 bg-emerald-50/80 border-2 border-emerald-300 rounded-xl mb-3 shadow-xs">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                  <Coins className="w-4 h-4 text-emerald-700" />
+                  <span>Adjust from Customer Advance (Account 2030)</span>
+                  <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono font-bold">
+                    Max: ৳{availableAdvance.toLocaleString()}
+                  </span>
+                </label>
+                {advanceInputAmt > 0 && (
+                  <span className="text-[11px] font-bold text-emerald-800">
+                    Remaining Deposit: <strong className="font-mono">৳{Math.max(0, availableAdvance - advanceInputAmt).toLocaleString()}</strong>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-emerald-700">৳</span>
+                  <input
+                    type="number"
+                    id="input-pay-advance"
+                    min="0"
+                    max={availableAdvance}
+                    step="1"
+                    value={advanceInputAmt === 0 ? '' : advanceInputAmt}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value) || 0;
+                      const clamped = Math.min(availableAdvance, Math.max(0, val));
+                      setAdvanceInputAmt(clamped);
+                    }}
+                    placeholder="0"
+                    className="w-full pl-7 pr-3 py-2 bg-white border border-emerald-300 rounded-lg text-base font-black text-emerald-950 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleApplyAdvance(Math.min(netTotal, availableAdvance))}
+                  className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-lg text-xs font-bold border border-emerald-300 transition cursor-pointer"
+                >
+                  Max (৳{Math.min(netTotal, availableAdvance).toLocaleString()})
+                </button>
+                {advanceInputAmt > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAdvanceInputAmt(0)}
+                    className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold border border-slate-300 transition cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-emerald-700 mt-1.5 font-medium">
+                <span>✓ Reduces liability (Code 2030) and registers food sales revenue</span>
+                <span>Physical Drawer Cash: Unaltered</span>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {paymentMethods.map(m => {
               const val = getMethodAmt(m.id);

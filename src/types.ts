@@ -444,6 +444,7 @@ export interface SaleRecord {
   dueCustomer?: string;
   dueCollected: number;
   dueCollectedFrom?: string;
+  advanceAdjusted?: number;
   paymentBreakdown?: Record<string, number>;
   change: number;
   total: number;
@@ -556,6 +557,8 @@ export interface CustomerAdvance {
   method: string;
   note?: string;
   status: 'ACTIVE' | 'ADJUSTED' | 'REFUNDED';
+  adjustedAmount?: number;
+  linkedInvoiceNo?: string;
 }
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'WAITER' | 'CHEF';
@@ -768,6 +771,7 @@ export interface PrintableReceipt {
     bkash?: number;
     nagad?: number;
     due?: number;
+    advance?: number;
     byMethod?: Record<string, number>;
   };
   changeReturn?: number;

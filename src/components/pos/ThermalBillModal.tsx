@@ -731,12 +731,17 @@ export const ThermalBillModal: React.FC = () => {
       if (pb.byMethod && Object.keys(pb.byMethod).length > 0) {
         Object.entries(pb.byMethod).forEach(([mKey, amt]) => {
           if (Number(amt) > 0) {
+            if (mKey === 'advance') {
+              lines.push(line2Col('Advance Adjusted:', Number(amt).toFixed(2), width));
+              return;
+            }
             const methodObj = (data?.paymentMethods || []).find(m => m.id === mKey || m.name.toLowerCase() === mKey.toLowerCase());
             const mName = methodObj?.name || mKey;
             lines.push(line2Col(`${mName} Paid:`, Number(amt).toFixed(2), width));
           }
         });
       } else {
+        if (pb.advance && pb.advance > 0) lines.push(line2Col('Advance Adjusted:', Number(pb.advance).toFixed(2), width));
         if (pb.cash > 0) lines.push(line2Col('Cash Paid:', Number(pb.cash).toFixed(2), width));
         if (pb.card > 0) lines.push(line2Col('Card Paid:', Number(pb.card).toFixed(2), width));
         if (pb.bkash > 0) lines.push(line2Col('bKash Paid:', Number(pb.bkash).toFixed(2), width));
@@ -1398,6 +1403,14 @@ export const ThermalBillModal: React.FC = () => {
                   {printableReceipt.paymentBreakdown.byMethod && Object.keys(printableReceipt.paymentBreakdown.byMethod).length > 0 ? (
                     Object.entries(printableReceipt.paymentBreakdown.byMethod).map(([mKey, amt]) => {
                       if (!amt || Number(amt) <= 0) return null;
+                      if (mKey === 'advance') {
+                        return (
+                          <div key="advance" className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-50/70 px-1 py-0.5 rounded">
+                            <span>Customer Advance Adjusted:</span>
+                            <span className="font-mono font-bold text-emerald-900">৳{Number(amt).toFixed(2)}</span>
+                          </div>
+                        );
+                      }
                       const methodObj = (data?.paymentMethods || []).find(m => m.id === mKey || m.name.toLowerCase() === mKey.toLowerCase());
                       const mName = methodObj?.name || mKey;
                       const isDue = methodObj?.type === 'CREDIT' || mName.toLowerCase().includes('due');
@@ -1410,6 +1423,12 @@ export const ThermalBillModal: React.FC = () => {
                     })
                   ) : (
                     <>
+                      {printableReceipt.paymentBreakdown.advance ? (
+                        <div className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-50/70 px-1 py-0.5 rounded">
+                          <span>Customer Advance Adjusted:</span>
+                          <span className="font-mono font-bold text-emerald-900">৳{Number(printableReceipt.paymentBreakdown.advance).toFixed(2)}</span>
+                        </div>
+                      ) : null}
                       {printableReceipt.paymentBreakdown.cash ? (
                         <div className="flex justify-between items-center">
                           <span className="text-slate-600">Cash Received:</span>
