@@ -2922,6 +2922,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (amt <= 0 || key === 'byMethod') return;
         const normKey = key.toLowerCase().trim();
 
+        // Advance adjustment or customer dues are NOT liquid fund receipts at POS settlement
+        // Advance was already accounted for in cash/bank when initially deposited.
+        if (normKey === 'advance' || normKey.includes('advance') || normKey === 'due' || normKey.includes('due') || normKey === 'credit') {
+          return;
+        }
+
         const matched = methodList.find(m => m.id.toLowerCase() === normKey || m.name.toLowerCase() === normKey);
         if (matched) {
           if (!handledMethodKeys.has(matched.id)) {
@@ -2949,6 +2955,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 // If no dedicated MFS account head in Chart of Accounts, settle into primary Bank Account
                 payCard += amt;
               }
+            } else if (matched.type === 'CREDIT' || targetRole === 'ACCOUNTS_RECEIVABLE') {
+              // Customer receivable credit - not liquid cash/bank
             } else {
               payCard += amt;
             }
@@ -2963,8 +2971,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           } else if (normKey === 'bkash') {
             if (hasDedicatedMfsHead) payBkash += amt;
             else payCard += amt;
-          } else if (normKey === 'due') {
-            // Customer credit receivable
+          } else if (normKey === 'due' || normKey === 'credit' || normKey === 'advance') {
+            // Customer credit receivable or advance adjustment
           } else {
             payCard += amt;
           }
