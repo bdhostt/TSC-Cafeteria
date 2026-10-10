@@ -38,10 +38,15 @@ import {
   Grid,
   TrendingUp,
   Sparkles,
-  Home
+  Home,
+  CheckCircle2,
+  RotateCcw,
+  Landmark,
+  Activity,
+  Lock
 } from 'lucide-react';
 
-interface SubMenuItem {
+export interface SubMenuItem {
   id: string;
   tabId: ActiveTab;
   subNav?: string;
@@ -50,7 +55,17 @@ interface SubMenuItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: string | number;
   badgeColor?: string;
+  suiteId?: 'pos' | 'inventory' | 'procurement' | 'receivables' | 'financials';
+  suiteTitle?: string;
 }
+
+export const REPORT_SUITE_GROUPS = [
+  { id: 'pos', title: 'POS & Sales', titleBn: 'পস ও বিক্রয়', icon: UtensilsCrossed, badgeColor: 'bg-emerald-500/20 text-emerald-300' },
+  { id: 'inventory', title: 'Stock & Inventory', titleBn: 'স্টক ও ইনভেন্টরি', icon: Boxes, badgeColor: 'bg-teal-500/20 text-teal-300' },
+  { id: 'procurement', title: 'Purchases & Vendors', titleBn: 'ক্রয় ও ভেন্ডর', icon: ShoppingCart, badgeColor: 'bg-amber-500/20 text-amber-300' },
+  { id: 'receivables', title: 'Registers & Ledgers', titleBn: 'রেজিস্টার ও লেজার', icon: BookOpen, badgeColor: 'bg-sky-500/20 text-sky-300' },
+  { id: 'financials', title: 'IFRS Financials', titleBn: 'আর্থিক বিবরণী', icon: Landmark, badgeColor: 'bg-purple-500/20 text-purple-300' },
+];
 
 interface MenuGroup {
   key: string;
@@ -108,6 +123,39 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
       [key]: !prev[key]
     }));
   };
+
+  // Open/collapse state for 5 report suites under Reports group
+  const [openReportSuites, setOpenReportSuites] = useState<Record<string, boolean>>({
+    pos: true,
+    inventory: false,
+    procurement: false,
+    receivables: false,
+    financials: false,
+  });
+
+  const toggleReportSuite = (suiteId: string) => {
+    setOpenReportSuites(prev => ({
+      ...prev,
+      [suiteId]: !prev[suiteId]
+    }));
+  };
+
+  // Auto-expand appropriate report suite when activeSubNav changes
+  useEffect(() => {
+    if (activeTab === 'reports' && activeSubNav) {
+      if (['pos-sessions', 'commission-report', 'user-sales', 'item-sales', 'category-sales', 'department-sales'].includes(activeSubNav)) {
+        setOpenReportSuites(prev => ({ ...prev, pos: true }));
+      } else if (['inventory-inwards', 'inventory-outward', 'inventory-transactional'].includes(activeSubNav)) {
+        setOpenReportSuites(prev => ({ ...prev, inventory: true }));
+      } else if (['supplier-total-po', 'supplier-grn', 'supplier-returns', 'all-purchases', 'vendor-statement'].includes(activeSubNav)) {
+        setOpenReportSuites(prev => ({ ...prev, procurement: true }));
+      } else if (['receivable-report', 'ageing-schedule', 'day-book', 'ledger-report', 'receipt-payment'].includes(activeSubNav)) {
+        setOpenReportSuites(prev => ({ ...prev, receivables: true }));
+      } else if (['trial-balance', 'pnl-ifrs', 'balance-sheet', 'cash-flow'].includes(activeSubNav)) {
+        setOpenReportSuites(prev => ({ ...prev, financials: true }));
+      }
+    }
+  }, [activeTab, activeSubNav]);
 
   const expandAll = () => {
     setOpenGroups({
@@ -431,61 +479,261 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
       ]
     },
 
-    // 7. Reports & Analytics (All requested sales reports)
+    // 7. Reports & Analytics (All 23 Enterprise Reports)
     {
       key: 'reports',
       title: 'Reports & Analytics',
-      
+      titleBn: 'রিপোর্ট ও বিশ্লেষণ',
       icon: BarChart3,
       items: [
         {
           id: 'reports-hub',
           tabId: 'reports',
           label: 'BI Reports Center',
-          subLabel: 'All 18 Enterprise Reports',
+          subLabel: 'All 23 Enterprise Reports',
           icon: BarChart3,
-          badge: '18',
+          badge: '23',
           badgeColor: 'bg-teal-500/20 text-teal-300 font-bold'
+        },
+
+        // Suite 1: POS & Sales (6)
+        {
+          id: 'rep-pos-sessions',
+          tabId: 'reports',
+          subNav: 'pos-sessions',
+          label: 'POS Shift Sessions & Z-Reports',
+          subLabel: 'Shift reconciliation & variance',
+          icon: Lock,
+          suiteId: 'pos',
+          suiteTitle: 'POS & Sales'
+        },
+        {
+          id: 'rep-commission',
+          tabId: 'reports',
+          subNav: 'commission-report',
+          label: 'Commission Agents & Portals',
+          subLabel: 'Foodpanda, Pathao & Foodi',
+          icon: Percent,
+          suiteId: 'pos',
+          suiteTitle: 'POS & Sales'
         },
         {
           id: 'rep-user-sales',
           tabId: 'reports',
           subNav: 'user-sales',
           label: '1. User Wise Sales Report',
-          subLabel: 'Waiter & Cashier Ranking',
+          subLabel: 'Staff sales volume & ranking',
           icon: UserCheck,
-          badge: 'Staff',
-          badgeColor: 'bg-indigo-500/20 text-indigo-300'
+          suiteId: 'pos',
+          suiteTitle: 'POS & Sales'
         },
         {
           id: 'rep-item-sales',
           tabId: 'reports',
           subNav: 'item-sales',
           label: '2. Item Wise Sales Report',
-          subLabel: 'Dish Quantity & Profit Share',
-          icon: Utensils,
-          badge: 'Items',
-          badgeColor: 'bg-emerald-500/20 text-emerald-300'
+          subLabel: 'Dish quantity & food margin',
+          icon: UtensilsCrossed,
+          suiteId: 'pos',
+          suiteTitle: 'POS & Sales'
         },
         {
-          id: 'rep-category-sales',
+          id: 'rep-cat-sales',
           tabId: 'reports',
           subNav: 'category-sales',
-          label: '3. Category Wise Sales',
-          subLabel: 'Menu Group Revenue Share',
+          label: '3. Category Wise Sales Report',
+          subLabel: 'Category revenue distribution',
           icon: FolderTree,
-          badge: 'Category',
-          badgeColor: 'bg-amber-500/20 text-amber-300'
+          suiteId: 'pos',
+          suiteTitle: 'POS & Sales'
         },
         {
           id: 'rep-dept-sales',
           tabId: 'reports',
           subNav: 'department-sales',
           label: '4. Kitchen Dept Wise Sales',
-          subLabel: 'Kitchen Workload & Stations',
+          subLabel: 'KOT production workload',
           icon: ChefHat,
-          badge: 'Kitchen',
-          badgeColor: 'bg-orange-500/20 text-orange-300'
+          suiteId: 'pos',
+          suiteTitle: 'POS & Sales'
+        },
+
+        // Suite 2: Stock & Inventory (3)
+        {
+          id: 'rep-inv-inward',
+          tabId: 'reports',
+          subNav: 'inventory-inwards',
+          label: 'Inventory Inwards Report',
+          subLabel: 'Material procurement receipts',
+          icon: Boxes,
+          suiteId: 'inventory',
+          suiteTitle: 'Stock & Inventory'
+        },
+        {
+          id: 'rep-inv-outward',
+          tabId: 'reports',
+          subNav: 'inventory-outward',
+          label: 'Inventory Outward Report',
+          subLabel: 'Recipe BOM consumption',
+          icon: Layers,
+          suiteId: 'inventory',
+          suiteTitle: 'Stock & Inventory'
+        },
+        {
+          id: 'rep-inv-trans',
+          tabId: 'reports',
+          subNav: 'inventory-transactional',
+          label: 'Inventory Transactional Report',
+          subLabel: 'Item-wise stock cards & valuation',
+          icon: Activity,
+          suiteId: 'inventory',
+          suiteTitle: 'Stock & Inventory'
+        },
+
+        // Suite 3: Purchases & Vendors (5)
+        {
+          id: 'rep-sup-po',
+          tabId: 'reports',
+          subNav: 'supplier-total-po',
+          label: 'Supplier Wise Total PO',
+          subLabel: 'Purchase orders & pending delivery',
+          icon: ShoppingCart,
+          suiteId: 'procurement',
+          suiteTitle: 'Purchases & Vendors'
+        },
+        {
+          id: 'rep-sup-grn',
+          tabId: 'reports',
+          subNav: 'supplier-grn',
+          label: 'Supplier Wise GRN Report',
+          subLabel: 'Goods received notes & bill totals',
+          icon: CheckCircle2,
+          suiteId: 'procurement',
+          suiteTitle: 'Purchases & Vendors'
+        },
+        {
+          id: 'rep-sup-ret',
+          tabId: 'reports',
+          subNav: 'supplier-returns',
+          label: 'Supplier Wise Return Report',
+          subLabel: 'Damaged materials & debit notes',
+          icon: RotateCcw,
+          suiteId: 'procurement',
+          suiteTitle: 'Purchases & Vendors'
+        },
+        {
+          id: 'rep-all-pur',
+          tabId: 'reports',
+          subNav: 'all-purchases',
+          label: 'All Reports of Purchase',
+          subLabel: '360° consolidated purchase register',
+          icon: FileText,
+          suiteId: 'procurement',
+          suiteTitle: 'Purchases & Vendors'
+        },
+        {
+          id: 'rep-ven-stmt',
+          tabId: 'reports',
+          subNav: 'vendor-statement',
+          label: 'Vendor Statement',
+          subLabel: 'Supplier ledger & balance due',
+          icon: Landmark,
+          suiteId: 'procurement',
+          suiteTitle: 'Purchases & Vendors'
+        },
+
+        // Suite 4: Registers & Ledgers (5)
+        {
+          id: 'rep-receivable',
+          tabId: 'reports',
+          subNav: 'receivable-report',
+          label: 'Receivable Report',
+          subLabel: 'Customer credit dues & collections',
+          icon: Users,
+          suiteId: 'receivables',
+          suiteTitle: 'Registers & Ledgers'
+        },
+        {
+          id: 'rep-ageing',
+          tabId: 'reports',
+          subNav: 'ageing-schedule',
+          label: 'Ageing Schedule (AR & AP)',
+          subLabel: '30/60/90+ days overdue analysis',
+          icon: Clock,
+          suiteId: 'receivables',
+          suiteTitle: 'Registers & Ledgers'
+        },
+        {
+          id: 'rep-daybook',
+          tabId: 'reports',
+          subNav: 'day-book',
+          label: 'Day Book',
+          subLabel: 'Chronological master journal',
+          icon: BookOpen,
+          suiteId: 'receivables',
+          suiteTitle: 'Registers & Ledgers'
+        },
+        {
+          id: 'rep-ledger',
+          tabId: 'reports',
+          subNav: 'ledger-report',
+          label: 'Ledger Report (General Ledger)',
+          subLabel: 'Head-wise interactive debits & credits',
+          icon: FileText,
+          suiteId: 'receivables',
+          suiteTitle: 'Registers & Ledgers'
+        },
+        {
+          id: 'rep-rcpt-pmt',
+          tabId: 'reports',
+          subNav: 'receipt-payment',
+          label: 'Receipt & Payment Report',
+          subLabel: 'Cash & bank inflows and disbursements',
+          icon: Wallet,
+          suiteId: 'receivables',
+          suiteTitle: 'Registers & Ledgers'
+        },
+
+        // Suite 5: IFRS Financial Statements (4)
+        {
+          id: 'rep-trial-bal',
+          tabId: 'reports',
+          subNav: 'trial-balance',
+          label: 'Trial Balance (Transactional)',
+          subLabel: 'Double-entry debit vs credit verification',
+          icon: Scale,
+          suiteId: 'financials',
+          suiteTitle: 'IFRS Financials'
+        },
+        {
+          id: 'rep-pnl',
+          tabId: 'reports',
+          subNav: 'pnl-ifrs',
+          label: 'Profit & Loss Account (IFRS)',
+          subLabel: 'Revenue, BOM food cost & net margin',
+          icon: TrendingUp,
+          suiteId: 'financials',
+          suiteTitle: 'IFRS Financials'
+        },
+        {
+          id: 'rep-bal-sheet',
+          tabId: 'reports',
+          subNav: 'balance-sheet',
+          label: 'Balance Sheet (IFRS)',
+          subLabel: 'Assets, equity & liabilities position',
+          icon: Landmark,
+          suiteId: 'financials',
+          suiteTitle: 'IFRS Financials'
+        },
+        {
+          id: 'rep-cashflow',
+          tabId: 'reports',
+          subNav: 'cash-flow',
+          label: 'Cash Flow Statement',
+          subLabel: 'Operating, investing & financing flows',
+          icon: Receipt,
+          suiteId: 'financials',
+          suiteTitle: 'IFRS Financials'
         }
       ]
     },
@@ -539,9 +787,9 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
       return;
     }
     if (item.subNav) {
-      navigateTo(item.tabId, item.subNav);
+      navigateTo(item.tabId, item.subNav, item.tabId === 'reports' ? 'reports' : undefined);
     } else {
-      navigateTo(item.tabId, '');
+      navigateTo(item.tabId, '', item.tabId === 'reports' ? 'reports' : undefined);
       if (item.tabId === 'pos') {
         setPosView('floor');
       }
@@ -762,7 +1010,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
-                      {group.items.length}
+                      {group.key === 'reports' ? 23 : group.items.length}
                     </span>
                     {isGroupOpen ? (
                       <ChevronDown className="w-3.5 h-3.5 text-slate-400 transition-transform" />
@@ -774,55 +1022,195 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onCloseMobile?: () => void }>
 
                 {/* Sub-menu Items (Rendered when expanded) */}
                 {isGroupOpen && (
-                  <div className="p-1 space-y-0.5 border-t border-slate-800/50 bg-slate-900/60">
-                    {group.items.map(item => {
-                      const ItemIcon = item.icon;
-                      const isItemActive = item.subNav 
-                        ? (activeTab === item.tabId && activeSubNav === item.subNav)
-                        : (activeTab === item.tabId && (item.tabId === 'heads' ? (!activeSubNav || activeSubNav === 'profile' || activeSubNav === 'heads') : (!activeSubNav || activeTab !== 'reports')));
-
-                      return (
-                        <button
-                          key={item.id}
-                          id={`sub-item-${item.id}`}
-                          onClick={() => handleSubItemClick(item)}
-                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer ${
-                            isItemActive
-                              ? 'bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold shadow-xs'
-                              : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <ItemIcon className={`w-3.5 h-3.5 shrink-0 ${
-                              isItemActive ? 'text-white font-bold' : 'text-slate-400'
-                            }`} />
-                            <div className="truncate">
-                              <div className="text-xs truncate leading-tight">
-                                {item.label}
-                              </div>
-                              {item.subLabel && (
-                                <div className={`text-[9px] truncate leading-none mt-0.5 ${
-                                  isItemActive ? 'text-blue-100' : 'text-slate-400'
-                                }`}>
-                                  {item.subLabel}
+                  group.key === 'reports' ? (
+                    <div className="p-1 space-y-1.5 border-t border-slate-800/50 bg-slate-900/60">
+                      {/* Top BI Reports Center Hub */}
+                      {(() => {
+                        const hubItem = group.items.find(i => i.id === 'reports-hub');
+                        if (!hubItem) return null;
+                        const HubIcon = hubItem.icon;
+                        const isHubActive = activeTab === 'reports' && (!activeSubNav || activeSubNav === 'reports');
+                        return (
+                          <button
+                            key={hubItem.id}
+                            id={`sub-item-${hubItem.id}`}
+                            onClick={() => handleSubItemClick(hubItem)}
+                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer border ${
+                              isHubActive
+                                ? 'bg-[#004b9b] hover:bg-[#005bb8] text-white border-blue-600 font-bold shadow-xs'
+                                : 'text-slate-200 bg-slate-850/80 hover:bg-slate-800 hover:text-white border-slate-750/70'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <HubIcon className={`w-3.5 h-3.5 shrink-0 ${isHubActive ? 'text-amber-300' : 'text-teal-400'}`} />
+                              <div className="truncate">
+                                <div className="text-xs font-bold truncate leading-tight">
+                                  {hubItem.label}
                                 </div>
-                              )}
+                                <div className="text-[9px] text-slate-400 truncate leading-none mt-0.5">
+                                  {hubItem.subLabel}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-
-                          {item.badge !== undefined && (
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-semibold ${
-                              isItemActive 
-                                ? 'bg-black text-blue-300 font-black' 
-                                : (item.badgeColor || 'bg-slate-800 text-slate-300')
-                            }`}>
-                              {item.badge}
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-full font-extrabold bg-teal-500/20 text-teal-300">
+                              23
                             </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                          </button>
+                        );
+                      })()}
+
+                      {/* 5 Categorized Report Suites */}
+                      {REPORT_SUITE_GROUPS.map(suite => {
+                        const suiteItems = group.items.filter(i => i.suiteId === suite.id);
+                        if (suiteItems.length === 0) return null;
+
+                        const SuiteIcon = suite.icon;
+                        const isSuiteOpen = searchQuery.length > 0 ? true : !!openReportSuites[suite.id];
+                        const hasActiveInSuite = suiteItems.some(i => activeTab === 'reports' && activeSubNav === i.subNav);
+
+                        return (
+                          <div 
+                            key={suite.id} 
+                            className={`rounded-lg border transition-colors overflow-hidden ${
+                              hasActiveInSuite 
+                                ? 'border-teal-700/60 bg-slate-950/40' 
+                                : 'border-slate-800/60 bg-slate-950/20'
+                            }`}
+                          >
+                            {/* Suite Accordion Header */}
+                            <button
+                              onClick={() => toggleReportSuite(suite.id)}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 text-left transition cursor-pointer select-none ${
+                                hasActiveInSuite
+                                  ? 'text-teal-300 font-bold bg-slate-800/50'
+                                  : 'text-slate-300 hover:text-white hover:bg-slate-800/40 font-semibold'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <SuiteIcon className={`w-3.5 h-3.5 shrink-0 ${hasActiveInSuite ? 'text-teal-300' : 'text-teal-400'}`} />
+                                <span className="text-xs truncate font-bold">
+                                  {suite.title}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+                                  {suiteItems.length}
+                                </span>
+                                {isSuiteOpen ? (
+                                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3 text-slate-400" />
+                                )}
+                              </div>
+                            </button>
+
+                            {/* Suite Report Items */}
+                            {isSuiteOpen && (
+                              <div className="p-1 pl-1.5 space-y-0.5 border-t border-slate-800/40 bg-slate-900/70">
+                                {suiteItems.map(item => {
+                                  const ItemIcon = item.icon;
+                                  const isItemActive = activeTab === 'reports' && activeSubNav === item.subNav;
+
+                                  return (
+                                    <button
+                                      key={item.id}
+                                      id={`sub-item-${item.id}`}
+                                      onClick={() => handleSubItemClick(item)}
+                                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-left transition-all cursor-pointer ${
+                                        isItemActive
+                                          ? 'bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold shadow-xs'
+                                          : 'text-slate-300 hover:bg-slate-800/70 hover:text-white'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <ItemIcon className={`w-3.5 h-3.5 shrink-0 ${
+                                          isItemActive ? 'text-white font-bold' : 'text-slate-400'
+                                        }`} />
+                                        <div className="truncate">
+                                          <div className="text-[11px] truncate leading-tight font-medium">
+                                            {item.label}
+                                          </div>
+                                          {item.subLabel && (
+                                            <div className={`text-[8.5px] truncate leading-none mt-0.5 ${
+                                              isItemActive ? 'text-blue-100' : 'text-slate-400'
+                                            }`}>
+                                              {item.subLabel}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {item.badge !== undefined && (
+                                        <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full shrink-0 font-semibold ${
+                                          isItemActive 
+                                            ? 'bg-black text-blue-300 font-black' 
+                                            : (item.badgeColor || 'bg-slate-800 text-slate-300')
+                                        }`}>
+                                          {item.badge}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-1 space-y-0.5 border-t border-slate-800/50 bg-slate-900/60">
+                      {group.items.map(item => {
+                        const ItemIcon = item.icon;
+                        const isItemActive = item.tabId === 'reports'
+                          ? activeTab === 'reports'
+                          : item.subNav 
+                            ? (activeTab === item.tabId && activeSubNav === item.subNav)
+                            : (activeTab === item.tabId && (item.tabId === 'heads' ? (!activeSubNav || activeSubNav === 'profile' || activeSubNav === 'heads') : !activeSubNav));
+
+                        return (
+                          <button
+                            key={item.id}
+                            id={`sub-item-${item.id}`}
+                            onClick={() => handleSubItemClick(item)}
+                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer ${
+                              isItemActive
+                                ? 'bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold shadow-xs'
+                                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <ItemIcon className={`w-3.5 h-3.5 shrink-0 ${
+                                isItemActive ? 'text-white font-bold' : 'text-slate-400'
+                              }`} />
+                              <div className="truncate">
+                                <div className="text-xs truncate leading-tight">
+                                  {item.label}
+                                </div>
+                                {item.subLabel && (
+                                  <div className={`text-[9px] truncate leading-none mt-0.5 ${
+                                    isItemActive ? 'text-blue-100' : 'text-slate-400'
+                                  }`}>
+                                    {item.subLabel}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {item.badge !== undefined && (
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-semibold ${
+                                isItemActive 
+                                  ? 'bg-black text-blue-300 font-black' 
+                                  : (item.badgeColor || 'bg-slate-800 text-slate-300')
+                              }`}>
+                                {item.badge}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </div>
             );

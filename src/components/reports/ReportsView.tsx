@@ -331,23 +331,6 @@ export const ReportsView: React.FC = () => {
     return 'user-sales';
   });
 
-  // Split-panel Option B: Left Sidebar State
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [sidebarSearch, setSidebarSearch] = useState('');
-
-  // Accordion state for suites: auto-expand the active suite
-  const [expandedSuites, setExpandedSuites] = useState<Record<ReportSuite, boolean>>(() => {
-    const matched = ALL_REPORTS_REGISTRY.find(r => r.id === activeReportId);
-    const activeCat = matched ? matched.category : 'pos';
-    return {
-      pos: activeCat === 'pos',
-      inventory: activeCat === 'inventory',
-      procurement: activeCat === 'procurement',
-      receivables: activeCat === 'receivables',
-      financials: activeCat === 'financials',
-    };
-  });
-
   // Global ⌘K Command Palette state
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -359,36 +342,11 @@ export const ReportsView: React.FC = () => {
     }
   }, [activeSubNav]);
 
-  // Auto-expand suite when activeReportId changes
-  useEffect(() => {
-    const matched = ALL_REPORTS_REGISTRY.find(r => r.id === activeReportId);
-    if (matched) {
-      setExpandedSuites(prev => ({ ...prev, [matched.category]: true }));
-    }
-  }, [activeReportId]);
-
   const handleSelectReport = (id: MasterReportId) => {
     setActiveReportId(id);
     if (setActiveSubNav) {
       setActiveSubNav(id);
     }
-  };
-
-  const toggleSuite = (suiteId: ReportSuite) => {
-    setExpandedSuites(prev => ({
-      ...prev,
-      [suiteId]: !prev[suiteId]
-    }));
-  };
-
-  const toggleAllSuites = (expand: boolean) => {
-    setExpandedSuites({
-      pos: expand,
-      inventory: expand,
-      procurement: expand,
-      receivables: expand,
-      financials: expand,
-    });
   };
 
   // Global Keyboard shortcut (Ctrl+K / Cmd+K) to toggle report catalog
@@ -415,8 +373,6 @@ export const ReportsView: React.FC = () => {
     return REPORT_SUITES.find(s => s.id === currentReport.category) || REPORT_SUITES[0];
   }, [currentReport]);
 
-  const normalizedSearch = sidebarSearch.trim().toLowerCase();
-
   return (
     <div className="space-y-4 pb-12">
       {/* Top Banner */}
@@ -442,28 +398,6 @@ export const ReportsView: React.FC = () => {
 
         {/* Global Quick Actions */}
         <div className="flex items-center gap-2 self-start lg:self-center">
-          <button
-            onClick={() => setIsSidebarOpen(prev => !prev)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
-              isSidebarOpen
-                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                : 'bg-teal-800 hover:bg-teal-900 text-amber-300 border-teal-800 shadow-sm'
-            }`}
-            title={isSidebarOpen ? 'Collapse sidebar for full screen' : 'Expand reports directory sidebar'}
-          >
-            {isSidebarOpen ? (
-              <>
-                <PanelLeftClose className="w-4 h-4 text-slate-500" />
-                <span>Hide Sidebar</span>
-              </>
-            ) : (
-              <>
-                <PanelLeftOpen className="w-4 h-4 text-amber-300" />
-                <span>Show Sidebar</span>
-              </>
-            )}
-          </button>
-
           <button
             onClick={() => { setCatalogSearch(''); setIsCatalogOpen(true); }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
@@ -538,235 +472,46 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* OPTION B: Split-Panel Workspace (Left Collapsible Sidebar + Right Full View) */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start">
-        
-        {/* LEFT SIDEBAR: Categorized Accordion Directory */}
-        {isSidebarOpen && (
-          <aside className="w-full lg:w-76 xl:w-80 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-xs sticky top-3 self-start max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-left-2 duration-150">
-            {/* Sidebar Top Header */}
-            <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-teal-700 flex items-center justify-center text-amber-400">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-black tracking-tight text-white flex items-center gap-1.5">
-                    <span>Report Navigator</span>
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950">
-                      23
-                    </span>
-                  </h2>
-                  <p className="text-[10px] text-slate-400">Select a report to inspect</p>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-                title="Collapse sidebar to full screen width"
-              >
-                <PanelLeftClose className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* In-Sidebar Quick Filter */}
-            <div className="p-2.5 border-b border-slate-100 bg-slate-50/70">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={sidebarSearch}
-                  onChange={e => setSidebarSearch(e.target.value)}
-                  placeholder="Filter 23 reports..."
-                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500 font-medium placeholder:text-slate-400"
-                />
-                {sidebarSearch && (
-                  <button
-                    onClick={() => setSidebarSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Accordion List for 5 Suites */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar max-h-[60vh]">
-              {REPORT_SUITES.map(suite => {
-                const SuiteIcon = suite.icon;
-                const suiteReports = ALL_REPORTS_REGISTRY.filter(r => r.category === suite.id);
-
-                // Filter by search query if present
-                const visibleReports = normalizedSearch
-                  ? suiteReports.filter(r => 
-                      r.title.toLowerCase().includes(normalizedSearch) || 
-                      r.description.toLowerCase().includes(normalizedSearch)
-                    )
-                  : suiteReports;
-
-                if (normalizedSearch && visibleReports.length === 0) {
-                  return null;
-                }
-
-                // If user is searching, force expand matching suites
-                const isExpanded = normalizedSearch ? true : !!expandedSuites[suite.id];
-                const hasActiveReport = suiteReports.some(r => r.id === activeReportId);
-
-                return (
-                  <div key={suite.id} className="rounded-xl border border-slate-150 overflow-hidden bg-white">
-                    {/* Accordion Category Header Button */}
-                    <button
-                      onClick={() => toggleSuite(suite.id)}
-                      className={`w-full flex items-center justify-between p-2.5 text-left transition cursor-pointer select-none ${
-                        hasActiveReport
-                          ? 'bg-slate-50/90 font-bold'
-                          : 'hover:bg-slate-50 text-slate-700 font-semibold'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border ${suite.colorClasses}`}>
-                          <SuiteIcon className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-xs text-slate-800 truncate font-bold">
-                          {suite.label}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-                          {visibleReports.length}
-                        </span>
-                        {isExpanded ? (
-                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                        ) : (
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                        )}
-                      </div>
-                    </button>
-
-                    {/* Accordion Children List */}
-                    {isExpanded && (
-                      <div className="py-1 px-1.5 space-y-0.5 bg-slate-50/40 border-t border-slate-100">
-                        {visibleReports.map(rep => {
-                          const Icon = rep.icon;
-                          const isCurrent = activeReportId === rep.id;
-
-                          return (
-                            <button
-                              key={rep.id}
-                              onClick={() => handleSelectReport(rep.id)}
-                              className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition flex items-center gap-2.5 cursor-pointer ${
-                                isCurrent
-                                  ? 'bg-teal-700 text-white font-bold shadow-xs'
-                                  : 'text-slate-600 hover:text-slate-900 hover:bg-white font-medium'
-                              }`}
-                            >
-                              <Icon className={`w-3.5 h-3.5 shrink-0 ${isCurrent ? 'text-amber-300' : 'text-slate-400'}`} />
-                              <span className="truncate flex-1">
-                                {rep.title}
-                              </span>
-                              {isCurrent && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Sidebar Bottom Utilities */}
-            <div className="p-2 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[11px] text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => toggleAllSuites(true)}
-                  className="px-2 py-0.5 rounded hover:bg-slate-200 font-semibold cursor-pointer text-slate-600"
-                >
-                  Expand All
-                </button>
-                <span>•</span>
-                <button
-                  onClick={() => toggleAllSuites(false)}
-                  className="px-2 py-0.5 rounded hover:bg-slate-200 font-semibold cursor-pointer text-slate-600"
-                >
-                  Collapse
-                </button>
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium">
-                Ctrl+K Quick Find
-              </span>
-            </div>
-          </aside>
-        )}
-
-        {/* RIGHT WORKSPACE: 100% Full View Selected Report Canvas */}
-        <main className="flex-1 w-full min-w-0 space-y-3">
-          {/* Top Context & Breadcrumb Bar */}
-          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 text-xs flex-wrap">
-              {!isSidebarOpen && (
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-800 hover:bg-teal-900 text-amber-300 rounded-xl font-bold text-xs shadow-xs cursor-pointer mr-1 transition"
-                  title="Show reports directory sidebar"
-                >
-                  <PanelLeftOpen className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Report Directory</span>
-                  <span className="bg-amber-400 text-teal-950 text-[10px] px-1.5 py-0.2 rounded-full font-black">23</span>
-                </button>
-              )}
-
-              <span className="text-slate-400 font-medium flex items-center gap-1">
-                <span>Reports</span>
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-              <span className="text-slate-600 font-bold flex items-center gap-1.5">
-                {currentSuite.label}
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-              <span className="text-teal-900 font-black bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
-                {currentReport.title}
-              </span>
-            </div>
-
-            {/* Quick Actions in Canvas Header */}
-            <div className="flex items-center gap-2 shrink-0">
-              {isSidebarOpen ? (
-                <button
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-semibold cursor-pointer border border-transparent hover:border-slate-200"
-                  title="Expand report to 100% full screen width"
-                >
-                  <PanelLeftClose className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Full Screen Width</span>
-                </button>
-              ) : null}
-
-              <button
-                onClick={() => { setCatalogSearch(''); setIsCatalogOpen(true); }}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-                title="Browse all 23 reports (⌘K)"
-              >
-                <Search className="w-3.5 h-3.5 text-slate-500" />
-                <span>Search</span>
-                <kbd className="text-[9px] font-mono text-slate-400 ml-0.5">⌘K</kbd>
-              </button>
-
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-bold cursor-pointer shadow-2xs"
-                title="Print current report"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print</span>
-              </button>
-            </div>
+      {/* 100% Full View Selected Report Canvas */}
+      <main className="w-full min-w-0 space-y-3">
+        {/* Top Context & Breadcrumb Bar */}
+        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            <span className="text-slate-400 font-medium flex items-center gap-1">
+              <span>Reports</span>
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+            <span className="text-slate-600 font-bold flex items-center gap-1.5">
+              {currentSuite.label}
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+            <span className="text-teal-900 font-black bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+              {currentReport.title}
+            </span>
           </div>
+
+          {/* Quick Actions in Canvas Header */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => { setCatalogSearch(''); setIsCatalogOpen(true); }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              title="Browse all 23 reports (⌘K)"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-500" />
+              <span>Search</span>
+              <kbd className="text-[9px] font-mono text-slate-400 ml-0.5">⌘K</kbd>
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-bold cursor-pointer shadow-2xs"
+              title="Print current report"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print</span>
+            </button>
+          </div>
+        </div>
 
           {/* ACTIVE REPORT CANVAS (Rendered 100% full width) */}
           <div className="w-full">
@@ -886,7 +631,6 @@ export const ReportsView: React.FC = () => {
             )}
           </div>
         </main>
-      </div>
 
       {/* Browse All 23 Reports Command Palette / Catalog Modal (⌘K) */}
       {isCatalogOpen && (

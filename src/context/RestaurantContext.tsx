@@ -1634,11 +1634,6 @@ export const getModuleForTab = (tab: ActiveTab, subNav?: string): string => {
   if (tab === 'hr') return 'hr';
   if (tab === 'heads' || tab === 'users' || tab === 'data-cleanup') return 'admin';
   if (tab === 'reports') {
-    if (subNav === 'pos-sessions' || subNav === 'commission-report') return 'sales-pos';
-    if (subNav === 'department-sales') return 'menu-kitchen';
-    if (subNav === 'inventory-inwards' || subNav === 'inventory-outward' || subNav === 'inventory-transactional') return 'inventory';
-    if (subNav === 'supplier-total-po' || subNav === 'vendor-statement') return 'purchases';
-    if (subNav === 'ledger-report' || subNav === 'pnl-ifrs') return 'accounts';
     return 'reports';
   }
   return 'sales-pos';
