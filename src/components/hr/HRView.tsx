@@ -107,6 +107,8 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
     department: 'Floor Service',
     employmentTypeId: employmentTypes[0]?.id || 'emp-ft',
     shiftId: workShifts[0]?.id || 'shift-1',
+    cardId: '',
+    fingerId: '',
     basicSalary: 18000,
     phone: '+880 1700-000000',
     email: '',
@@ -184,6 +186,8 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
       department: 'Floor Service',
       employmentTypeId: employmentTypes[0]?.id || 'emp-ft',
       shiftId: workShifts[0]?.id || 'shift-1',
+      cardId: '',
+      fingerId: '',
       basicSalary: 18000,
       phone: '+880 1',
       email: '',
@@ -202,8 +206,10 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
       name: emp.name,
       designation: emp.designation,
       department: emp.department,
-      employmentTypeId: emp.employmentTypeId,
-      shiftId: emp.shiftId,
+      employmentTypeId: emp.employmentTypeId || employmentTypes[0]?.id || 'emp-ft',
+      shiftId: emp.shiftId || workShifts[0]?.id || 'shift-1',
+      cardId: emp.cardId || '',
+      fingerId: emp.fingerId || '',
       basicSalary: emp.basicSalary,
       phone: emp.phone,
       email: emp.email || '',
@@ -272,10 +278,14 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
 
   // Filtered employees
   const filteredEmployees = employees.filter(e => {
-    const matchSearch = e.name.toLowerCase().includes(empSearch.toLowerCase()) || 
-      e.empCode.toLowerCase().includes(empSearch.toLowerCase()) || 
-      e.designation.toLowerCase().includes(empSearch.toLowerCase()) ||
-      e.phone.includes(empSearch);
+    const q = empSearch.toLowerCase().trim();
+    const matchSearch = !q ||
+      e.name.toLowerCase().includes(q) || 
+      e.empCode.toLowerCase().includes(q) || 
+      e.designation.toLowerCase().includes(q) ||
+      e.phone.includes(q) ||
+      (e.cardId && e.cardId.toLowerCase().includes(q)) ||
+      (e.fingerId && e.fingerId.toLowerCase().includes(q));
     const matchDept = empDeptFilter === 'ALL' || e.department === empDeptFilter;
     return matchSearch && matchDept;
   });
@@ -436,7 +446,7 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search employee by name, code (EMP-01), designation, phone..."
+                placeholder="Search employee by name, code (EMP-01), designation, phone, Card ID, Finger ID..."
                 value={empSearch}
                 onChange={e => setEmpSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:border-amber-500"
@@ -467,7 +477,7 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                   <tr>
                     <th className="py-3.5 px-4">Employee</th>
                     <th className="py-3.5 px-4">Department & Role</th>
-                    <th className="py-3.5 px-4">Shift</th>
+                    <th className="py-3.5 px-4">Work Shift</th>
                     <th className="py-3.5 px-4">Monthly Salary</th>
                     <th className="py-3.5 px-4">Contact</th>
                     <th className="py-3.5 px-4">Status</th>
@@ -500,6 +510,20 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                                 <div className="text-[11px] font-mono text-amber-600 font-semibold">
                                   {emp.empCode} • Joined {emp.joiningDate}
                                 </div>
+                                {(emp.cardId || emp.fingerId) && (
+                                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-600 mt-1 flex-wrap">
+                                    {emp.cardId && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200 font-medium">
+                                        💳 Card: {emp.cardId}
+                                      </span>
+                                    )}
+                                    {emp.fingerId && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 font-medium">
+                                        👆 Finger: {emp.fingerId}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -520,6 +544,11 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                             <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-medium text-[11px] border border-indigo-100">
                               {shift?.name || 'Morning Shift'}
                             </span>
+                            {shift && (
+                              <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                                {shift.startTime} - {shift.endTime}
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -718,13 +747,24 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                 <label className="block text-xs font-bold text-slate-700 mb-1">Select Employee *</label>
                 <select
                   value={attForm.employeeId}
-                  onChange={e => setAttForm({ ...attForm, employeeId: e.target.value })}
+                  onChange={e => {
+                    const selId = e.target.value;
+                    const emp = employees.find(x => x.id === selId);
+                    const empShift = emp ? workShifts.find(s => s.id === emp.shiftId) : null;
+                    setAttForm({
+                      ...attForm,
+                      employeeId: selId,
+                      shift: empShift ? empShift.name : attForm.shift,
+                      inTime: empShift?.startTime || attForm.inTime,
+                      outTime: empShift?.endTime || attForm.outTime
+                    });
+                  }}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-hidden focus:border-amber-500 cursor-pointer"
                   required
                 >
                   {employees.map(emp => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.empCode} • {emp.designation})
+                      {emp.name} ({emp.empCode} • {emp.designation}{emp.fingerId ? ` • Finger: ${emp.fingerId}` : ''}{emp.cardId ? ` • Card: ${emp.cardId}` : ''})
                     </option>
                   ))}
                 </select>
@@ -745,7 +785,16 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                 <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Shift</label>
                 <select
                   value={attForm.shift}
-                  onChange={e => setAttForm({ ...attForm, shift: e.target.value })}
+                  onChange={e => {
+                    const shiftName = e.target.value;
+                    const s = workShifts.find(x => x.name === shiftName);
+                    setAttForm({
+                      ...attForm,
+                      shift: shiftName,
+                      inTime: s?.startTime || attForm.inTime,
+                      outTime: s?.endTime || attForm.outTime
+                    });
+                  }}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-hidden focus:border-amber-500 cursor-pointer"
                 >
                   {workShifts.map(s => (
@@ -1090,7 +1139,7 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
       {/* 1. Add / Edit Employee Modal */}
       {isEmpModalOpen && (
         <div className="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">
                 {editingEmpId ? 'Edit Employee Profile' : 'Add New Restaurant Employee'}
@@ -1139,7 +1188,7 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                   <select
                     value={empForm.department}
                     onChange={e => setEmpForm({ ...empForm, department: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-amber-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-amber-500 cursor-pointer"
                   >
                     <option value="Main Kitchen">Main Kitchen</option>
                     <option value="Floor Service">Floor Service</option>
@@ -1148,6 +1197,35 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                     <option value="Management">Management</option>
                   </select>
                 </div>
+
+                {/* Work Shift */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Work Shift *</label>
+                  <select
+                    value={empForm.shiftId}
+                    onChange={e => setEmpForm({ ...empForm, shiftId: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-hidden focus:border-amber-500 cursor-pointer"
+                    required
+                  >
+                    {workShifts.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.startTime} - {s.endTime})
+                      </option>
+                    ))}
+                  </select>
+                  {(() => {
+                    const selectedShift = workShifts.find(s => s.id === empForm.shiftId);
+                    if (!selectedShift) return null;
+                    return (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-[10.5px] text-indigo-700 bg-indigo-50/90 px-2 py-1 rounded-lg border border-indigo-100">
+                        <Clock className="w-3 h-3 text-indigo-500 shrink-0" />
+                        <span>ডিউটি সময়: <strong className="font-mono">{selectedShift.startTime} - {selectedShift.endTime}</strong> (গ্রেস: {selectedShift.graceMinutes || 0} মিনিট)</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Monthly Salary */}
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Monthly Salary (৳) *</label>
                   <input
@@ -1158,6 +1236,31 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                     required
                   />
                 </div>
+
+                {/* Card ID */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Card ID (RFID / Card No)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. CRD-101 or Card UID"
+                    value={empForm.cardId || ''}
+                    onChange={e => setEmpForm({ ...empForm, cardId: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-hidden focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Finger ID */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Finger ID / Biometric ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 101 or Machine User ID"
+                    value={empForm.fingerId || ''}
+                    onChange={e => setEmpForm({ ...empForm, fingerId: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-hidden focus:border-amber-500"
+                  />
+                </div>
+
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Phone Number *</label>
                   <input
@@ -1178,11 +1281,25 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                   />
                 </div>
                 <div>
+                  <label className="block font-bold text-slate-700 mb-1">Employment Type</label>
+                  <select
+                    value={empForm.employmentTypeId}
+                    onChange={e => setEmpForm({ ...empForm, employmentTypeId: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-amber-500 cursor-pointer"
+                  >
+                    {employmentTypes.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block font-bold text-slate-700 mb-1">Status</label>
                   <select
                     value={empForm.status}
                     onChange={e => setEmpForm({ ...empForm, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-amber-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-amber-500 cursor-pointer"
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="ON_LEAVE">ON LEAVE</option>
@@ -1195,13 +1312,13 @@ export const HRView: React.FC<{ initialSubTab?: HRSubTab }> = ({ initialSubTab =
                 <button
                   type="button"
                   onClick={() => setIsEmpModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#004b9b] text-white font-bold rounded-xl hover:bg-[#005bb8] shadow-md shadow-blue-900/20"
+                  className="px-5 py-2 bg-[#004b9b] text-white font-bold rounded-xl hover:bg-[#005bb8] shadow-md shadow-blue-900/20 cursor-pointer"
                 >
                   Save Employee
                 </button>

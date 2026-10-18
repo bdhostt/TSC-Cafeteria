@@ -590,6 +590,8 @@ export interface Employee {
   department: string;
   employmentTypeId: string;
   shiftId: string;
+  cardId?: string;
+  fingerId?: string;
   basicSalary: number;
   phone: string;
   email?: string;
