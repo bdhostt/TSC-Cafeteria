@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { MenuItem, RawMasterItem, CommissionAgent, MenuItemVariation, MenuItemAddon, MenuItemPromo } from '../types';
+import { MenuItem, RawMasterItem, CommissionAgent, MenuItemVariation, MenuItemAddon, MenuItemPromo, Employee, AttendanceRecord, WorkShift } from '../types';
 
 /**
  * Clean string helper
@@ -588,3 +588,422 @@ export const readSpreadsheetFile = async (file: File): Promise<any[]> => {
     reader.readAsArrayBuffer(file);
   });
 };
+
+// ==========================================
+// 4. ATTENDANCE & BIOMETRIC LOG UTILITIES
+// ==========================================
+
+export interface AttendanceExportRow {
+  'Date': string;
+  'Employee Code': string;
+  'Finger ID': string;
+  'Employee Name': string;
+  'Department': string;
+  'Designation': string;
+  'Shift': string;
+  'Clock In': string;
+  'Clock Out': string;
+  'Total Hours': number | string;
+  'Overtime Hours': number | string;
+  'Status': string;
+  'Source': string;
+  'Notes': string;
+}
+
+export const exportAttendanceToExcel = (
+  records: AttendanceRecord[],
+  employees: Employee[],
+  selectedDate?: string,
+  fileName?: string
+) => {
+  const empMap = new Map<string, Employee>();
+  employees.forEach(e => empMap.set(e.id, e));
+
+  const targetDate = selectedDate || new Date().toISOString().split('T')[0];
+  const outName = fileName || `Staff_Attendance_${targetDate}.xlsx`;
+
+  const targetRecords = selectedDate ? records.filter(r => r.date === selectedDate) : records;
+
+  const data: AttendanceExportRow[] = targetRecords.map(rec => {
+    const emp = empMap.get(rec.employeeId);
+    return {
+      'Date': rec.date,
+      'Employee Code': emp?.empCode || '',
+      'Finger ID': emp?.fingerId || '',
+      'Employee Name': rec.employeeName || emp?.name || '',
+      'Department': emp?.department || '',
+      'Designation': emp?.designation || '',
+      'Shift': rec.shift || 'General Shift',
+      'Clock In': rec.inTime || '',
+      'Clock Out': rec.outTime || '',
+      'Total Hours': rec.workingHours ?? 8,
+      'Overtime Hours': rec.overtimeHours ?? 0,
+      'Status': rec.status,
+      'Source': rec.punchSource || 'MANUAL',
+      'Notes': rec.notes || ''
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  worksheet['!cols'] = [
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 12 },
+    { wch: 24 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 16 },
+    { wch: 30 }
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+  XLSX.writeFile(workbook, outName);
+};
+
+export const generateAttendanceTemplateExcel = () => {
+  const templateRows = [
+    {
+      'Employee Code / Finger ID': 'EMP-01',
+      'Employee Name': 'Rahim Uddin',
+      'Date (YYYY-MM-DD)': new Date().toISOString().split('T')[0],
+      'Clock In (HH:MM)': '09:05',
+      'Clock Out (HH:MM)': '18:15',
+      'Status': 'PRESENT',
+      'Notes': 'Biometric punch verified'
+    },
+    {
+      'Employee Code / Finger ID': '102',
+      'Employee Name': 'Karim Hossain',
+      'Date (YYYY-MM-DD)': new Date().toISOString().split('T')[0],
+      'Clock In (HH:MM)': '09:45',
+      'Clock Out (HH:MM)': '18:30',
+      'Status': 'LATE',
+      'Notes': 'Checked-in after shift grace period'
+    }
+  ];
+
+  const worksheet = XLSX.utils.json_to_sheet(templateRows);
+  worksheet['!cols'] = [
+    { wch: 28 },
+    { wch: 24 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 35 }
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance_Template');
+  XLSX.writeFile(workbook, `Attendance_Import_Template.xlsx`);
+};
+
+export interface ParseAttendanceResult {
+  items: AttendanceRecord[];
+  errors: string[];
+  matchedEmployeesCount: number;
+}
+
+const normalizeTimeString = (val: any): string => {
+  if (val === undefined || val === null || val === '') return '';
+  // If Excel fraction of day (e.g. 0.375 for 9:00 AM)
+  if (typeof val === 'number') {
+    if (val >= 0 && val < 1) {
+      const totalMinutes = Math.round(val * 24 * 60);
+      const hours = Math.floor(totalMinutes / 60) % 24;
+      const mins = totalMinutes % 60;
+      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    }
+  }
+  const str = String(val).trim();
+  // Check if string contains full date-time e.g. "2026-10-18 09:30:00"
+  if (str.includes(' ') && (str.includes(':') || str.includes('-') || str.includes('/'))) {
+    const parts = str.split(' ');
+    const timePart = parts.find(p => p.includes(':'));
+    if (timePart) {
+      return normalizeTimeString(timePart);
+    }
+  }
+
+  const ampmMatch = str.match(/(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+  if (ampmMatch) {
+    let hours = parseInt(ampmMatch[1], 10);
+    const mins = parseInt(ampmMatch[2], 10);
+    const modifier = ampmMatch[3]?.toUpperCase();
+    if (modifier === 'PM' && hours < 12) hours += 12;
+    if (modifier === 'AM' && hours === 12) hours = 0;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  }
+  return str.slice(0, 5);
+};
+
+const normalizeDateString = (val: any, defaultDate: string): string => {
+  if (!val) return defaultDate;
+  if (typeof val === 'number') {
+    // Excel serial date number
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + val * 86400000);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+  const str = String(val).trim();
+  // If contains space (DateTime string like "2026-10-18 09:00:00")
+  const dateStr = str.split(' ')[0];
+  const ymd = dateStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
+  }
+  const dmy = dateStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  }
+  return defaultDate;
+};
+
+const calculateWorkingHours = (inTime: string, outTime?: string): number => {
+  if (!inTime || !outTime) return 8;
+  const inParts = inTime.split(':').map(Number);
+  const outParts = outTime.split(':').map(Number);
+  if (isNaN(inParts[0]) || isNaN(outParts[0])) return 8;
+  let diff = (outParts[0] * 60 + (outParts[1] || 0)) - (inParts[0] * 60 + (inParts[1] || 0));
+  if (diff < 0) diff += 24 * 60; // Over midnight
+  const hours = Math.round((diff / 60) * 10) / 10;
+  return hours > 0 ? hours : 8;
+};
+
+export const parseAttendanceSpreadsheet = (
+  rawRows: any[],
+  employees: Employee[],
+  workShifts: WorkShift[],
+  defaultDate = new Date().toISOString().split('T')[0]
+): ParseAttendanceResult => {
+  const errors: string[] = [];
+  const matchedEmpIds = new Set<string>();
+
+  if (!Array.isArray(rawRows) || rawRows.length === 0) {
+    return { items: [], errors: ['No data found in the spreadsheet.'], matchedEmployeesCount: 0 };
+  }
+
+  // Helper to match an employee by identifier (fingerId, empCode, cardId, or name)
+  const findEmployee = (idOrCodeOrName: string): Employee | undefined => {
+    const q = String(idOrCodeOrName).trim().toLowerCase();
+    if (!q) return undefined;
+
+    return employees.find(e => 
+      (e.fingerId && e.fingerId.toLowerCase() === q) ||
+      (e.empCode && e.empCode.toLowerCase() === q) ||
+      (e.cardId && e.cardId.toLowerCase() === q) ||
+      e.name.toLowerCase() === q ||
+      e.name.toLowerCase().includes(q)
+    );
+  };
+
+  // Intermediate structure to aggregate punches: Map key = `${empId}_${date}`
+  interface PunchAggregate {
+    employee: Employee;
+    date: string;
+    punches: string[];
+    explicitInTime?: string;
+    explicitOutTime?: string;
+    explicitStatus?: AttendanceRecord['status'];
+    notes?: string;
+  }
+
+  const aggregates = new Map<string, PunchAggregate>();
+
+  rawRows.forEach((row, idx) => {
+    // 1. Identify employee identifier column
+    const idKey = Object.keys(row).find(k => {
+      const lower = k.toLowerCase().trim();
+      return (
+        lower.includes('code') || 
+        lower.includes('finger') || 
+        lower.includes('user') || 
+        lower.includes('ac-no') || 
+        lower.includes('ac no') || 
+        lower.includes('enroll') || 
+        lower.includes('badge') || 
+        lower.includes('pin') ||
+        lower === 'id' ||
+        lower.includes('staff') ||
+        lower.includes('employee')
+      );
+    });
+
+    const rawId = idKey ? cleanStr(row[idKey]) : '';
+    let emp = findEmployee(rawId);
+
+    // If not found by ID key, try name key
+    if (!emp) {
+      const nameKey = Object.keys(row).find(k => {
+        const lower = k.toLowerCase().trim();
+        return lower.includes('name') || lower.includes('staff');
+      });
+      if (nameKey) {
+        emp = findEmployee(cleanStr(row[nameKey]));
+      }
+    }
+
+    if (!emp) {
+      if (rawId) {
+        errors.push(`Row ${idx + 2}: Could not match employee with ID/Name "${rawId}". Please ensure Finger ID or Employee Code is configured.`);
+      }
+      return;
+    }
+
+    matchedEmpIds.add(emp.id);
+
+    // 2. Identify Date
+    const dateKey = Object.keys(row).find(k => {
+      const lower = k.toLowerCase().trim();
+      return lower.includes('date') && !lower.includes('time');
+    });
+    const dateTimeKey = Object.keys(row).find(k => {
+      const lower = k.toLowerCase().trim();
+      return lower.includes('datetime') || lower.includes('date/time');
+    });
+
+    let rowDate = defaultDate;
+    if (dateTimeKey && row[dateTimeKey]) {
+      rowDate = normalizeDateString(row[dateTimeKey], defaultDate);
+    } else if (dateKey && row[dateKey]) {
+      rowDate = normalizeDateString(row[dateKey], defaultDate);
+    }
+
+    // 3. Identify Times
+    // Check for explicit Clock In / Clock Out columns
+    const clockInKey = Object.keys(row).find(k => {
+      const lower = k.toLowerCase().trim();
+      return lower.includes('in') && (lower.includes('clock') || lower.includes('time') || lower.includes('punch') || lower === 'in');
+    });
+    const clockOutKey = Object.keys(row).find(k => {
+      const lower = k.toLowerCase().trim();
+      return lower.includes('out') && (lower.includes('clock') || lower.includes('time') || lower.includes('punch') || lower === 'out');
+    });
+
+    // Or single punch time column (e.g., ZKTeco raw machine log)
+    const singleTimeKey = Object.keys(row).find(k => {
+      const lower = k.toLowerCase().trim();
+      return (lower === 'time' || lower === 'punch time' || lower === 'att time' || lower.includes('datetime') || lower.includes('date/time')) &&
+             !lower.includes('out') && !lower.includes('total');
+    });
+
+    const explicitIn = clockInKey ? normalizeTimeString(row[clockInKey]) : '';
+    const explicitOut = clockOutKey ? normalizeTimeString(row[clockOutKey]) : '';
+    const singlePunch = singleTimeKey ? normalizeTimeString(row[singleTimeKey]) : '';
+
+    // Status
+    const statusKey = Object.keys(row).find(k => k.toLowerCase().trim().includes('status'));
+    let explicitStatus: AttendanceRecord['status'] | undefined;
+    if (statusKey && row[statusKey]) {
+      const rawStat = cleanStr(row[statusKey]).toUpperCase();
+      if (rawStat.includes('LATE')) explicitStatus = 'LATE';
+      else if (rawStat.includes('HALF')) explicitStatus = 'HALF_DAY';
+      else if (rawStat.includes('LEAVE')) explicitStatus = 'LEAVE';
+      else if (rawStat.includes('ABSENT')) explicitStatus = 'ABSENT';
+      else if (rawStat.includes('PRESENT')) explicitStatus = 'PRESENT';
+    }
+
+    // Notes
+    const noteKey = Object.keys(row).find(k => {
+      const lower = k.toLowerCase().trim();
+      return lower.includes('note') || lower.includes('remark');
+    });
+    const notes = noteKey ? cleanStr(row[noteKey]) : '';
+
+    const aggKey = `${emp.id}_${rowDate}`;
+    if (!aggregates.has(aggKey)) {
+      aggregates.set(aggKey, {
+        employee: emp,
+        date: rowDate,
+        punches: [],
+        explicitInTime: explicitIn,
+        explicitOutTime: explicitOut,
+        explicitStatus,
+        notes
+      });
+    }
+
+    const agg = aggregates.get(aggKey)!;
+    if (explicitIn && !agg.explicitInTime) agg.explicitInTime = explicitIn;
+    if (explicitOut && !agg.explicitOutTime) agg.explicitOutTime = explicitOut;
+    if (singlePunch) agg.punches.push(singlePunch);
+    if (notes && !agg.notes) agg.notes = notes;
+    if (explicitStatus && !agg.explicitStatus) agg.explicitStatus = explicitStatus;
+  });
+
+  const items: AttendanceRecord[] = [];
+
+  aggregates.forEach((agg) => {
+    const emp = agg.employee;
+    const shift = workShifts.find(s => s.id === emp.shiftId) || workShifts[0];
+
+    // Determine inTime and outTime
+    let inTime = agg.explicitInTime || '';
+    let outTime = agg.explicitOutTime || '';
+
+    if (agg.punches.length > 0) {
+      agg.punches.sort();
+      if (!inTime) inTime = agg.punches[0];
+      if (!outTime && agg.punches.length > 1) {
+        const lastPunch = agg.punches[agg.punches.length - 1];
+        if (lastPunch !== inTime) {
+          outTime = lastPunch;
+        }
+      }
+    }
+
+    if (!inTime && shift) {
+      inTime = shift.startTime;
+    }
+
+    // Determine Status (PRESENT, LATE, etc.)
+    let status: AttendanceRecord['status'] = agg.explicitStatus || 'PRESENT';
+    if (!agg.explicitStatus && shift && inTime) {
+      const [inH, inM] = inTime.split(':').map(Number);
+      const [startH, startM] = shift.startTime.split(':').map(Number);
+      const grace = shift.graceMinutes || 15;
+      
+      const inMinutes = inH * 60 + (inM || 0);
+      const shiftStartGraceMinutes = startH * 60 + (startM || 0) + grace;
+
+      if (inMinutes > shiftStartGraceMinutes) {
+        status = 'LATE';
+      } else {
+        status = 'PRESENT';
+      }
+    }
+
+    const workingHours = calculateWorkingHours(inTime, outTime);
+
+    items.push({
+      id: `att-import-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      employeeId: emp.id,
+      employeeName: emp.name,
+      date: agg.date,
+      shift: shift ? shift.name : 'General Shift',
+      inTime: inTime || '09:00',
+      outTime: outTime || undefined,
+      status,
+      workingHours,
+      overtimeHours: workingHours > 8 ? Math.round((workingHours - 8) * 10) / 10 : 0,
+      notes: agg.notes || (agg.punches.length > 0 ? `Biometric punch (${agg.punches.length} logged)` : 'Excel imported attendance'),
+      punchSource: 'EXCEL_IMPORT'
+    });
+  });
+
+  return {
+    items,
+    errors,
+    matchedEmployeesCount: matchedEmpIds.size
+  };
+};
+

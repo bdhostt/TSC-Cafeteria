@@ -613,6 +613,7 @@ export interface AttendanceRecord {
   workingHours?: number;
   overtimeHours?: number;
   notes?: string;
+  punchSource?: 'MANUAL' | 'BIOMETRIC_DEVICE' | 'EXCEL_IMPORT';
 }
 
 export interface LeaveApplication {

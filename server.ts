@@ -7,6 +7,8 @@ import fs from "fs";
 import os from "os";
 import { exec, execFile } from "child_process";
 import { connectToDatabase, isDbConnected, getLastDbError, RestaurantStateModel } from "./src/db/mongodb";
+// @ts-ignore
+import ZKLib from "node-zklib";
 
 dotenv.config();
 
@@ -1729,6 +1731,136 @@ async function startServer() {
     } catch (err: any) {
       console.error("Hardware KOT print error:", err);
       res.status(500).json({ success: false, error: err?.message || "Hardware print failed" });
+    }
+  });
+
+  // Helper to connect and safely run action with ZKTeco biometric device
+  async function withZKDevice<T>(ip: string, port = 4370, timeout = 5000, action: (zk: any) => Promise<T>): Promise<T> {
+    const zk = new ZKLib(ip, port, timeout, 4000);
+    let socketCreated = false;
+    try {
+      const connectPromise = zk.createSocket().catch((err: any) => {
+        const msg = err?.err?.message || err?.message || 'TCP/UDP socket connection failed';
+        throw new Error(msg);
+      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Connection to biometric device at ${ip}:${port} timed out after ${timeout}ms. Ensure device is powered on, IP is correct, and PC is on same local network.`)), timeout + 1500)
+      );
+      await Promise.race([connectPromise, timeoutPromise]);
+      socketCreated = true;
+      return await action(zk);
+    } catch (err: any) {
+      const msg = err?.err?.message || err?.message || 'Biometric device connection failed.';
+      throw new Error(msg);
+    } finally {
+      if (socketCreated) {
+        try {
+          await zk.disconnect();
+        } catch {
+          // ignore disconnect error
+        }
+      }
+    }
+  }
+
+  // REST API: Test biometric device connection via IP
+  app.post("/api/biometric/test-connection", async (req, res) => {
+    const { ip, port = 4370, timeout = 5000 } = req.body || {};
+    if (!ip) {
+      return res.status(400).json({ success: false, message: "Device IP address is required." });
+    }
+
+    try {
+      const info = await withZKDevice(ip, Number(port) || 4370, Number(timeout) || 5000, async (zk) => {
+        try {
+          return await zk.getInfo();
+        } catch {
+          return { status: "connected" };
+        }
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully connected to biometric machine at ${ip}:${port}`,
+        info
+      });
+    } catch (err: any) {
+      console.error("Biometric device test failed:", err?.message || err);
+      res.status(500).json({
+        success: false,
+        message: err?.message || "Failed to reach device. Check IP and network connection."
+      });
+    }
+  });
+
+  // REST API: Fetch attendance logs directly from device database via IP
+  app.post("/api/biometric/fetch-logs", async (req, res) => {
+    const { ip, port = 4370, timeout = 10000, date } = req.body || {};
+    if (!ip) {
+      return res.status(400).json({ success: false, message: "Device IP address is required." });
+    }
+
+    try {
+      const logs = await withZKDevice(ip, Number(port) || 4370, Number(timeout) || 10000, async (zk) => {
+        const attData = await zk.getAttendances();
+        return Array.isArray(attData?.data) ? attData.data : (Array.isArray(attData) ? attData : []);
+      });
+
+      const formatted = (logs || []).map((log: any) => {
+        const d = log.recordTime ? new Date(log.recordTime) : new Date();
+        const dateStr = !isNaN(d.getTime()) ? d.toISOString().split("T")[0] : "";
+        const hours = !isNaN(d.getTime()) ? d.getHours().toString().padStart(2, "0") : "00";
+        const mins = !isNaN(d.getTime()) ? d.getMinutes().toString().padStart(2, "0") : "00";
+        const timeStr = `${hours}:${mins}`;
+
+        return {
+          deviceUserId: String(log.deviceUserId || log.userSn || "").trim(),
+          userSn: log.userSn,
+          recordTime: log.recordTime,
+          date: dateStr,
+          time: timeStr
+        };
+      }).filter((l: any) => l.deviceUserId && (!date || l.date === date));
+
+      res.json({
+        success: true,
+        count: formatted.length,
+        totalDeviceLogs: (logs || []).length,
+        logs: formatted
+      });
+    } catch (err: any) {
+      console.error("Biometric device log fetch failed:", err?.message || err);
+      res.status(500).json({
+        success: false,
+        message: err?.message || "Failed to fetch attendance logs from device."
+      });
+    }
+  });
+
+  // REST API: Fetch registered users list from device
+  app.post("/api/biometric/fetch-users", async (req, res) => {
+    const { ip, port = 4370, timeout = 8000 } = req.body || {};
+    if (!ip) {
+      return res.status(400).json({ success: false, message: "Device IP address is required." });
+    }
+
+    try {
+      const usersData = await withZKDevice(ip, Number(port) || 4370, Number(timeout) || 8000, async (zk) => {
+        const res = await zk.getUsers();
+        return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      });
+
+      res.json({
+        success: true,
+        count: usersData.length,
+        users: usersData
+      });
+    } catch (err: any) {
+      console.error("Biometric device users fetch failed:", err?.message || err);
+      res.status(500).json({
+        success: false,
+        message: err?.message || "Failed to fetch registered users from device."
+      });
     }
   });
 

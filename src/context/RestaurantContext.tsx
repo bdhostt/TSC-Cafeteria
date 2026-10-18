@@ -1545,6 +1545,7 @@ interface RestaurantContextType {
   addAttendanceRecord: (record: Omit<AttendanceRecord, 'id'>) => void;
   updateAttendanceRecord: (id: string, updates: Partial<AttendanceRecord>) => void;
   deleteAttendanceRecord: (id: string) => void;
+  bulkSyncAttendanceRecords: (records: (Omit<AttendanceRecord, 'id'> | AttendanceRecord)[]) => { added: number; updated: number };
 
   // Leave Applications
   addLeaveApplication: (leave: Omit<LeaveApplication, 'id'>) => void;
@@ -6768,6 +6769,50 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
+  const bulkSyncAttendanceRecords = (incoming: (Omit<AttendanceRecord, 'id'> | AttendanceRecord)[]) => {
+    let added = 0;
+    let updated = 0;
+    setData(prev => {
+      const current = [...(prev.attendanceRecords || DEFAULT_ATTENDANCE_RECORDS)];
+      const updatedList = [...current];
+
+      incoming.forEach((rec, idx) => {
+        const existingIdx = updatedList.findIndex(
+          a => a.employeeId === rec.employeeId && a.date === rec.date
+        );
+
+        if (existingIdx >= 0) {
+          const old = updatedList[existingIdx];
+          updatedList[existingIdx] = {
+            ...old,
+            ...rec,
+            id: old.id,
+            inTime: rec.inTime || old.inTime,
+            outTime: rec.outTime || old.outTime,
+            status: rec.status || old.status,
+            workingHours: rec.workingHours !== undefined ? rec.workingHours : old.workingHours,
+            punchSource: rec.punchSource || old.punchSource || 'EXCEL_IMPORT'
+          };
+          updated++;
+        } else {
+          const newId = ('id' in rec && rec.id) ? (rec as any).id : `att-${Date.now()}-${idx}`;
+          updatedList.unshift({
+            ...rec,
+            id: newId,
+            punchSource: rec.punchSource || 'EXCEL_IMPORT'
+          });
+          added++;
+        }
+      });
+
+      return {
+        ...prev,
+        attendanceRecords: updatedList
+      };
+    });
+    return { added, updated };
+  };
+
   // Leave Handlers
   const addLeaveApplication = (leave: Omit<LeaveApplication, 'id'>) => {
     const id = `leave-${Date.now()}`;
@@ -7671,6 +7716,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addAttendanceRecord,
       updateAttendanceRecord,
       deleteAttendanceRecord,
+      bulkSyncAttendanceRecords,
       addLeaveApplication,
       updateLeaveStatus,
       deleteLeaveApplication,
