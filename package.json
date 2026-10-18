@@ -27,7 +27,7 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -40,5 +40,11 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
+  },
+  "allowScripts": {
+    "@google/genai@2.20.0": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "protobufjs@7.6.6": true
   }
 }

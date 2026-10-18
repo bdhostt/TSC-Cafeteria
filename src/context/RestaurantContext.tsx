@@ -7474,6 +7474,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         parsedData = JSON.parse(imported);
       }
       if (!parsedData || typeof parsedData !== 'object') return false;
+      lastLocalEditTimeRef.current = Date.now();
       setData(prev => ({
         ...DEFAULT_DATA,
         ...parsedData,

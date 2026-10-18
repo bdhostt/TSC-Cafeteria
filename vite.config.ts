@@ -22,5 +22,20 @@ export default defineConfig(() => {
         interval: 500
       },
     },
+    build: {
+      chunkSizeWarningLimit: 2000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('xlsx')) return 'xlsx';
+              if (id.includes('lucide-react')) return 'icons';
+              if (id.includes('motion')) return 'motion';
+              if (id.includes('react') || id.includes('react-dom')) return 'react-vendor';
+            }
+          },
+        },
+      },
+    },
   };
 });

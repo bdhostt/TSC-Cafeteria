@@ -48,7 +48,33 @@ export const DataCleanupView: React.FC = () => {
   // In-app Modal Confirmation States
   const [pendingModule, setPendingModule] = useState<CleanModuleTarget | null>(null);
   const [isFactoryResetModalOpen, setIsFactoryResetModalOpen] = useState(false);
+  const [pendingImportData, setPendingImportData] = useState<{
+    fileName: string;
+    data: any;
+    stats: {
+      sales: number;
+      expenses: number;
+      purchases: number;
+      menu: number;
+      raw: number;
+      tables: number;
+    };
+  } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Compute total records across all modules
+  const totalSystemRecords = 
+    (data.sales?.length || 0) +
+    (data.expenses?.length || 0) +
+    (data.purchases?.length || 0) +
+    (data.payments?.length || 0) +
+    (data.customerAdvances?.length || 0) +
+    (data.inventory?.length || 0) +
+    (data.menuItems?.length || 0) +
+    (data.masterItems?.length || 0) +
+    (data.tables?.length || 0) +
+    (data.chartOfAccounts?.length || 0) +
+    (data.users?.length || 0);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -92,7 +118,7 @@ export const DataCleanupView: React.FC = () => {
   const handleExportBackup = () => {
     try {
       exportBackupJson();
-      showSuccess('System backup JSON file downloaded successfully!');
+      showSuccess('Full project backup JSON file exported & downloaded successfully!');
     } catch (e: any) {
       showError('Failed to export backup: ' + (e?.message || 'Unknown error'));
     }
@@ -107,18 +133,47 @@ export const DataCleanupView: React.FC = () => {
       try {
         const content = event.target?.result as string;
         const parsedData = JSON.parse(content);
-        const success = importBackupJson(parsedData);
-        if (success) {
-          showSuccess('System backup successfully restored! All modules updated.');
-        } else {
-          showError('Invalid backup file format or corrupted JSON schema.');
+        if (!parsedData || typeof parsedData !== 'object') {
+          showError('Invalid file: The selected file does not contain a valid JSON backup.');
+          return;
         }
+
+        setPendingImportData({
+          fileName: file.name,
+          data: parsedData,
+          stats: {
+            sales: Array.isArray(parsedData.sales) ? parsedData.sales.length : 0,
+            expenses: Array.isArray(parsedData.expenses) ? parsedData.expenses.length : 0,
+            purchases: Array.isArray(parsedData.purchases) ? parsedData.purchases.length : 0,
+            menu: Array.isArray(parsedData.menuItems) ? parsedData.menuItems.length : 0,
+            raw: Array.isArray(parsedData.masterItems) ? parsedData.masterItems.length : 0,
+            tables: Array.isArray(parsedData.tables) ? parsedData.tables.length : 0,
+          }
+        });
       } catch (err: any) {
-        showError('Error reading backup file: ' + (err?.message || 'Invalid file'));
+        showError('Error reading backup file: ' + (err?.message || 'Invalid JSON format'));
       }
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const confirmImportBackup = () => {
+    if (!pendingImportData) return;
+    setIsProcessing(true);
+    try {
+      const success = importBackupJson(pendingImportData.data);
+      if (success) {
+        showSuccess(`Full system database restored from "${pendingImportData.fileName}"! All modules updated.`);
+      } else {
+        showError('Failed to restore backup: Invalid database schema.');
+      }
+    } catch (err: any) {
+      showError('Error restoring backup: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setIsProcessing(false);
+      setPendingImportData(null);
+    }
   };
 
   const modulesList: CleanModuleTarget[] = [
@@ -328,6 +383,60 @@ export const DataCleanupView: React.FC = () => {
             </div>
           );
         })}
+
+        {/* 12th Slot: Full Project Data Backup & Restore (Exact location requested) */}
+        <div 
+          id="card-full-system-backup-restore"
+          className="bg-gradient-to-br from-indigo-50/80 via-white to-blue-50/80 border-2 border-indigo-200 hover:border-[#004b9b] rounded-2xl p-4 shadow-xs flex flex-col justify-between hover:shadow-md transition relative group"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold bg-[#004b9b] text-white shadow-xs">
+                  <Database className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                    <span>Full Project Backup & Restore</span>
+                  </h4>
+                  <span className="text-[10px] font-bold text-indigo-700 font-mono">
+                    {totalSystemRecords} total records across all modules
+                  </span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 text-[10px] font-extrabold bg-indigo-100 text-indigo-800 rounded-full border border-indigo-200">
+                JSON Data
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
+              Full project data export and restore. Download the entire database or import a saved backup JSON file.
+            </p>
+          </div>
+
+          <div className="pt-3 mt-3 border-t border-indigo-100 flex items-center gap-2">
+            <button
+              type="button"
+              id="btn-card-export-full-data"
+              onClick={handleExportBackup}
+              title="Download entire project data as JSON"
+              className="flex-1 py-2 bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export Full Data</span>
+            </button>
+
+            <button
+              type="button"
+              id="btn-card-import-full-data"
+              onClick={() => fileInputRef.current?.click()}
+              title="Upload and restore full project data from JSON"
+              className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import Full Data</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Dangerous Full Factory Reset */}
@@ -480,6 +589,97 @@ export const DataCleanupView: React.FC = () => {
               >
                 <RefreshCcw className="w-3.5 h-3.5" />
                 <span>{isProcessing ? 'Resetting...' : 'Yes, Confirm Factory Reset'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- IN-APP MODAL: CONFIRM FULL SYSTEM RESTORE --- */}
+      {pendingImportData && (
+        <div 
+          id="modal-import-backup-confirm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5 text-purple-700 font-extrabold text-base">
+                <div className="p-2 rounded-xl bg-purple-100 text-purple-700">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <span>Confirm Full Project Data Import</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingImportData(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200">
+                <div className="text-xs text-purple-950 font-bold mb-1">
+                  Selected Backup File:
+                </div>
+                <div className="font-mono text-xs text-purple-900 bg-white/90 p-2 rounded-lg border border-purple-100 break-all">
+                  📄 {pendingImportData.fileName}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-purple-200/60 text-center">
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Sales</div>
+                    <div className="text-xs font-black text-slate-800">{pendingImportData.stats.sales}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Menu Dishes</div>
+                    <div className="text-xs font-black text-slate-800">{pendingImportData.stats.menu}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Raw Items</div>
+                    <div className="text-xs font-black text-slate-800">{pendingImportData.stats.raw}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Expenses</div>
+                    <div className="text-xs font-black text-slate-800">{pendingImportData.stats.expenses}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Purchases</div>
+                    <div className="text-xs font-black text-slate-800">{pendingImportData.stats.purchases}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Tables</div>
+                    <div className="text-xs font-black text-slate-800">{pendingImportData.stats.tables}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  <span className="font-bold">Notice:</span> Importing this backup will restore all system records from this JSON file and sync to your local and cloud database.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPendingImportData(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-import-backup"
+                disabled={isProcessing}
+                onClick={confirmImportBackup}
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>{isProcessing ? 'Restoring Data...' : 'Confirm & Restore Data'}</span>
               </button>
             </div>
           </div>
