@@ -73,7 +73,7 @@ async function startServer() {
   await initDatabase();
 
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(express.json({ limit: "50mb" })); // Support large restaurant dataset syncing
 
@@ -2099,9 +2099,15 @@ Return ONLY a valid JSON object matching this exact schema:
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`E-Commerce Platform Server running on http://localhost:${PORT}`);
-  });
+  if (typeof PORT === "string" && isNaN(Number(PORT))) {
+    app.listen(PORT, () => {
+      console.log(`E-Commerce Platform Server running on socket ${PORT}`);
+    });
+  } else {
+    app.listen(Number(PORT) || 3000, "0.0.0.0", () => {
+      console.log(`E-Commerce Platform Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
