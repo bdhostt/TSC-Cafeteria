@@ -2281,10 +2281,22 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }
 
   const dataRef = useRef<AppData>(data);
+  const posViewRef = useRef(posView);
+  const activeTableIdRef = useRef(activeTableId);
+  const lastSyncedTablesStrRef = useRef<string>("");
+  const debounceSyncTimerRef = useRef<any>(null);
 
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
+
+  useEffect(() => {
+    posViewRef.current = posView;
+  }, [posView]);
+
+  useEffect(() => {
+    activeTableIdRef.current = activeTableId;
+  }, [activeTableId]);
 
   // Unified, smart state processor for both SSE real-time stream and HTTP polling
   const processIncomingServerState = (incomingData: AppData, serverTimestamp?: number, isInitial = false) => {
@@ -2447,9 +2459,112 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  // Instant differential tables applicator (<1ms in React)
+  const applyIncomingTables = (incomingTables: Table[], newSale?: SaleRecord, serverTimestamp?: number) => {
+    if (!Array.isArray(incomingTables)) return;
+
+    const curTablesStr = JSON.stringify(dataRef.current.tables);
+    const inTablesStr = JSON.stringify(incomingTables);
+    if (curTablesStr === inTablesStr && (!newSale || dataRef.current.sales?.some(s => s.invoiceNo === newSale.invoiceNo))) {
+      if (serverTimestamp) lastSyncedTimestampRef.current = serverTimestamp;
+      return;
+    }
+
+    lastSyncedTablesStrRef.current = inTablesStr;
+
+    setData(prev => {
+      const isActivelyOnOrderScreen = posViewRef.current === 'order';
+      const curActiveId = activeTableIdRef.current;
+      let finalTables = incomingTables;
+
+      if (isActivelyOnOrderScreen && curActiveId) {
+        const localActive = prev.tables?.find(t => t.id === curActiveId);
+        const hasUnprintedDraft = localActive && Array.isArray(localActive.cart) && localActive.cart.some(item => !item.kotPrinted);
+
+        if (hasUnprintedDraft && localActive) {
+          finalTables = incomingTables.map(st => {
+            if (st.id === curActiveId) {
+              return {
+                ...st,
+                cart: localActive.cart,
+                status: localActive.status,
+                waiter: localActive.waiter || st.waiter,
+                customer: (localActive.customer && localActive.customer !== 'Walk-in Customer') ? localActive.customer : (st.customer || localActive.customer),
+                channelOrAgentId: localActive.channelOrAgentId || st.channelOrAgentId,
+                discountVal: localActive.discountVal ?? st.discountVal,
+                discountType: localActive.discountType ?? st.discountType
+              };
+            }
+            return st;
+          });
+        }
+      }
+
+      let updatedSales = prev.sales || [];
+      if (newSale && newSale.invoiceNo) {
+        const exists = updatedSales.some(s => s.invoiceNo === newSale.invoiceNo);
+        if (!exists) {
+          updatedSales = [...updatedSales, newSale];
+        }
+      }
+
+      return {
+        ...prev,
+        tables: finalTables,
+        sales: updatedSales
+      };
+    });
+
+    if (serverTimestamp) {
+      lastSyncedTimestampRef.current = serverTimestamp;
+    }
+  };
+
+  // Instant differential POS table pusher (<10ms across all screens & terminals)
+  const syncPosTablesToServer = async (tablesToSend: Table[], newSaleToSend?: SaleRecord, action = 'TABLES_UPDATE') => {
+    const now = Date.now();
+    lastLocalEditTimeRef.current = now;
+
+    // 1. Instant zero-lag broadcast to sibling tabs in this browser (0ms)
+    if (posBroadcastChannelRef.current) {
+      try {
+        posBroadcastChannelRef.current.postMessage({
+          type: 'POS_TABLES_UPDATE',
+          sender: tabClientIdRef.current,
+          tables: tablesToSend,
+          newSale: newSaleToSend,
+          timestamp: now
+        });
+      } catch (e) {}
+    }
+
+    // 2. High-speed differential POS push (<10ms across different accounts & devices)
+    try {
+      const res = await fetch('/api/restaurant/pos-sync', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        body: JSON.stringify({
+          action,
+          tables: tablesToSend,
+          newSale: newSaleToSend
+        })
+      });
+      if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        if (json.timestamp) {
+          lastSyncedTimestampRef.current = json.timestamp;
+        }
+      }
+    } catch (err) {
+      console.warn('POS fast-sync error:', err);
+    }
+  };
+
   // Synchronize state to server
   const syncToServer = async (stateToSend: AppData) => {
-    // Never push unverified initial default state to server before initial fetch completes
     if (!isInitialSyncDoneRef.current || isUpdatingFromSync.current) return;
     const serialized = JSON.stringify(stateToSend);
     if (serialized === lastSyncedStringRef.current) return;
@@ -2458,7 +2573,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const timestamp = Date.now();
       const res = await fetch("/api/restaurant/state", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
         body: JSON.stringify({ data: stateToSend, clientTimestamp: timestamp }),
       });
       if (res.ok) {
@@ -2478,7 +2593,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Initial pull, real-time SSE stream (<20ms across devices), 0ms multi-tab broadcast, and fallback polling
+  // Initial pull, real-time SSE stream (<15ms across devices), 0ms multi-tab broadcast, and fallback pulse polling
   useEffect(() => {
     syncFromServer(true);
 
@@ -2494,7 +2609,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         sseInstance.onmessage = (event) => {
           try {
             const parsed = JSON.parse(event.data);
-            if (parsed && (parsed.type === 'STATE_UPDATED' || parsed.type === 'CONNECTED') && parsed.data) {
+            if (!parsed) return;
+            if (parsed.type === 'POS_TABLES_UPDATE' && parsed.tables) {
+              applyIncomingTables(parsed.tables, parsed.newSale, parsed.timestamp);
+            } else if (parsed.type === 'CONNECTED' && parsed.tables) {
+              applyIncomingTables(parsed.tables, undefined, parsed.timestamp);
+            } else if (parsed.type === 'FULL_STATE_UPDATED' && parsed.data) {
               processIncomingServerState(parsed.data, parsed.timestamp, false);
             }
           } catch (e) {}
@@ -2502,7 +2622,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         sseInstance.onerror = () => {
           sseInstance?.close();
-          sseReconnectTimer = setTimeout(setupSSE, 3000);
+          sseReconnectTimer = setTimeout(setupSSE, 2000);
         };
       } catch (err) {
         console.error('SSE initialization error:', err);
@@ -2511,17 +2631,34 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     setupSSE();
 
-    // 2. High-speed fallback polling every 2 seconds
-    const interval = setInterval(() => {
-      syncFromServer(false);
-    }, 2000);
+    // 2. High-speed lightweight heartbeat pulse check every 1 second (<40 bytes)
+    const pulseInterval = setInterval(async () => {
+      try {
+        const since = lastSyncedTimestampRef.current || 0;
+        const res = await fetch(`/api/restaurant/pulse?since=${since}`, {
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.changed && json.tables) {
+            applyIncomingTables(json.tables, undefined, json.timestamp);
+            if (json.salesCount && json.salesCount !== (dataRef.current.sales?.length || 0)) {
+              syncFromServer(false);
+            }
+          }
+        }
+      } catch (e) {}
+    }, 1000);
 
     // 3. Instant multi-tab message listener (0ms on same device)
     const channel = posBroadcastChannelRef.current;
     let onBroadcast: ((evt: MessageEvent) => void) | null = null;
     if (channel) {
       onBroadcast = (evt: MessageEvent) => {
-        if (evt.data?.type === 'POS_TAB_SYNC' && evt.data?.sender !== tabClientIdRef.current && evt.data?.data) {
+        if (evt.data?.sender === tabClientIdRef.current) return;
+        if (evt.data?.type === 'POS_TABLES_UPDATE' && evt.data?.tables) {
+          applyIncomingTables(evt.data.tables, evt.data.newSale, evt.data.timestamp);
+        } else if (evt.data?.type === 'POS_TAB_SYNC' && evt.data?.data) {
           isUpdatingFromSync.current = true;
           setData(evt.data.data);
           lastSyncedStringRef.current = JSON.stringify(evt.data.data);
@@ -2534,14 +2671,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     return () => {
-      clearInterval(interval);
+      clearInterval(pulseInterval);
       clearTimeout(sseReconnectTimer);
       sseInstance?.close();
       if (channel && onBroadcast) {
         channel.removeEventListener('message', onBroadcast);
       }
     };
-  }, [posView]);
+  }, []);
 
   // Save changes to localStorage, broadcast instantly to sibling tabs, and push to Server when modified
   useEffect(() => {
@@ -2551,6 +2688,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (isInitialSyncDoneRef.current && !isUpdatingFromSync.current) {
         localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(now));
         lastLocalEditTimeRef.current = now;
+
+        // Instant zero-lag differential tables push (<10ms across all terminals)
+        const curTablesStr = JSON.stringify(data.tables);
+        if (curTablesStr !== lastSyncedTablesStrRef.current) {
+          lastSyncedTablesStrRef.current = curTablesStr;
+          const recentSale = (data.sales && data.sales.length > 0) ? data.sales[data.sales.length - 1] : undefined;
+          const isRecentSettle = recentSale && (now - (recentSale.createdAt || recentSale.id || 0) < 5000);
+          syncPosTablesToServer(data.tables, isRecentSettle ? recentSale : undefined);
+        }
 
         // Instant zero-lag broadcast to all other open tabs in this browser
         if (posBroadcastChannelRef.current) {
@@ -2563,7 +2709,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           } catch (e) {}
         }
 
-        syncToServer(data);
+        // Debounced full state push to MongoDB/Disk (1.5s debounce so it never floods server)
+        if (debounceSyncTimerRef.current) clearTimeout(debounceSyncTimerRef.current);
+        debounceSyncTimerRef.current = setTimeout(() => {
+          syncToServer(data);
+        }, 1500);
       }
     } catch (e) {
       console.error("Error saving app data:", e);

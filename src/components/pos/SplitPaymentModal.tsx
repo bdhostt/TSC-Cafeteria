@@ -130,17 +130,13 @@ export const SplitPaymentModal: React.FC = () => {
     }
 
     const finalWaiter = selectedWaiter.trim() || activeSettlingTable.waiter || '';
-    if (finalWaiter && finalWaiter !== activeSettlingTable.waiter) {
-      setTableWaiter(activeSettlingTable.id, finalWaiter);
-    }
-
     const finalCustomer = (selectedCustomer.trim() || activeSettlingTable.customer || '').trim();
+
     if (advanceInputAmt > 0) {
       if (!finalCustomer || finalCustomer.toLowerCase().includes('walk-in')) {
         alert('Please select a customer with registered advance deposit to adjust advance!');
         return;
       }
-      setTableCustomer(activeSettlingTable.id, finalCustomer);
     }
 
     if (creditEntered > 0) {
@@ -148,7 +144,6 @@ export const SplitPaymentModal: React.FC = () => {
         alert('Please select or specify a registered customer name for due/credit sales!');
         return;
       }
-      setTableCustomer(activeSettlingTable.id, finalCustomer);
     }
 
     settlePayment(

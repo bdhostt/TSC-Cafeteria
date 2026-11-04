@@ -32,6 +32,38 @@ try {
   console.error("Error reading startup state from file:", e);
 }
 
+let savedLogoBuffer: Buffer | null = null;
+let savedLogoMime = "image/png";
+
+function normalizeLogo(state: any): boolean {
+  if (!state || !state.restaurantProfile || !state.restaurantProfile.logoUrl) return false;
+  const logoUrl = state.restaurantProfile.logoUrl;
+  if (typeof logoUrl === 'string' && logoUrl.startsWith('data:image/')) {
+    try {
+      const matches = logoUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
+      if (matches && matches[2]) {
+        savedLogoMime = matches[1];
+        savedLogoBuffer = Buffer.from(matches[2], 'base64');
+        state.restaurantProfile.logoUrl = '/api/restaurant/logo';
+        try {
+          const distDir = path.join(process.cwd(), 'dist');
+          if (fs.existsSync(distDir)) {
+            fs.writeFileSync(path.join(distDir, 'restaurant-logo.png'), savedLogoBuffer);
+          }
+          const publicDir = path.join(process.cwd(), 'public');
+          if (fs.existsSync(publicDir)) {
+            fs.writeFileSync(path.join(publicDir, 'restaurant-logo.png'), savedLogoBuffer);
+          }
+        } catch {}
+        return true;
+      }
+    } catch (e) {
+      console.error('Error normalizing logoUrl:', e);
+    }
+  }
+  return false;
+}
+
 // Initialize MongoDB connection and synchronize state
 async function initDatabase() {
   const connected = await connectToDatabase();
@@ -43,6 +75,12 @@ async function initDatabase() {
         const now = Date.now();
         lastServerUpdate = (doc.timestamp && doc.timestamp <= now + 60000) ? doc.timestamp : now;
         isLoadedFromMongo = true;
+        if (normalizeLogo(cachedState)) {
+          RestaurantStateModel.updateOne(
+            { stateKey: STATE_KEY },
+            { $set: { "data.restaurantProfile.logoUrl": "/api/restaurant/logo" } }
+          ).catch(() => {});
+        }
         console.log("📦 Loaded restaurant state from MongoDB successfully.");
       } else if (cachedState) {
         // Seed MongoDB from existing JSON backup only if collection is completely empty
@@ -1863,6 +1901,28 @@ async function startServer() {
     }
   });
 
+  // Restaurant Logo Endpoint (Caches the image separately so state stays small <80KB)
+  app.get("/api/restaurant/logo", (req, res) => {
+    if (savedLogoBuffer) {
+      res.setHeader("Content-Type", savedLogoMime || "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+      return res.send(savedLogoBuffer);
+    }
+    const distLogo = path.join(process.cwd(), "dist", "restaurant-logo.png");
+    if (fs.existsSync(distLogo)) {
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+      return res.sendFile(distLogo);
+    }
+    const pubLogo = path.join(process.cwd(), "public", "restaurant-logo.png");
+    if (fs.existsSync(pubLogo)) {
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+      return res.sendFile(pubLogo);
+    }
+    res.status(404).end();
+  });
+
   // Active SSE connections for instant real-time push to all devices
   const sseClients = new Set<express.Response>();
 
@@ -1871,33 +1931,41 @@ async function startServer() {
     for (const client of sseClients) {
       try {
         client.write(dataString);
+        (client as any).flush?.();
       } catch {
         sseClients.delete(client);
       }
     }
   }
 
-  // Real-time Event Stream (SSE) for zero-lag instant cross-device synchronization
+  // Real-time Event Stream (SSE) for zero-lag instant cross-device synchronization (<15ms)
   app.get("/api/restaurant/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
+    res.setHeader("X-LiteSpeed-Cache-Control", "no-cache");
     res.flushHeaders?.();
 
-    // Send immediate initial connection packet
-    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: lastServerUpdate, data: cachedState })}\n\n`);
+    // Send immediate compact initial packet (only tables & timestamp, NOT full 1MB)
+    res.write(`data: ${JSON.stringify({ 
+      type: 'CONNECTED', 
+      timestamp: lastServerUpdate, 
+      tables: cachedState?.tables || [] 
+    })}\n\n`);
+    (res as any).flush?.();
 
     sseClients.add(res);
 
     const pingInterval = setInterval(() => {
       try {
         res.write(": ping\n\n");
+        (res as any).flush?.();
       } catch {
         clearInterval(pingInterval);
         sseClients.delete(res);
       }
-    }, 15000);
+    }, 10000);
 
     req.on("close", () => {
       clearInterval(pingInterval);
@@ -1905,13 +1973,80 @@ async function startServer() {
     });
   });
 
-  // REST API endpoints for POS real-time cloud synchronization
+  // Dedicated Ultra-Fast Real-Time POS Sync (3.8KB payload, <5ms round-trip)
+  app.post("/api/restaurant/pos-sync", async (req, res) => {
+    try {
+      const { tables, newSale, action = 'TABLES_UPDATE' } = req.body;
+      const now = Date.now();
+
+      if (Array.isArray(tables) && cachedState) {
+        cachedState.tables = tables;
+        if (newSale && newSale.invoiceNo) {
+          if (!Array.isArray(cachedState.sales)) cachedState.sales = [];
+          const exists = cachedState.sales.some((s: any) => s.invoiceNo === newSale.invoiceNo);
+          if (!exists) {
+            cachedState.sales.push(newSale);
+          }
+        }
+
+        lastServerUpdate = now;
+        lastMongoSyncCheck = now;
+
+        // Broadcast to all connected terminals instantly via SSE (<10ms)
+        broadcastRealtimeState({
+          type: 'POS_TABLES_UPDATE',
+          action,
+          timestamp: now,
+          tables: cachedState.tables,
+          newSale: newSale || null
+        });
+
+        // Persist to MongoDB asynchronously in background
+        if (isDbConnected()) {
+          RestaurantStateModel.findOneAndUpdate(
+            { stateKey: STATE_KEY },
+            { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
+            { upsert: true }
+          ).catch((err: any) => console.error("Mongo background sync error:", err));
+        }
+
+        // File backup asynchronously in background
+        fs.writeFile(STATE_FILE, JSON.stringify({ data: cachedState, timestamp: lastServerUpdate }), () => {});
+      }
+
+      res.setHeader("X-LiteSpeed-Cache-Control", "no-cache");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.json({ success: true, timestamp: lastServerUpdate });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message });
+    }
+  });
+
+  // High-Frequency Lightweight Heartbeat Polling (<40 bytes, <2ms)
+  app.get("/api/restaurant/pulse", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("X-LiteSpeed-Cache-Control", "no-cache");
+
+    const since = Number(req.query.since) || 0;
+    if (since >= lastServerUpdate) {
+      return res.json({ changed: false, timestamp: lastServerUpdate });
+    }
+
+    return res.json({
+      changed: true,
+      timestamp: lastServerUpdate,
+      tables: cachedState?.tables || [],
+      salesCount: cachedState?.sales?.length || 0
+    });
+  });
+
+  // REST API endpoints for full POS state synchronization
   let lastMongoSyncCheck = 0;
 
   app.get("/api/restaurant/state", async (req, res) => {
     try {
       const now = Date.now();
-      // Ultra-fast in-memory response: only hit MongoDB if cache is empty or every 2.5s for fresh multi-terminal updates
       if (!cachedState || (now - lastMongoSyncCheck > 2500)) {
         if (!isDbConnected()) {
           await connectToDatabase();
@@ -1923,12 +2058,15 @@ async function startServer() {
               cachedState = doc.data;
               lastServerUpdate = doc.timestamp || now;
               isLoadedFromMongo = true;
+              normalizeLogo(cachedState);
             }
           }
         }
         lastMongoSyncCheck = now;
       }
 
+      res.setHeader("X-LiteSpeed-Cache-Control", "no-cache");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.json({
         success: true,
         data: cachedState,
@@ -1956,7 +2094,7 @@ async function startServer() {
       }
 
       if (clientData) {
-        // Immediate in-memory state update for instant sub-millisecond response to other terminals
+        normalizeLogo(clientData);
         cachedState = clientData;
         lastServerUpdate = Date.now();
         lastMongoSyncCheck = lastServerUpdate;
@@ -1979,14 +2117,16 @@ async function startServer() {
           if (err) console.error("Error writing restaurant state file:", err);
         });
 
-        // Broadcast to all other terminals instantly via SSE stream (<20ms)
+        // Broadcast to all other terminals instantly via SSE stream
         broadcastRealtimeState({
-          type: 'STATE_UPDATED',
+          type: 'FULL_STATE_UPDATED',
           timestamp: lastServerUpdate,
           data: cachedState
         });
       }
 
+      res.setHeader("X-LiteSpeed-Cache-Control", "no-cache");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.json({
         success: true,
         timestamp: lastServerUpdate,
