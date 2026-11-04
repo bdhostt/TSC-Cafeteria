@@ -1864,19 +1864,29 @@ async function startServer() {
   });
 
   // REST API endpoints for POS real-time cloud synchronization
+  let lastMongoSyncCheck = 0;
+
   app.get("/api/restaurant/state", async (req, res) => {
     try {
-      if (!isDbConnected()) {
-        await connectToDatabase();
-      }
-      if (isDbConnected()) {
-        const doc = await RestaurantStateModel.findOne({ stateKey: STATE_KEY }).lean() as any;
-        if (doc && doc.data) {
-          cachedState = doc.data;
-          lastServerUpdate = doc.timestamp || Date.now();
-          isLoadedFromMongo = true;
+      const now = Date.now();
+      // Ultra-fast in-memory response: only hit MongoDB if cache is empty or every 2.5s for fresh multi-terminal updates
+      if (!cachedState || (now - lastMongoSyncCheck > 2500)) {
+        if (!isDbConnected()) {
+          await connectToDatabase();
         }
+        if (isDbConnected()) {
+          const doc = await RestaurantStateModel.findOne({ stateKey: STATE_KEY }).lean() as any;
+          if (doc && doc.data) {
+            if (!cachedState || (doc.timestamp && doc.timestamp > lastServerUpdate)) {
+              cachedState = doc.data;
+              lastServerUpdate = doc.timestamp || now;
+              isLoadedFromMongo = true;
+            }
+          }
+        }
+        lastMongoSyncCheck = now;
       }
+
       res.json({
         success: true,
         data: cachedState,
@@ -1904,24 +1914,25 @@ async function startServer() {
       }
 
       if (clientData) {
+        // Immediate in-memory state update for instant sub-millisecond response to other terminals
         cachedState = clientData;
         lastServerUpdate = Date.now();
+        lastMongoSyncCheck = lastServerUpdate;
 
-        // Save to MongoDB if connected
+        // Persist to MongoDB asynchronously in background without blocking HTTP response
         if (isDbConnected()) {
-          try {
-            await RestaurantStateModel.findOneAndUpdate(
-              { stateKey: STATE_KEY },
-              { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
-              { upsert: true, returnDocument: 'after' }
-            );
+          RestaurantStateModel.findOneAndUpdate(
+            { stateKey: STATE_KEY },
+            { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
+            { upsert: true, returnDocument: 'after' }
+          ).then(() => {
             isLoadedFromMongo = true;
-          } catch (err: any) {
+          }).catch((err: any) => {
             console.error("MongoDB async update error:", err);
-          }
+          });
         }
 
-        // Always write file backup to disk
+        // Always write file backup to disk asynchronously
         fs.writeFile(STATE_FILE, JSON.stringify({ data: cachedState, timestamp: lastServerUpdate }, null, 2), (err) => {
           if (err) console.error("Error writing restaurant state file:", err);
         });

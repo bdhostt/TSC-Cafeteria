@@ -2270,6 +2270,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const isUpdatingFromSync = useRef<boolean>(false);
   const isInitialSyncDoneRef = useRef<boolean>(false);
   const lastLocalEditTimeRef = useRef<number>(0);
+  // Multi-tab instant synchronization channel
+  const posBroadcastChannelRef = useRef<BroadcastChannel | null>(null);
+  const tabClientIdRef = useRef<string>(Math.random().toString(36).substring(2, 9));
+
+  if (!posBroadcastChannelRef.current && typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      posBroadcastChannelRef.current = new BroadcastChannel('posdemo_multi_tab_sync');
+    } catch (e) {}
+  }
+
   const dataRef = useRef<AppData>(data);
 
   useEffect(() => {
@@ -2278,8 +2288,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Synchronize state from server
   const syncFromServer = async (isInitial = false) => {
-    // If local update/delete/edit happened within 15s, don't let periodic background polling overwrite it
-    if (!isInitial && Date.now() - lastLocalEditTimeRef.current < 15000) {
+    // Do not overwrite state while reviewing or printing a physical receipt modal
+    if (!isInitial && printableReceiptRef.current) {
       return;
     }
 
@@ -2315,6 +2325,17 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           // Immediately send the user's latest client data to seed the woken server
           syncToServer(dataRef.current);
           return;
+        }
+
+        // Smart Sales Merge: ensure no locally created recent sales are lost if server response is slightly behind
+        if (Array.isArray(result.data.sales) && Array.isArray(dataRef.current.sales)) {
+          const serverInvoiceSet = new Set(result.data.sales.map((s: any) => s.invoiceNo));
+          const recentUnsyncedLocalSales = dataRef.current.sales.filter(
+            (ls: any) => !serverInvoiceSet.has(ls.invoiceNo) && (Date.now() - (ls.id || ls.createdAt || 0) < 60000)
+          );
+          if (recentUnsyncedLocalSales.length > 0) {
+            result.data.sales = [...result.data.sales, ...recentUnsyncedLocalSales];
+          }
         }
 
         if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
@@ -2450,18 +2471,40 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Initial pull and periodic polling from server
+  // Initial pull, periodic 1.5s background polling, and instant multi-tab broadcast listener
   useEffect(() => {
     syncFromServer(true);
 
     const interval = setInterval(() => {
       syncFromServer(false);
-    }, 2500); // Poll every 2.5 seconds for snappy updates across terminals
+    }, 1500); // High-frequency 1.5s polling for instant cross-device updates
 
-    return () => clearInterval(interval);
+    // Instant multi-tab message listener
+    const channel = posBroadcastChannelRef.current;
+    let onBroadcast: ((evt: MessageEvent) => void) | null = null;
+    if (channel) {
+      onBroadcast = (evt: MessageEvent) => {
+        if (evt.data?.type === 'POS_TAB_SYNC' && evt.data?.sender !== tabClientIdRef.current && evt.data?.data) {
+          isUpdatingFromSync.current = true;
+          setData(evt.data.data);
+          lastSyncedStringRef.current = JSON.stringify(evt.data.data);
+          setTimeout(() => {
+            isUpdatingFromSync.current = false;
+          }, 100);
+        }
+      };
+      channel.addEventListener('message', onBroadcast);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (channel && onBroadcast) {
+        channel.removeEventListener('message', onBroadcast);
+      }
+    };
   }, []);
 
-  // Save changes to localStorage and push to Server when modified
+  // Save changes to localStorage, broadcast instantly to sibling tabs, and push to Server when modified
   useEffect(() => {
     try {
       const now = Date.now();
@@ -2469,6 +2512,18 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (isInitialSyncDoneRef.current && !isUpdatingFromSync.current) {
         localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(now));
         lastLocalEditTimeRef.current = now;
+
+        // Instant zero-lag broadcast to all other open tabs in this browser
+        if (posBroadcastChannelRef.current) {
+          try {
+            posBroadcastChannelRef.current.postMessage({
+              type: 'POS_TAB_SYNC',
+              sender: tabClientIdRef.current,
+              data
+            });
+          } catch (e) {}
+        }
+
         syncToServer(data);
       }
     } catch (e) {
