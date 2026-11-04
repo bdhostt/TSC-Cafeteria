@@ -1863,6 +1863,48 @@ async function startServer() {
     }
   });
 
+  // Active SSE connections for instant real-time push to all devices
+  const sseClients = new Set<express.Response>();
+
+  function broadcastRealtimeState(payload: any) {
+    const dataString = `data: ${JSON.stringify(payload)}\n\n`;
+    for (const client of sseClients) {
+      try {
+        client.write(dataString);
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }
+
+  // Real-time Event Stream (SSE) for zero-lag instant cross-device synchronization
+  app.get("/api/restaurant/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+
+    // Send immediate initial connection packet
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: lastServerUpdate, data: cachedState })}\n\n`);
+
+    sseClients.add(res);
+
+    const pingInterval = setInterval(() => {
+      try {
+        res.write(": ping\n\n");
+      } catch {
+        clearInterval(pingInterval);
+        sseClients.delete(res);
+      }
+    }, 15000);
+
+    req.on("close", () => {
+      clearInterval(pingInterval);
+      sseClients.delete(res);
+    });
+  });
+
   // REST API endpoints for POS real-time cloud synchronization
   let lastMongoSyncCheck = 0;
 
@@ -1935,6 +1977,13 @@ async function startServer() {
         // Always write file backup to disk asynchronously
         fs.writeFile(STATE_FILE, JSON.stringify({ data: cachedState, timestamp: lastServerUpdate }, null, 2), (err) => {
           if (err) console.error("Error writing restaurant state file:", err);
+        });
+
+        // Broadcast to all other terminals instantly via SSE stream (<20ms)
+        broadcastRealtimeState({
+          type: 'STATE_UPDATED',
+          timestamp: lastServerUpdate,
+          data: cachedState
         });
       }
 

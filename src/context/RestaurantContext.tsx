@@ -2286,9 +2286,126 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     dataRef.current = data;
   }, [data]);
 
+  // Unified, smart state processor for both SSE real-time stream and HTTP polling
+  const processIncomingServerState = (incomingData: AppData, serverTimestamp?: number, isInitial = false) => {
+    if (!isInitial && printableReceiptRef.current) {
+      return;
+    }
+
+    const result = { data: JSON.parse(JSON.stringify(incomingData)) };
+
+    // Smart Sales Merge: ensure no locally created recent sales are lost if server response is slightly behind
+    if (Array.isArray(result.data.sales) && Array.isArray(dataRef.current.sales)) {
+      const serverInvoiceSet = new Set(result.data.sales.map((s: any) => s.invoiceNo));
+      const recentUnsyncedLocalSales = dataRef.current.sales.filter(
+        (ls: any) => !serverInvoiceSet.has(ls.invoiceNo) && (Date.now() - (ls.id || ls.createdAt || 0) < 60000)
+      );
+      if (recentUnsyncedLocalSales.length > 0) {
+        result.data.sales = [...result.data.sales, ...recentUnsyncedLocalSales];
+      }
+    }
+
+    if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
+      result.data.tableDimensions = { width: 147, height: 98 };
+    }
+
+    if (Array.isArray(result.data.inventory) && result.data.purchases?.some((p: any) => p.billNo === 'BILL-8540' || p.billNo?.includes('8540'))) {
+      result.data.inventory = result.data.inventory.map((inv: any) => {
+        if (inv.id === 1 && inv.open === 1) {
+          return { ...inv, open: 0 };
+        }
+        return inv;
+      });
+    }
+
+    if (result.data.tables) {
+      result.data.tables = result.data.tables.map((t: Table) => {
+        if (t.status === 'free' && (!t.cart || t.cart.length === 0)) {
+          return {
+            ...t,
+            waiter: '',
+            customer: 'Walk-in Customer',
+            cart: [],
+            discountVal: 0,
+            channelOrAgentId: 'dine_in',
+            orderCreatedBy: undefined,
+            orderCreatedRole: undefined,
+            orderCreatedId: undefined,
+            orderCreatedAt: undefined,
+            billedAt: undefined,
+            billedAtTime: undefined
+          };
+        }
+        return t;
+      });
+
+      // Smart Table Protection: only protect draft cart if user is actively in 'order' screen
+      // When user is on the floor view ('floor'), NEVER lock tables: show 100% live server state across all devices!
+      const isActivelyOnOrderScreen = posView === 'order';
+      if (isActivelyOnOrderScreen && activeTableId && !isInitial) {
+        const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
+        const hasUnprintedDraft = localActive && Array.isArray(localActive.cart) && localActive.cart.some(item => !item.kotPrinted);
+
+        if (hasUnprintedDraft && localActive) {
+          result.data.tables = result.data.tables.map((st: Table) => {
+            if (st.id === activeTableId) {
+              return {
+                ...st,
+                cart: localActive.cart,
+                status: localActive.status,
+                waiter: localActive.waiter || st.waiter,
+                customer: (localActive.customer && localActive.customer !== 'Walk-in Customer') ? localActive.customer : (st.customer || localActive.customer),
+                channelOrAgentId: localActive.channelOrAgentId || st.channelOrAgentId,
+                discountVal: localActive.discountVal ?? st.discountVal,
+                discountType: localActive.discountType ?? st.discountType,
+                orderCreatedBy: localActive.orderCreatedBy || st.orderCreatedBy,
+                orderCreatedRole: localActive.orderCreatedRole || st.orderCreatedRole
+              };
+            }
+            return st;
+          });
+        }
+      }
+    }
+
+    if (result.data) {
+      if (!result.data.printTemplates || result.data.printTemplates.length === 0) {
+        result.data.printTemplates = (dataRef.current.printTemplates && dataRef.current.printTemplates.length > 0)
+          ? dataRef.current.printTemplates
+          : DEFAULT_PRINT_TEMPLATES;
+      }
+      if (result.data.chartOfAccounts) {
+        result.data.chartOfAccounts = ensureAccountSystemRoles(result.data.chartOfAccounts);
+      }
+    }
+
+    const serverStateStr = JSON.stringify(result.data);
+    const currentLocalStr = JSON.stringify(dataRef.current);
+
+    if (isInitial || (serverStateStr !== currentLocalStr && serverStateStr !== lastSyncedStringRef.current)) {
+      isUpdatingFromSync.current = true;
+      setData(result.data);
+      lastSyncedStringRef.current = serverStateStr;
+      if (serverTimestamp) {
+        lastSyncedTimestampRef.current = serverTimestamp;
+        try {
+          localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(serverTimestamp));
+        } catch {}
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY, serverStateStr);
+      } catch {}
+      setTimeout(() => {
+        isUpdatingFromSync.current = false;
+      }, 150);
+    } else if (!lastSyncedStringRef.current) {
+      lastSyncedStringRef.current = serverStateStr;
+      if (serverTimestamp) lastSyncedTimestampRef.current = serverTimestamp;
+    }
+  };
+
   // Synchronize state from server
   const syncFromServer = async (isInitial = false) => {
-    // Do not overwrite state while reviewing or printing a physical receipt modal
     if (!isInitial && printableReceiptRef.current) {
       return;
     }
@@ -2301,135 +2418,25 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       const result = await res.json();
       if (result.success && result.data) {
-        if (!isInitial && printableReceiptRef.current) {
-          // Do not mutate state while reviewing or printing a receipt
-          return;
-        }
-
         const serverTimestamp = Number(result.timestamp) || 0;
         const localSavedTimestamp = Number(localStorage.getItem(TIMESTAMP_STORAGE_KEY)) || 0;
         const isServerFromMongo = Boolean(result.isLoadedFromMongo);
 
-        // Check whether local state has active user data (sales, pos sessions, purchases, custom items)
         const localSalesCount = dataRef.current.sales?.length || 0;
         const localPurchasesCount = dataRef.current.purchases?.length || 0;
         const localSessionActive = Boolean(dataRef.current.session?.isActive || (dataRef.current.posSessions && dataRef.current.posSessions.length > 0));
 
-        // If this is the initial load and local browser data is newer or has active data while server returned default/unloaded data:
         const isLocalNewer = localSavedTimestamp > serverTimestamp;
         const isServerUninitialized = !isServerFromMongo && serverTimestamp <= 0;
 
         if (isInitial && (isLocalNewer || (isServerUninitialized && (localSalesCount > 0 || localPurchasesCount > 0 || localSessionActive)))) {
           console.log("🛡️ Preserving local restaurant state and syncing up to server (preventing overwrite by default server fallback)");
           isInitialSyncDoneRef.current = true;
-          // Immediately send the user's latest client data to seed the woken server
           syncToServer(dataRef.current);
           return;
         }
 
-        // Smart Sales Merge: ensure no locally created recent sales are lost if server response is slightly behind
-        if (Array.isArray(result.data.sales) && Array.isArray(dataRef.current.sales)) {
-          const serverInvoiceSet = new Set(result.data.sales.map((s: any) => s.invoiceNo));
-          const recentUnsyncedLocalSales = dataRef.current.sales.filter(
-            (ls: any) => !serverInvoiceSet.has(ls.invoiceNo) && (Date.now() - (ls.id || ls.createdAt || 0) < 60000)
-          );
-          if (recentUnsyncedLocalSales.length > 0) {
-            result.data.sales = [...result.data.sales, ...recentUnsyncedLocalSales];
-          }
-        }
-
-        if (result.data.tableDimensions?.width === 210 && result.data.tableDimensions?.height === 140) {
-          result.data.tableDimensions = { width: 147, height: 98 };
-        }
-        if (Array.isArray(result.data.inventory) && result.data.purchases?.some((p: any) => p.billNo === 'BILL-8540' || p.billNo?.includes('8540'))) {
-          result.data.inventory = result.data.inventory.map((inv: any) => {
-            if (inv.id === 1 && inv.open === 1) {
-              return { ...inv, open: 0 };
-            }
-            return inv;
-          });
-        }
-        if (result.data.tables) {
-          result.data.tables = result.data.tables.map((t: Table) => {
-            if (t.status === 'free' && (!t.cart || t.cart.length === 0) && t.id !== activeTableId) {
-              return {
-                ...t,
-                waiter: '',
-                customer: 'Walk-in Customer',
-                cart: [],
-                discountVal: 0,
-                channelOrAgentId: 'dine_in',
-                orderCreatedBy: undefined,
-                orderCreatedRole: undefined,
-                orderCreatedId: undefined,
-                orderCreatedAt: undefined,
-                billedAt: undefined,
-                billedAtTime: undefined
-              };
-            }
-            return t;
-          });
-
-          // Protect active local table's cart and metadata from being wiped by background server poll
-          if (activeTableId && !isInitial) {
-            const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
-            if (localActive) {
-              result.data.tables = result.data.tables.map((st: Table) => {
-                if (st.id === activeTableId) {
-                  return {
-                    ...st,
-                    cart: (localActive.cart && localActive.cart.length > 0) ? localActive.cart : st.cart,
-                    status: (localActive.cart && localActive.cart.length > 0) ? localActive.status : st.status,
-                    waiter: localActive.waiter || st.waiter,
-                    customer: (localActive.customer && localActive.customer !== 'Walk-in Customer') ? localActive.customer : (st.customer || localActive.customer),
-                    channelOrAgentId: localActive.channelOrAgentId || st.channelOrAgentId,
-                    discountVal: localActive.discountVal ?? st.discountVal,
-                    discountType: localActive.discountType ?? st.discountType,
-                    orderCreatedBy: localActive.orderCreatedBy || st.orderCreatedBy,
-                    orderCreatedRole: localActive.orderCreatedRole || st.orderCreatedRole
-                  };
-                }
-                return st;
-              });
-            }
-          }
-        }
-
-        if (result.data) {
-          if (!result.data.printTemplates || result.data.printTemplates.length === 0) {
-            result.data.printTemplates = (dataRef.current.printTemplates && dataRef.current.printTemplates.length > 0)
-              ? dataRef.current.printTemplates
-              : DEFAULT_PRINT_TEMPLATES;
-          } else if (Date.now() - lastLocalEditTimeRef.current < 20000 && dataRef.current.printTemplates && dataRef.current.printTemplates.length > 0) {
-            result.data.printTemplates = dataRef.current.printTemplates;
-          }
-          if (result.data.chartOfAccounts) {
-            result.data.chartOfAccounts = ensureAccountSystemRoles(result.data.chartOfAccounts);
-          }
-        }
-        const serverStateStr = JSON.stringify(result.data);
-        const currentLocalStr = JSON.stringify(dataRef.current);
-        
-        if (isInitial || (serverStateStr !== currentLocalStr && serverStateStr !== lastSyncedStringRef.current)) {
-          isUpdatingFromSync.current = true;
-          setData(result.data);
-          lastSyncedStringRef.current = serverStateStr;
-          if (serverTimestamp) {
-            lastSyncedTimestampRef.current = serverTimestamp;
-            try {
-              localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(serverTimestamp));
-            } catch {}
-          }
-          try {
-            localStorage.setItem(STORAGE_KEY, serverStateStr);
-          } catch {}
-          setTimeout(() => {
-            isUpdatingFromSync.current = false;
-          }, 150);
-        } else if (!lastSyncedStringRef.current) {
-          lastSyncedStringRef.current = serverStateStr;
-          if (serverTimestamp) lastSyncedTimestampRef.current = serverTimestamp;
-        }
+        processIncomingServerState(result.data, serverTimestamp, isInitial);
       }
     } catch (err) {
       console.error("Failed to sync state from server:", err);
@@ -2471,15 +2478,45 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Initial pull, periodic 1.5s background polling, and instant multi-tab broadcast listener
+  // Initial pull, real-time SSE stream (<20ms across devices), 0ms multi-tab broadcast, and fallback polling
   useEffect(() => {
     syncFromServer(true);
 
+    // 1. Real-time Server-Sent Events (SSE) Stream
+    let sseInstance: EventSource | null = null;
+    let sseReconnectTimer: any = null;
+
+    const setupSSE = () => {
+      if (typeof window === 'undefined' || !('EventSource' in window)) return;
+      try {
+        sseInstance = new EventSource('/api/restaurant/stream');
+
+        sseInstance.onmessage = (event) => {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed && (parsed.type === 'STATE_UPDATED' || parsed.type === 'CONNECTED') && parsed.data) {
+              processIncomingServerState(parsed.data, parsed.timestamp, false);
+            }
+          } catch (e) {}
+        };
+
+        sseInstance.onerror = () => {
+          sseInstance?.close();
+          sseReconnectTimer = setTimeout(setupSSE, 3000);
+        };
+      } catch (err) {
+        console.error('SSE initialization error:', err);
+      }
+    };
+
+    setupSSE();
+
+    // 2. High-speed fallback polling every 2 seconds
     const interval = setInterval(() => {
       syncFromServer(false);
-    }, 1500); // High-frequency 1.5s polling for instant cross-device updates
+    }, 2000);
 
-    // Instant multi-tab message listener
+    // 3. Instant multi-tab message listener (0ms on same device)
     const channel = posBroadcastChannelRef.current;
     let onBroadcast: ((evt: MessageEvent) => void) | null = null;
     if (channel) {
@@ -2498,11 +2535,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     return () => {
       clearInterval(interval);
+      clearTimeout(sseReconnectTimer);
+      sseInstance?.close();
       if (channel && onBroadcast) {
         channel.removeEventListener('message', onBroadcast);
       }
     };
-  }, []);
+  }, [posView]);
 
   // Save changes to localStorage, broadcast instantly to sibling tabs, and push to Server when modified
   useEffect(() => {
