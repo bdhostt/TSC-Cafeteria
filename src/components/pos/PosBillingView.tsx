@@ -68,6 +68,71 @@ const TABLE_SIZE_PRESETS: Record<'compact' | 'medium' | 'large' | 'xl', TableDim
   xl: { width: 260, height: 175 },
 };
 
+interface CartItemQtyInputProps {
+  qty: number;
+  minQty: number;
+  disabled?: boolean;
+  onCommit: (newQty: number) => void;
+  onVoidRequest?: () => void;
+}
+
+const CartItemQtyInput: React.FC<CartItemQtyInputProps> = ({
+  qty,
+  minQty,
+  disabled,
+  onCommit,
+  onVoidRequest
+}) => {
+  const [val, setVal] = useState<string>(String(qty));
+
+  useEffect(() => {
+    setVal(String(qty));
+  }, [qty]);
+
+  const handleBlurOrCommit = () => {
+    const num = parseInt(val, 10);
+    if (isNaN(num) || num < 1) {
+      setVal(String(qty));
+      return;
+    }
+    if (minQty && num < minQty) {
+      setVal(String(qty));
+      if (onVoidRequest) onVoidRequest();
+      return;
+    }
+    if (num !== qty) {
+      onCommit(num);
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min={minQty}
+      disabled={disabled}
+      value={val}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => {
+        const next = e.target.value;
+        setVal(next);
+        const parsed = parseInt(next, 10);
+        if (!isNaN(parsed) && parsed >= minQty) {
+          onCommit(parsed);
+        }
+      }}
+      onBlur={handleBlurOrCommit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          handleBlurOrCommit();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className="w-8 h-6 text-center font-black text-xs text-slate-900 bg-white border border-slate-300 rounded-md shadow-2xs hover:border-[#004b9b] focus:ring-1 focus:ring-[#004b9b] focus:border-[#004b9b] focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none cursor-text px-0.5 select-all transition"
+      title="Click to type quantity directly"
+    />
+  );
+};
+
 export const PosBillingView: React.FC = () => {
   const { 
     data, 
@@ -79,6 +144,7 @@ export const PosBillingView: React.FC = () => {
     addToCart,
     updateCartQty,
     updateCartItemQty,
+    setCartItemQty,
     updateCartItemNotes,
     removeCartItem,
     voidCartItem,
@@ -1349,7 +1415,13 @@ export const PosBillingView: React.FC = () => {
                           <Minus className="w-3 h-3" />
                         </button>
 
-                        <span className="w-7 text-center font-extrabold text-xs text-slate-900">{item.qty}</span>
+                        <CartItemQtyInput
+                          qty={item.qty}
+                          minQty={isItemKotPrinted ? (item.kotPrintedQty || 1) : 1}
+                          disabled={Boolean(activeTable.linkedSaleId)}
+                          onCommit={(newQty) => setCartItemQty(activeTable.id, item.cartItemId || idx, newQty)}
+                          onVoidRequest={() => setVoidingItem({ item, index: idx })}
+                        />
 
                         {/* Increment */}
                         <button

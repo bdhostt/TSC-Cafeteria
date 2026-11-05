@@ -1315,6 +1315,7 @@ interface RestaurantContextType {
   ) => void;
   updateCartQty: (tableId: string, menuItemId: number, delta: number) => void;
   updateCartItemQty: (tableId: string, cartItemIdOrIdx: string | number, delta: number) => void;
+  setCartItemQty: (tableId: string, cartItemIdOrIdx: string | number, newQty: number) => void;
   updateCartItemNotes: (tableId: string, cartItemIdOrIdx: string | number, notes: string) => void;
   removeCartItem: (tableId: string, cartItemIdOrIdx: string | number) => void;
   voidCartItem: (
@@ -3962,6 +3963,37 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           orderCreatedId: isNowEmpty ? undefined : table.orderCreatedId,
           billedAt: isNowEmpty ? undefined : table.billedAt,
           billedAtTime: isNowEmpty ? undefined : table.billedAtTime,
+          cart: existingCart
+        };
+      });
+      return { ...prev, tables: updatedTables };
+    });
+  };
+
+  const setCartItemQty = (tableId: string, cartItemIdOrIdx: string | number, newQty: number) => {
+    if (!data.session || !data.session.isActive) {
+      setIsStartSessionModalOpen(true);
+      return;
+    }
+    const safeQty = Math.max(1, Math.floor(Number(newQty) || 1));
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => {
+      const updatedTables = prev.tables.map(table => {
+        if (table.id !== tableId) return table;
+        let existingCart = table.cart.map(c => ({ ...c }));
+        
+        const itemIdx = typeof cartItemIdOrIdx === 'number'
+          ? cartItemIdOrIdx
+          : existingCart.findIndex(c => (c.cartItemId || `${c.id}`) === cartItemIdOrIdx || c.id === Number(cartItemIdOrIdx));
+
+        if (itemIdx >= 0 && itemIdx < existingCart.length) {
+          existingCart[itemIdx] = {
+            ...existingCart[itemIdx],
+            qty: safeQty
+          };
+        }
+        return {
+          ...table,
           cart: existingCart
         };
       });
@@ -7839,6 +7871,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addToCart,
       updateCartQty,
       updateCartItemQty,
+      setCartItemQty,
       updateCartItemNotes,
       removeCartItem,
       voidCartItem,

@@ -1,24 +1,32 @@
 {
   "data": {
     "session": {
-      "isActive": false,
+      "id": "SES-20261104-4211",
+      "isActive": true,
       "openingCash": 0,
-      "startTime": ""
+      "startTime": "10:52 AM",
+      "startDate": "2026-11-04",
+      "startTimestamp": 1793767944211,
+      "openedBy": "Super Admin (ADMIN)",
+      "notes": "Business Day Start - Shift 1 float verified",
+      "shiftType": "Shift 1"
     },
     "businessDay": {
-      "date": "2026-10-14",
-      "isOpen": false,
+      "date": "2026-11-04",
+      "isOpen": true,
+      "openedAt": "10:52 AM",
+      "openedBy": "Super Admin (ADMIN)",
       "dayNumber": 1
     },
     "restaurantProfile": {
-      "name": "BD HOSTT POS & ERP",
-      "tagline": "Restaurant POS & Recipe BOM ERP,BD HOSTT DEFAULT DATA CHECK  12.33 AM",
+      "name": "Bar Code Restaurant Group",
+      "tagline": "Restaurant POS & Recipe BOM ERP",
       "logoUrl": "/api/restaurant/logo",
       "logoType": "custom",
       "presetIcon": "utensils",
-      "address": "House #42, Road #11, Block D, Muradpur, Chittagong-1213",
-      "phone": "01846100900",
-      "email": "bdhosttpos@gmail.com",
+      "address": "MuradPur, Chattogram - 4349, Bangladesh",
+      "phone": "01895602816",
+      "email": "tsc@bdhostt.com",
       "binOrVat": "0029381-01",
       "currencySymbol": "৳",
       "vatPercent": 0,
@@ -387,49 +395,7 @@
       "width": 110,
       "height": 75
     },
-    "purchaseOrders": [
-      {
-        "id": 1792305688900,
-        "poNo": "DCC-PO-2026-8355",
-        "date": "2026-10-18",
-        "vendor": "Haji And Sons",
-        "expectedDate": "2026-10-20",
-        "items": [
-          {
-            "itemId": 1,
-            "item": "Flour - ময়দা",
-            "category": "Grocery",
-            "uom": "KG",
-            "qty": 5,
-            "rate": 60,
-            "total": 300
-          }
-        ],
-        "total": 300,
-        "status": "PARTIALLY_RECEIVED",
-        "grnNo": "INV-7486",
-        "notes": "",
-        "receivedHistory": [
-          {
-            "grnNo": "INV-7486",
-            "billNo": "INV-7486",
-            "date": "2026-10-18",
-            "items": [
-              {
-                "itemId": 1,
-                "item": "Flour - ময়দা",
-                "category": "Grocery",
-                "uom": "KG",
-                "qty": 4,
-                "rate": 60,
-                "total": 240
-              }
-            ],
-            "total": 240
-          }
-        ]
-      }
-    ],
+    "purchaseOrders": [],
     "purchaseReturns": [],
     "employees": [
       {
@@ -770,11 +736,204 @@
         "isPaid": true
       }
     ],
-    "journalEntries": [],
+    "journalEntries": [
+      {
+        "voucherNo": "JV-2026-016",
+        "date": "2026-11-04",
+        "debitAccountId": "1030",
+        "debitAccountName": "1030 - Bank A/C",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 33500,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-6238",
+        "id": "jv-1793778969812"
+      },
+      {
+        "voucherNo": "JV-2026-015",
+        "date": "2026-11-01",
+        "debitAccountId": "5030",
+        "debitAccountName": "5030 - COGS - Raw Fish",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 29360,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-6562",
+        "id": "jv-1793778819015"
+      },
+      {
+        "voucherNo": "JV-2026-014",
+        "date": "2026-11-04",
+        "debitAccountId": "5050",
+        "debitAccountName": "5050 - COGS - Raw Eggs",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 2160,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-3279",
+        "id": "jv-1793778132263"
+      },
+      {
+        "voucherNo": "JV-2026-013",
+        "date": "2026-11-03",
+        "debitAccountId": "5020",
+        "debitAccountName": "5020 - COGS - Raw Grocery",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 17506,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-7041",
+        "id": "jv-1793778111192"
+      },
+      {
+        "voucherNo": "JV-2026-012",
+        "date": "2026-11-03",
+        "debitAccountId": "5010",
+        "debitAccountName": "5010 - COGS - Raw Chicken",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 9965,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-8776",
+        "id": "jv-1793778085681"
+      },
+      {
+        "voucherNo": "JV-2026-011",
+        "date": "2026-11-02",
+        "debitAccountId": "5020",
+        "debitAccountName": "5020 - COGS - Raw Grocery",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 10133,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-2151",
+        "id": "jv-1793777717755"
+      },
+      {
+        "voucherNo": "JV-2026-010",
+        "date": "2026-11-02",
+        "debitAccountId": "5050",
+        "debitAccountName": "5050 - COGS - Raw Eggs",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 2160,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-1346",
+        "id": "jv-1793777700723"
+      },
+      {
+        "voucherNo": "JV-2026-009",
+        "date": "2026-11-02",
+        "debitAccountId": "5010",
+        "debitAccountName": "5010 - COGS - Raw Chicken",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 7011,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-0621",
+        "id": "jv-1793777615989"
+      },
+      {
+        "voucherNo": "JV-2026-008",
+        "date": "2026-11-02",
+        "debitAccountId": "5090",
+        "debitAccountName": "5090 - COGS - Raw Processed Item",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 250,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-3288",
+        "id": "jv-1793777597580"
+      },
+      {
+        "voucherNo": "JV-2026-007",
+        "date": "2026-11-02",
+        "debitAccountId": "5070",
+        "debitAccountName": "5070 - COGS - Raw Vegetable",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 3130,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-8989",
+        "id": "jv-1793777571172"
+      },
+      {
+        "voucherNo": "JV-2026-006",
+        "date": "2026-11-01",
+        "debitAccountId": "5020",
+        "debitAccountName": "5020 - COGS - Raw Grocery",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 50,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-0392",
+        "id": "jv-1793775352919"
+      },
+      {
+        "voucherNo": "JV-2026-005",
+        "date": "2026-11-01",
+        "debitAccountId": "5070",
+        "debitAccountName": "5070 - COGS - Raw Vegetable",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 3585,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-1032",
+        "id": "jv-1793775321529"
+      },
+      {
+        "voucherNo": "JV-2026-004",
+        "date": "2026-11-01",
+        "debitAccountId": "5040",
+        "debitAccountName": "5040 - COGS - Raw Cold & Beverage",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 2100,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-3175",
+        "id": "jv-1793775279703"
+      },
+      {
+        "voucherNo": "JV-2026-003",
+        "date": "2026-11-01",
+        "debitAccountId": "5050",
+        "debitAccountName": "5050 - COGS - Raw Eggs",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 2300,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-5990",
+        "id": "jv-1793775253553"
+      },
+      {
+        "voucherNo": "JV-2026-002",
+        "date": "2026-11-01",
+        "debitAccountId": "5020",
+        "debitAccountName": "5020 - COGS - Raw Grocery",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 17090,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-1122",
+        "id": "jv-1793775217182"
+      },
+      {
+        "voucherNo": "JV-2026-001",
+        "date": "2026-11-01",
+        "debitAccountId": "5010",
+        "debitAccountName": "5010 - COGS - Raw Chicken",
+        "creditAccountId": "1010",
+        "creditAccountName": "1010 - Cash in Hand (POS Drawer)",
+        "amount": 10310,
+        "narration": "Daily adjustment and journal voucher entry",
+        "referenceNo": "REF-7521",
+        "id": "jv-1793774463235"
+      }
+    ],
     "tables": [
       {
         "id": "T-01",
-        "name": "Table 01",
+        "name": "T 1",
         "zone": "Floor 1",
         "status": "free",
         "waiter": "",
@@ -790,7 +949,7 @@
       },
       {
         "id": "T-02",
-        "name": "Table 02",
+        "name": "T 2",
         "zone": "Floor 1",
         "status": "free",
         "waiter": "",
@@ -806,7 +965,7 @@
       },
       {
         "id": "T-03",
-        "name": "Table 03",
+        "name": "T 3",
         "zone": "Floor 1",
         "status": "free",
         "waiter": "",
@@ -822,7 +981,7 @@
       },
       {
         "id": "T-04",
-        "name": "Table 04",
+        "name": "T 4",
         "zone": "Floor 1",
         "status": "free",
         "waiter": "",
@@ -838,7 +997,7 @@
       },
       {
         "id": "T-05",
-        "name": "Table 05",
+        "name": "T 5",
         "zone": "Floor 1",
         "status": "free",
         "waiter": "",
@@ -933,10 +1092,7 @@
         "paidAmount": 0
       }
     ],
-    "waiters": [
-      "Rahim",
-      "Karim"
-    ],
+    "waiters": [],
     "departments": [
       "Bangla Kitchen",
       "Grill & BBQ",
@@ -979,7 +1135,7 @@
       "Chicken",
       "Beef",
       "Fish",
-      "Cold & Beverage",
+      "Beverage",
       "Ice Cream",
       "Egg",
       "Vegetable",
@@ -990,10 +1146,13 @@
       "Haji And Sons",
       "Ahmadia Store",
       "Al-Madina Sales Center",
-      "General Supplier"
+      "General Supplier",
+      "Vegetable Supplier",
+      "Fish Supplier"
     ],
     "customers": [
-      "Walk-in Customer"
+      "Walk-in Customer",
+      "Sajib Khan"
     ],
     "chartOfAccounts": [
       {
@@ -1003,7 +1162,7 @@
         "type": "ASSET",
         "category": "Current Assets",
         "systemRole": "CASH",
-        "balance": 0
+        "balance": 36090
       },
       {
         "id": "1020",
@@ -1107,28 +1266,10 @@
       {
         "id": "4010",
         "code": "4010",
-        "name": "Dine-in Restaurant Sales",
+        "name": "Restaurant Sales",
         "type": "REVENUE",
         "category": "Food Sales Revenue",
         "systemRole": "DINE_IN_REVENUE",
-        "balance": 0
-      },
-      {
-        "id": "4020",
-        "code": "4020",
-        "name": "Takeaway & Delivery Sales",
-        "type": "REVENUE",
-        "category": "Food Sales Revenue",
-        "systemRole": "DELIVERY_REVENUE",
-        "balance": 0
-      },
-      {
-        "id": "4030",
-        "code": "4030",
-        "name": "Beverage & Bar Counter Sales",
-        "type": "REVENUE",
-        "category": "Beverage Revenue",
-        "systemRole": "BEVERAGE_REVENUE",
         "balance": 0
       },
       {
@@ -1391,15 +1532,6 @@
         "systemRole": "OPERATING_EXPENSE",
         "balance": 0,
         "id": "6190"
-      },
-      {
-        "code": "6200",
-        "name": "Printing & Branding",
-        "type": "EXPENSE",
-        "category": "Operating Expenses",
-        "systemRole": "OPERATING_EXPENSE",
-        "balance": 0,
-        "id": "6200"
       }
     ],
     "customerAdvances": [],
@@ -1470,20 +1602,11 @@
         "role": "CASHIER",
         "permissions": [
           "launcher",
-          "dashboard",
           "pos",
-          "menu-items",
           "sales",
-          "expenses",
-          "purchases",
-          "payables",
           "receivables",
-          "inv-items",
-          "inventory",
           "hr",
-          "journal",
-          "reports",
-          "heads"
+          "journal"
         ],
         "isActive": true,
         "phone": "+880 1911-000003",
@@ -1498,20 +1621,11 @@
         "role": "CASHIER",
         "permissions": [
           "launcher",
-          "dashboard",
           "pos",
-          "menu-items",
           "sales",
-          "expenses",
-          "purchases",
-          "payables",
           "receivables",
-          "inv-items",
-          "inventory",
           "hr",
-          "journal",
-          "reports",
-          "heads"
+          "journal"
         ],
         "isActive": true,
         "phone": "+880 1911-000004",
@@ -1590,20 +1704,11 @@
       ],
       "CASHIER": [
         "launcher",
-        "dashboard",
         "pos",
-        "menu-items",
         "sales",
-        "expenses",
-        "purchases",
-        "payables",
         "receivables",
-        "inv-items",
-        "inventory",
         "hr",
-        "journal",
-        "reports",
-        "heads"
+        "journal"
       ],
       "WAITER": [
         "launcher",
@@ -1641,7 +1746,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 210
+        "defaultRate": 190
       },
       {
         "id": 4,
@@ -1657,7 +1762,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 84.5
+        "defaultRate": 0
       },
       {
         "id": 6,
@@ -1713,7 +1818,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 82
       },
       {
         "id": 13,
@@ -1745,7 +1850,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 55
       },
       {
         "id": 17,
@@ -1769,7 +1874,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 100
       },
       {
         "id": 20,
@@ -1809,7 +1914,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 65
       },
       {
         "id": 25,
@@ -1817,7 +1922,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "PCS",
-        "defaultRate": 0
+        "defaultRate": 210
       },
       {
         "id": 26,
@@ -1825,7 +1930,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 420
       },
       {
         "id": 27,
@@ -1833,7 +1938,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 390
       },
       {
         "id": 28,
@@ -1841,7 +1946,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "PCS",
-        "defaultRate": 0
+        "defaultRate": 135
       },
       {
         "id": 29,
@@ -1849,7 +1954,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "PCS",
-        "defaultRate": 0
+        "defaultRate": 125
       },
       {
         "id": 30,
@@ -1857,7 +1962,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "PCS",
-        "defaultRate": 0
+        "defaultRate": 45
       },
       {
         "id": 31,
@@ -1873,7 +1978,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 270
       },
       {
         "id": 33,
@@ -1913,7 +2018,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "PCS",
-        "defaultRate": 185
+        "defaultRate": 110
       },
       {
         "id": 38,
@@ -1953,7 +2058,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 815
+        "defaultRate": 1800
       },
       {
         "id": 43,
@@ -1961,7 +2066,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 100
+        "defaultRate": 120
       },
       {
         "id": 44,
@@ -1977,7 +2082,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "Caan",
-        "defaultRate": 90
+        "defaultRate": 70
       },
       {
         "id": 46,
@@ -1985,7 +2090,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "Caan",
-        "defaultRate": 0
+        "defaultRate": 80
       },
       {
         "id": 47,
@@ -1993,7 +2098,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "Caan",
-        "defaultRate": 350
+        "defaultRate": 87
       },
       {
         "id": 48,
@@ -2033,7 +2138,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 460
+        "defaultRate": 200
       },
       {
         "id": 53,
@@ -2073,7 +2178,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "PCS",
-        "defaultRate": 10
+        "defaultRate": 13
       },
       {
         "id": 58,
@@ -2121,7 +2226,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 950
+        "defaultRate": 1100
       },
       {
         "id": 64,
@@ -2161,7 +2266,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 460
+        "defaultRate": 780
       },
       {
         "id": 69,
@@ -2185,7 +2290,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 130
+        "defaultRate": 110
       },
       {
         "id": 72,
@@ -2193,7 +2298,7 @@
         "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 4800
+        "defaultRate": 4000
       },
       {
         "id": 73,
@@ -2230,7 +2335,7 @@
       {
         "id": 77,
         "name": "Dried Red Chilli -লাল মরিচ",
-        "category": "Vegetable",
+        "category": "Grocery",
         "vendor": "General Supplier",
         "uom": "KG",
         "defaultRate": 365
@@ -2249,7 +2354,7 @@
         "category": "Vegetable",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 70
       },
       {
         "id": 80,
@@ -2257,7 +2362,7 @@
         "category": "Vegetable",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 110
       },
       {
         "id": 81,
@@ -2273,7 +2378,7 @@
         "category": "Vegetable",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 18
       },
       {
         "id": 83,
@@ -2313,7 +2418,7 @@
         "category": "Vegetable",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 0
+        "defaultRate": 28
       },
       {
         "id": 88,
@@ -2401,7 +2506,7 @@
         "category": "Chicken",
         "vendor": "General Supplier",
         "uom": "KG",
-        "defaultRate": 325
+        "defaultRate": 0
       },
       {
         "id": 99,
@@ -2445,27 +2550,27 @@
       },
       {
         "id": 104,
-        "name": "Sprite 200 ml",
+        "name": "Beverage 200 ml",
         "category": "Beverage",
         "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
+        "uom": "Pcs",
+        "defaultRate": 25
       },
       {
         "id": 105,
-        "name": "Sprite 500 ml",
+        "name": "Beverage 500 ml",
         "category": "Beverage",
         "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
+        "uom": "Pcs",
+        "defaultRate": 50
       },
       {
         "id": 106,
-        "name": "Sprite 1000 ml",
+        "name": "Beverage 1000 ml",
         "category": "Beverage",
         "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
+        "uom": "Pcs",
+        "defaultRate": 80
       },
       {
         "id": 107,
@@ -2486,54 +2591,6 @@
       {
         "id": 109,
         "name": "Water 2000 ml",
-        "category": "Beverage",
-        "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
-      },
-      {
-        "id": 110,
-        "name": "Fanta 200 ml",
-        "category": "Beverage",
-        "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
-      },
-      {
-        "id": 111,
-        "name": "Fanta 500 ml",
-        "category": "Beverage",
-        "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
-      },
-      {
-        "id": 112,
-        "name": "Fanta 1000 ml",
-        "category": "Beverage",
-        "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
-      },
-      {
-        "id": 113,
-        "name": "Coca-Cola 200 ml",
-        "category": "Beverage",
-        "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
-      },
-      {
-        "id": 114,
-        "name": "Coca-Cola 500 ml",
-        "category": "Beverage",
-        "vendor": "General Supplier",
-        "uom": "PCS",
-        "defaultRate": 0
-      },
-      {
-        "id": 115,
-        "name": "Coca-Cola 1000 ml",
         "category": "Beverage",
         "vendor": "General Supplier",
         "uom": "PCS",
@@ -2702,7 +2759,7 @@
       {
         "id": 136,
         "name": "Aarong Chocolate juice",
-        "category": "Juice",
+        "category": "Ice Cream",
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
@@ -2710,7 +2767,7 @@
       {
         "id": 137,
         "name": "Aarong Mango juice",
-        "category": "Juice",
+        "category": "Ice Cream",
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
@@ -2718,7 +2775,7 @@
       {
         "id": 138,
         "name": "Aarong Moka juice",
-        "category": "Juice",
+        "category": "Ice Cream",
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
@@ -2726,7 +2783,7 @@
       {
         "id": 139,
         "name": "Borhani",
-        "category": "Processed Item",
+        "category": "Ice Cream",
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
@@ -2734,7 +2791,7 @@
       {
         "id": 140,
         "name": "Pudding",
-        "category": "Processed Item",
+        "category": "Ice Cream",
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
@@ -2742,7 +2799,7 @@
       {
         "id": 141,
         "name": "Yogurt",
-        "category": "Processed Item",
+        "category": "Ice Cream",
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
@@ -2750,7 +2807,7 @@
       {
         "id": 142,
         "name": "Firni",
-        "category": "Processed Item",
+        "category": "Ice Cream",
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
@@ -2834,6 +2891,62 @@
         "vendor": "General Supplier",
         "uom": "PCS",
         "defaultRate": 0
+      },
+      {
+        "id": 1072,
+        "name": "Powdered Coffee-কফি পাউডার",
+        "category": "Grocery",
+        "vendor": "General Supplier",
+        "uom": "KG",
+        "defaultRate": 0
+      },
+      {
+        "id": 1091,
+        "name": "Egg-ডিম",
+        "category": "Egg",
+        "vendor": "General Supplier",
+        "uom": "PCS",
+        "defaultRate": 0
+      },
+      {
+        "id": 1096,
+        "name": "Mash Votrth-মাছ ভর্তা",
+        "category": "Fish",
+        "vendor": "General Supplier",
+        "uom": "KG",
+        "defaultRate": 0
+      },
+      {
+        "id": 1100,
+        "name": "Chicken Jhal Fry& Biryani",
+        "category": "Chicken",
+        "vendor": "General Supplier",
+        "uom": "PCS",
+        "defaultRate": 0
+      },
+      {
+        "id": 1104,
+        "name": "Sprite, Fanta, Coca-Cola 200 ml",
+        "category": "Beverage",
+        "vendor": "General Supplier",
+        "uom": "PCS",
+        "defaultRate": 0
+      },
+      {
+        "id": 1105,
+        "name": "Sprite, Fanta, Coca-Cola 500 ml",
+        "category": "Beverage",
+        "vendor": "General Supplier",
+        "uom": "PCS",
+        "defaultRate": 0
+      },
+      {
+        "id": 1106,
+        "name": "Sprite, Fanta, Coca-Cola 1 Ltr",
+        "category": "Beverage",
+        "vendor": "General Supplier",
+        "uom": "PCS",
+        "defaultRate": 0
       }
     ],
     "menuItems": [
@@ -2844,52 +2957,21 @@
         "category": "Bangla Items",
         "price": 15,
         "cost": 0,
-        "recipe": []
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
       },
       {
         "id": 1790766956012,
-        "name": "Beef",
+        "name": "Beef Bhuna",
         "department": "Bangla Kitchen",
         "category": "Bangla Items",
         "price": 130,
         "cost": 0,
-        "recipe": []
-      },
-      {
-        "id": 1790766977529,
-        "name": "Dal, Bhaji",
-        "department": "Bangla Kitchen",
-        "category": "Bangla Items",
-        "price": 20,
-        "cost": 0,
         "recipe": [],
         "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_5321",
-            "name": "Dal",
-            "criteria": "Custom",
-            "price": 20,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_5381",
-            "name": "Bhaji",
-            "criteria": "Custom",
-            "price": 20,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_0878",
-            "name": "Dal & Bhaji",
-            "criteria": "Size",
-            "price": 20,
-            "cost": 0,
-            "recipeMultiplier": 1.4
-          }
-        ],
+        "variations": [],
         "addons": []
       },
       {
@@ -2921,31 +3003,14 @@
       },
       {
         "id": 1790767087138,
-        "name": "Chicken Tehari",
+        "name": "Chicken Tehari Half",
         "department": "Bangla Kitchen",
         "category": "Bangla Items",
         "price": 35,
         "cost": 0,
         "recipe": [],
         "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_6908",
-            "name": "Half",
-            "criteria": "Size",
-            "price": 35,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_0462",
-            "name": "Full",
-            "criteria": "Size",
-            "price": 70,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
+        "variations": [],
         "addons": []
       },
       {
@@ -3059,32 +3124,7 @@
         "cost": 0,
         "recipe": [],
         "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_5852",
-            "name": "0.5 Plate",
-            "criteria": "Custom",
-            "price": 10,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_4559",
-            "name": "1 Plate",
-            "criteria": "Custom",
-            "price": 15,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_8690",
-            "name": "1.5 Plate",
-            "criteria": "Custom",
-            "price": 25,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
+        "variations": [],
         "addons": []
       },
       {
@@ -3143,154 +3183,6 @@
         "price": 130,
         "cost": 0,
         "recipe": []
-      },
-      {
-        "id": 1790768183582,
-        "name": "Coca Cola",
-        "department": "Beverage",
-        "category": "Beverage Items",
-        "price": 25,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_0314",
-            "name": "200 ml",
-            "criteria": "Size",
-            "price": 25,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_1146",
-            "name": "500 ml",
-            "criteria": "Size",
-            "price": 50,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_2722",
-            "name": "1 ltr",
-            "criteria": "Size",
-            "price": 80,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
-      },
-      {
-        "id": 1790768271160,
-        "name": "Fanta",
-        "department": "Beverage",
-        "category": "Beverage Items",
-        "price": 25,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_7837",
-            "name": "200 ml",
-            "criteria": "Size",
-            "price": 25,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_8021",
-            "name": "500 ml",
-            "criteria": "Size",
-            "price": 50,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_9524",
-            "name": "1 ltr",
-            "criteria": "Size",
-            "price": 80,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
-      },
-      {
-        "id": 1790768516623,
-        "name": "Sprite",
-        "department": "Beverage",
-        "category": "Beverage Items",
-        "price": 25,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_2790",
-            "name": "200 ml",
-            "criteria": "Size",
-            "price": 25,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_3174",
-            "name": "500 ml",
-            "criteria": "Size",
-            "price": 50,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_4350",
-            "name": "1 ltr",
-            "criteria": "Size",
-            "price": 80,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
-      },
-      {
-        "id": 1790768582480,
-        "name": "Water",
-        "department": "Beverage",
-        "category": "Beverage Items",
-        "price": 20,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_9212",
-            "name": "500 ml",
-            "criteria": "Size",
-            "price": 20,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_9862",
-            "name": "1 ltr",
-            "criteria": "Size",
-            "price": 30,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_0853",
-            "name": "2 ltr",
-            "criteria": "Size",
-            "price": 40,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
       },
       {
         "id": 1790768736478,
@@ -3512,35 +3404,6 @@
         "recipe": []
       },
       {
-        "id": 1790777865094,
-        "name": "Chocobar",
-        "department": "Beverage",
-        "category": "Ice Creams Items",
-        "price": 25,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_2556",
-            "name": "46 ml",
-            "criteria": "Custom",
-            "price": 25,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_2299",
-            "name": "72 ml",
-            "criteria": "Custom",
-            "price": 35,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
-      },
-      {
         "id": 1790777972224,
         "name": "Shell & Core",
         "department": "Beverage",
@@ -3550,35 +3413,6 @@
         "recipe": [],
         "channelPrices": {},
         "variations": [],
-        "addons": []
-      },
-      {
-        "id": 1790778054269,
-        "name": "Crunchie Bar",
-        "department": "Beverage",
-        "category": "Ice Creams Items",
-        "price": 30,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_3216",
-            "name": "52 ml",
-            "criteria": "Custom",
-            "price": 30,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_3455",
-            "name": "82 ml",
-            "criteria": "Custom",
-            "price": 50,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
         "addons": []
       },
       {
@@ -3607,35 +3441,6 @@
         "price": 50,
         "cost": 0,
         "recipe": []
-      },
-      {
-        "id": 1790778596273,
-        "name": "I Kone",
-        "department": "Beverage",
-        "category": "Ice Creams Items",
-        "price": 40,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_4890",
-            "name": "72 ml",
-            "criteria": "Custom",
-            "price": 40,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_6787",
-            "name": "121 ml",
-            "criteria": "Custom",
-            "price": 60,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
       },
       {
         "id": 1790778701963,
@@ -3719,51 +3524,6 @@
         "recipe": []
       },
       {
-        "id": 1790779530123,
-        "name": "Aarong Milk",
-        "department": "Beverage",
-        "category": "Beverage Items",
-        "price": 35,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_7864",
-            "name": "Chocolate",
-            "criteria": "Custom",
-            "price": 35,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_8133",
-            "name": "Mango",
-            "criteria": "Custom",
-            "price": 35,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_0228",
-            "name": "Vanilla",
-            "criteria": "Custom",
-            "price": 35,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_1580",
-            "name": "Strawberry",
-            "criteria": "Custom",
-            "price": 35,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
-      },
-      {
         "id": 1790779691892,
         "name": "Mocha Juice",
         "department": "Beverage",
@@ -3771,51 +3531,6 @@
         "price": 45,
         "cost": 0,
         "recipe": []
-      },
-      {
-        "id": 1790779740322,
-        "name": "Marks",
-        "department": "Beverage",
-        "category": "Beverage Items",
-        "price": 40,
-        "cost": 0,
-        "recipe": [],
-        "channelPrices": {},
-        "variations": [
-          {
-            "id": "var_2514",
-            "name": "Cafe Latte",
-            "criteria": "Custom",
-            "price": 40,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_7008",
-            "name": "Belgian Chocoalet",
-            "criteria": "Custom",
-            "price": 40,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_8728",
-            "name": "Cookies & Cream",
-            "criteria": "Custom",
-            "price": 40,
-            "cost": 0,
-            "recipeMultiplier": 1
-          },
-          {
-            "id": "var_9687",
-            "name": "Large (Full / 1:3)",
-            "criteria": "Custom",
-            "price": 40,
-            "cost": 0,
-            "recipeMultiplier": 1
-          }
-        ],
-        "addons": []
       },
       {
         "id": 1791612252578,
@@ -3912,51 +3627,2439 @@
         },
         "variations": [],
         "addons": []
-      }
-    ],
-    "purchases": [
-      {
-        "id": 1792305696537,
-        "date": "2026-10-18",
-        "vendor": "Haji And Sons",
-        "billNo": "INV-7486",
-        "paymentType": "CREDIT",
-        "status": "FINAL",
-        "total": 240,
-        "items": [
-          {
-            "itemId": 1,
-            "item": "Flour - ময়দা",
-            "category": "Grocery",
-            "uom": "KG",
-            "qty": 4,
-            "rate": 60,
-            "total": 240
-          }
-        ]
-      }
-    ],
-    "sales": [],
-    "expenses": [],
-    "payments": [],
-    "inventory": [
-      {
-        "id": 1,
-        "open": 0,
-        "used": 0,
-        "manualUsed": 0,
-        "wastage": 0,
-        "rate": 60
       },
       {
-        "id": 20,
-        "open": 0,
-        "used": 0,
-        "manualUsed": 0,
-        "wastage": 0,
-        "rate": 112
+        "id": 1793764604128,
+        "name": "Chicken Tehari Full",
+        "department": "Bangla Kitchen",
+        "category": "Bangla Items",
+        "price": 70,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793764653845,
+        "name": "Dal Bhaji",
+        "department": "Bangla Kitchen",
+        "category": "Bangla Items",
+        "price": 20,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793764664757,
+        "name": "Bhaji",
+        "department": "Bangla Kitchen",
+        "category": "Bangla Items",
+        "price": 20,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793764707090,
+        "name": "Water 500ml",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 20,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793764735346,
+        "name": "Water 1ltr",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 30,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793764761027,
+        "name": "Water 2ltr",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 40,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765047884,
+        "name": "Sprite,Coca-Cola,Fanta 200ml",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 25,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765080839,
+        "name": "Sprite,Coca-Cola,Fanta 500ml",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 50,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765106273,
+        "name": "Sprite,Coca-Cola,Fanta 1ltr",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 80,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765126878,
+        "name": "Mojo",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 20,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765146772,
+        "name": "Clemon",
+        "department": "Beverage",
+        "category": "Beverage Items",
+        "price": 20,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765259961,
+        "name": "i kone 72ml",
+        "department": "Beverage",
+        "category": "Ice Creams Items",
+        "price": 40,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765285156,
+        "name": "i kone 121ml",
+        "department": "Beverage",
+        "category": "Ice Creams Items",
+        "price": 60,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765407545,
+        "name": "Crunchie Bar Ice Cream 52ml",
+        "department": "Beverage",
+        "category": "Ice Creams Items",
+        "price": 30,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765435242,
+        "name": "Crunchie Bar Ice Cream 82ml",
+        "department": "Beverage",
+        "category": "Ice Creams Items",
+        "price": 50,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765488190,
+        "name": "Choc Bar Ice Cream 46ml",
+        "department": "Beverage",
+        "category": "Ice Creams Items",
+        "price": 25,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793765512127,
+        "name": "Choc Bar Ice Cream 72ml",
+        "department": "Beverage",
+        "category": "Ice Creams Items",
+        "price": 35,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
+      },
+      {
+        "id": 1793770902459,
+        "name": "Fish Bharta",
+        "department": "Bangla Kitchen",
+        "category": "Bangla Items",
+        "price": 80,
+        "cost": 0,
+        "recipe": [],
+        "channelPrices": {},
+        "variations": [],
+        "addons": []
       }
     ],
+    "purchases": [],
+    "sales": [
+      {
+        "id": 1793773299534,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-299534",
+        "tableId": "T-02",
+        "table": "T 2",
+        "subtotal": 59935,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 2 [Zone: Floor 1] (W: N/A): Milk Tea (297), Porata (73), Plain Naan (2), Kuboos (20), Dim Khichuri (1), Dhakaiya Teheri (23), Morog Polaw (143), Lotte Fish (21), Chicken Biryani (68), Sonali Roast (23), Macher Dim (31), Narikel Fish (52), Chicken Soup (20), Chicken Kaliea (8), Mixed Sobji (3), Dim Omelette (1), Chicken Tehari Half (21), Potol Bharta (1), Plain Polaw (1), Plain Rice (1), Pabda Fish (1), Shak (1), Beef Bhuna (22), Jhal Chicken (4), Borhani (1), Sim Bharta (1), Kechki Fish (1), Rui Fish (7)",
+        "items": [
+          {
+            "id": 1790769188006,
+            "cartItemId": "1790769188006-std--",
+            "name": "Milk Tea",
+            "department": "Tea",
+            "category": "Tea",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 297,
+            "addedAt": 1793772009991,
+            "addedAtTime": "12:00 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 297,
+            "kotPrintedAt": "12:06 PM",
+            "kotPrintedTimestamp": 1793772364618
+          },
+          {
+            "id": 1790768957870,
+            "cartItemId": "1790768957870-std--",
+            "name": "Porata",
+            "department": "Snacks",
+            "category": "Grill & BBQ Items",
+            "basePrice": 8,
+            "price": 8,
+            "qty": 73,
+            "addedAt": 1793772254919,
+            "addedAtTime": "12:04 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 73,
+            "kotPrintedAt": "12:06 PM",
+            "kotPrintedTimestamp": 1793772364618
+          },
+          {
+            "id": 1790768941773,
+            "cartItemId": "1790768941773-std--",
+            "name": "Plain Naan",
+            "department": "Grill & BBQ",
+            "category": "Grill & BBQ Items",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 2,
+            "addedAt": 1793772301284,
+            "addedAtTime": "12:05 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 2,
+            "kotPrintedAt": "12:06 PM",
+            "kotPrintedTimestamp": 1793772364618
+          },
+          {
+            "id": 1791613852046,
+            "cartItemId": "1791613852046-std--",
+            "name": "Kuboos",
+            "department": "Grill & BBQ",
+            "category": "Grill & BBQ Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 20,
+            "addedAt": 1793772357275,
+            "addedAtTime": "12:05 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 20,
+            "kotPrintedAt": "12:06 PM",
+            "kotPrintedTimestamp": 1793772364618
+          },
+          {
+            "id": 1790767454931,
+            "cartItemId": "1790767454931-std--",
+            "name": "Dim Khichuri",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 45,
+            "price": 45,
+            "qty": 1,
+            "addedAt": 1793772362502,
+            "addedAtTime": "12:06 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:06 PM",
+            "kotPrintedTimestamp": 1793772364618
+          },
+          {
+            "id": 1790767336430,
+            "cartItemId": "1790767336430-std--",
+            "name": "Dhakaiya Teheri",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 160,
+            "price": 160,
+            "qty": 23,
+            "addedAt": 1793772363289,
+            "addedAtTime": "12:06 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 23,
+            "kotPrintedAt": "12:06 PM",
+            "kotPrintedTimestamp": 1793772364618
+          },
+          {
+            "id": 1790767640266,
+            "cartItemId": "1790767640266-std--",
+            "name": "Morog Polaw",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 180,
+            "price": 180,
+            "qty": 143,
+            "addedAt": 1793772369172,
+            "addedAtTime": "12:06 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 143,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767602187,
+            "cartItemId": "1790767602187-std--",
+            "name": "Lotte Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 80,
+            "price": 80,
+            "qty": 21,
+            "addedAt": 1793772390365,
+            "addedAtTime": "12:06 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 21,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790766996490,
+            "cartItemId": "1790766996490-std--",
+            "name": "Chicken Biryani",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 122,
+            "price": 122,
+            "qty": 68,
+            "addedAt": 1793772394609,
+            "addedAtTime": "12:06 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 68,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790768003820,
+            "cartItemId": "1790768003820-std--",
+            "name": "Sonali Roast",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 130,
+            "price": 130,
+            "qty": 23,
+            "addedAt": 1793772418715,
+            "addedAtTime": "12:06 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 23,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767614925,
+            "cartItemId": "1790767614925-std--",
+            "name": "Macher Dim",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 70,
+            "price": 70,
+            "qty": 31,
+            "addedAt": 1793772423156,
+            "addedAtTime": "12:07 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 31,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767652677,
+            "cartItemId": "1790767652677-std--",
+            "name": "Narikel Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 70,
+            "price": 70,
+            "qty": 52,
+            "addedAt": 1793772431552,
+            "addedAtTime": "12:07 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 52,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767031883,
+            "cartItemId": "1790767031883-std--",
+            "name": "Chicken Soup",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 50,
+            "price": 50,
+            "qty": 20,
+            "addedAt": 1793772442458,
+            "addedAtTime": "12:07 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 20,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767014674,
+            "cartItemId": "1790767014674-std--",
+            "name": "Chicken Kaliea",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 80,
+            "price": 80,
+            "qty": 8,
+            "addedAt": 1793772446866,
+            "addedAtTime": "12:07 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 8,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767627081,
+            "cartItemId": "1790767627081-std--",
+            "name": "Mixed Sobji",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 25,
+            "price": 25,
+            "qty": 3,
+            "addedAt": 1793772486355,
+            "addedAtTime": "12:08 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 3,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767501638,
+            "cartItemId": "1790767501638-std--",
+            "name": "Dim Omelette",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 1,
+            "addedAt": 1793772491924,
+            "addedAtTime": "12:08 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:08 PM",
+            "kotPrintedTimestamp": 1793772494608
+          },
+          {
+            "id": 1790767087138,
+            "cartItemId": "1790767087138-std--",
+            "name": "Chicken Tehari Half",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 35,
+            "price": 35,
+            "qty": 21,
+            "addedAt": 1793772546526,
+            "addedAtTime": "12:09 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 21,
+            "kotPrintedAt": "12:14 PM",
+            "kotPrintedTimestamp": 1793772865591
+          },
+          {
+            "id": 1790767900730,
+            "cartItemId": "1790767900730-std--",
+            "name": "Potol Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 1,
+            "addedAt": 1793772854101,
+            "addedAtTime": "12:14 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:14 PM",
+            "kotPrintedTimestamp": 1793772865591
+          },
+          {
+            "id": 1790767866225,
+            "cartItemId": "1790767866225-std--",
+            "name": "Plain Polaw",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 35,
+            "price": 35,
+            "qty": 1,
+            "addedAt": 1793772854705,
+            "addedAtTime": "12:14 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:14 PM",
+            "kotPrintedTimestamp": 1793772865591
+          },
+          {
+            "id": 1790767746844,
+            "cartItemId": "1790767746844-std--",
+            "name": "Plain Rice",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 1,
+            "addedAt": 1793772855297,
+            "addedAtTime": "12:14 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:14 PM",
+            "kotPrintedTimestamp": 1793772865591
+          },
+          {
+            "id": 1790767667007,
+            "cartItemId": "1790767667007-std--",
+            "name": "Pabda Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 40,
+            "price": 40,
+            "qty": 1,
+            "addedAt": 1793772855869,
+            "addedAtTime": "12:14 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:14 PM",
+            "kotPrintedTimestamp": 1793772865591
+          },
+          {
+            "id": 1790767971091,
+            "cartItemId": "1790767971091-std--",
+            "name": "Shak",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 1,
+            "addedAt": 1793772856457,
+            "addedAtTime": "12:14 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:14 PM",
+            "kotPrintedTimestamp": 1793772865591
+          },
+          {
+            "id": 1790766956012,
+            "cartItemId": "1790766956012-std--",
+            "name": "Beef Bhuna",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 130,
+            "price": 130,
+            "qty": 22,
+            "addedAt": 1793772857605,
+            "addedAtTime": "12:14 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 22,
+            "kotPrintedAt": "12:14 PM",
+            "kotPrintedTimestamp": 1793772865591
+          },
+          {
+            "id": 1790767534248,
+            "cartItemId": "1790767534248-std--",
+            "name": "Jhal Chicken",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 65,
+            "price": 65,
+            "qty": 4,
+            "addedAt": 1793772951315,
+            "addedAtTime": "12:15 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 4,
+            "kotPrintedAt": "12:16 PM",
+            "kotPrintedTimestamp": 1793772962083
+          },
+          {
+            "id": 1790768736478,
+            "cartItemId": "1790768736478-std--",
+            "name": "Borhani",
+            "department": "Bangla Kitchen",
+            "category": "Dessert Items",
+            "basePrice": 50,
+            "price": 50,
+            "qty": 1,
+            "addedAt": 1793772958061,
+            "addedAtTime": "12:15 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:16 PM",
+            "kotPrintedTimestamp": 1793772962083
+          },
+          {
+            "id": 1790767984548,
+            "cartItemId": "1790767984548-std--",
+            "name": "Sim Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 1,
+            "addedAt": 1793772959185,
+            "addedAtTime": "12:15 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:16 PM",
+            "kotPrintedTimestamp": 1793772962083
+          },
+          {
+            "id": 1790767585859,
+            "cartItemId": "1790767585859-std--",
+            "name": "Kechki Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 60,
+            "price": 60,
+            "qty": 1,
+            "addedAt": 1793772960078,
+            "addedAtTime": "12:16 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "12:16 PM",
+            "kotPrintedTimestamp": 1793772962083
+          },
+          {
+            "id": 1790767959224,
+            "cartItemId": "1790767959224-std--",
+            "name": "Rui Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 70,
+            "price": 70,
+            "qty": 7,
+            "addedAt": 1793772997668,
+            "addedAtTime": "12:16 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 7,
+            "kotPrintedAt": "12:16 PM",
+            "kotPrintedTimestamp": 1793773008789
+          }
+        ],
+        "cash": 59935,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 59935,
+          "Cash": 59935
+        },
+        "change": 0,
+        "total": 59935,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 59935,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793773299534
+      },
+      {
+        "id": 1793780378455,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-378455",
+        "tableId": "T-01",
+        "table": "T 1",
+        "subtotal": 98627,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 1 [Zone: Floor 1] (W: N/A): Milk Tea (445), Plain Rice (456), Plain Naan (430), Porata (390), Singara (237), Samosa (157), Dal Bhaji (185), Chicken Kaliea (118), Sprite,Coca-Cola,Fanta 200ml (84), Chicken Biryani (79), Alo Bharta (73), Burger (68), Grilled Chicken (60), Wonton (59), Chicken Tehari Half (78), Pasta (56), Mixed Sobji (62), Jhal Chicken (51), Pabda Fish (65), Mini Souce (46), Dal Chinese (40), Dim Omelette (47), Roll (30), Chicken Sandwich (52), Beef Bhuna (24), Coffee (23), Chinese Bhaji (19), Kima Puri (35), Fish Bharta (18), Egg Pudding (15), Lotte Fish (14), Bhaji (13), Narikel Fish (19), Rui Fish (11), Macher Dim (10), Nimki (8), Potol Bharta (6), Water 500ml (4), Sprite,Coca-Cola,Fanta 1ltr (3), Lemon Tea (2), Sprite,Coca-Cola,Fanta 500ml (2), Firni (2), Chicken Tehari Full (13), Chicken Soup (8), Morog Polaw (9), Plain Polaw (10), Sonali Roast (4), Sim Bharta (4), Shak (4), Kechki Fish (3), Dhakaiya Teheri (23), Dim Khichuri (3), Kuboos (9), Water 1ltr (1), Water 2ltr (1), Clemon (1), Mojo (12), Mocha Juice (1), Doi (6), Borhani (8), Piyaju (2)",
+        "items": [
+          {
+            "id": 1790769188006,
+            "cartItemId": "1790769188006-std--",
+            "name": "Milk Tea",
+            "department": "Tea",
+            "category": "Tea",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 445,
+            "addedAt": 1793767979530,
+            "addedAtTime": "10:52 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 445,
+            "kotPrintedAt": "10:58 AM",
+            "kotPrintedTimestamp": 1793768300515
+          },
+          {
+            "id": 1790767746844,
+            "cartItemId": "1790767746844-std--",
+            "name": "Plain Rice",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 456,
+            "addedAt": 1793768200747,
+            "addedAtTime": "10:56 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 456,
+            "kotPrintedAt": "10:58 AM",
+            "kotPrintedTimestamp": 1793768300515
+          },
+          {
+            "id": 1790768941773,
+            "cartItemId": "1790768941773-std--",
+            "name": "Plain Naan",
+            "department": "Grill & BBQ",
+            "category": "Grill & BBQ Items",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 430,
+            "addedAt": 1793768312998,
+            "addedAtTime": "10:58 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 430,
+            "kotPrintedAt": "11:00 AM",
+            "kotPrintedTimestamp": 1793768404868
+          },
+          {
+            "id": 1790768957870,
+            "cartItemId": "1790768957870-std--",
+            "name": "Porata",
+            "department": "Snacks",
+            "category": "Grill & BBQ Items",
+            "basePrice": 8,
+            "price": 8,
+            "qty": 390,
+            "addedAt": 1793768411579,
+            "addedAtTime": "11:00 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 390,
+            "kotPrintedAt": "11:01 AM",
+            "kotPrintedTimestamp": 1793768508485
+          },
+          {
+            "id": 1790769146756,
+            "cartItemId": "1790769146756-std--",
+            "name": "Singara",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 8,
+            "price": 8,
+            "qty": 237,
+            "addedAt": 1793768528341,
+            "addedAtTime": "11:02 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 237,
+            "kotPrintedAt": "11:04 AM",
+            "kotPrintedTimestamp": 1793768688133
+          },
+          {
+            "id": 1790769131453,
+            "cartItemId": "1790769131453-std--",
+            "name": "Samosa",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 157,
+            "addedAt": 1793768697749,
+            "addedAtTime": "11:04 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 157,
+            "kotPrintedAt": "11:05 AM",
+            "kotPrintedTimestamp": 1793768735402
+          },
+          {
+            "id": 1793764653845,
+            "cartItemId": "1793764653845-std--",
+            "name": "Dal Bhaji",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 185,
+            "addedAt": 1793768835167,
+            "addedAtTime": "11:07 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 185,
+            "kotPrintedAt": "11:07 AM",
+            "kotPrintedTimestamp": 1793768864830
+          },
+          {
+            "id": 1790767014674,
+            "cartItemId": "1790767014674-std--",
+            "name": "Chicken Kaliea",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 80,
+            "price": 80,
+            "qty": 118,
+            "addedAt": 1793768879569,
+            "addedAtTime": "11:07 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 118,
+            "kotPrintedAt": "11:08 AM",
+            "kotPrintedTimestamp": 1793768910625
+          },
+          {
+            "id": 1793765047884,
+            "cartItemId": "1793765047884-std--",
+            "name": "Sprite,Coca-Cola,Fanta 200ml",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 25,
+            "price": 25,
+            "qty": 84,
+            "addedAt": 1793768935157,
+            "addedAtTime": "11:08 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 84,
+            "kotPrintedAt": "11:09 AM",
+            "kotPrintedTimestamp": 1793768963043
+          },
+          {
+            "id": 1790766996490,
+            "cartItemId": "1790766996490-std--",
+            "name": "Chicken Biryani",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 122,
+            "price": 122,
+            "qty": 79,
+            "addedAt": 1793769146308,
+            "addedAtTime": "11:12 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 79,
+            "kotPrintedAt": "11:13 AM",
+            "kotPrintedTimestamp": 1793769193242
+          },
+          {
+            "id": 1790766923505,
+            "cartItemId": "1790766923505-std--",
+            "name": "Alo Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 73,
+            "addedAt": 1793770056027,
+            "addedAtTime": "11:27 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 73,
+            "kotPrintedAt": "11:27 AM",
+            "kotPrintedTimestamp": 1793770078425
+          },
+          {
+            "id": 1790768982451,
+            "cartItemId": "1790768982451-std--",
+            "name": "Burger",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 50,
+            "price": 50,
+            "qty": 68,
+            "addedAt": 1793770088750,
+            "addedAtTime": "11:28 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 68,
+            "kotPrintedAt": "11:28 AM",
+            "kotPrintedTimestamp": 1793770123993
+          },
+          {
+            "id": 1790768875033,
+            "cartItemId": "1790768875033-std--",
+            "name": "Grilled Chicken",
+            "department": "Grill & BBQ",
+            "category": "Grill & BBQ Items",
+            "basePrice": 120,
+            "price": 120,
+            "qty": 60,
+            "addedAt": 1793770106988,
+            "addedAtTime": "11:28 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 60,
+            "kotPrintedAt": "11:28 AM",
+            "kotPrintedTimestamp": 1793770123993
+          },
+          {
+            "id": 1791612304148,
+            "cartItemId": "1791612304148-std--",
+            "name": "Wonton",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 59,
+            "addedAt": 1793770138362,
+            "addedAtTime": "11:28 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 59,
+            "kotPrintedAt": "11:29 AM",
+            "kotPrintedTimestamp": 1793770159073
+          },
+          {
+            "id": 1790767087138,
+            "cartItemId": "1790767087138-std--",
+            "name": "Chicken Tehari Half",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 35,
+            "price": 35,
+            "qty": 78,
+            "addedAt": 1793770174567,
+            "addedAtTime": "11:29 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 78,
+            "kotPrintedAt": "11:30 AM",
+            "kotPrintedTimestamp": 1793770222574
+          },
+          {
+            "id": 1790769070422,
+            "cartItemId": "1790769070422-std--",
+            "name": "Pasta",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 56,
+            "addedAt": 1793770236689,
+            "addedAtTime": "11:30 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 56,
+            "kotPrintedAt": "11:31 AM",
+            "kotPrintedTimestamp": 1793770307829
+          },
+          {
+            "id": 1790767627081,
+            "cartItemId": "1790767627081-std--",
+            "name": "Mixed Sobji",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 25,
+            "price": 25,
+            "qty": 62,
+            "addedAt": 1793770262431,
+            "addedAtTime": "11:31 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 62,
+            "kotPrintedAt": "11:31 AM",
+            "kotPrintedTimestamp": 1793770307829
+          },
+          {
+            "id": 1790767534248,
+            "cartItemId": "1790767534248-std--",
+            "name": "Jhal Chicken",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 65,
+            "price": 65,
+            "qty": 51,
+            "addedAt": 1793770288162,
+            "addedAtTime": "11:31 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 51,
+            "kotPrintedAt": "11:31 AM",
+            "kotPrintedTimestamp": 1793770307829
+          },
+          {
+            "id": 1790767667007,
+            "cartItemId": "1790767667007-std--",
+            "name": "Pabda Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 40,
+            "price": 40,
+            "qty": 65,
+            "addedAt": 1793770322123,
+            "addedAtTime": "11:32 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 65,
+            "kotPrintedAt": "11:32 AM",
+            "kotPrintedTimestamp": 1793770349527
+          },
+          {
+            "id": 1791612252578,
+            "cartItemId": "1791612252578-std--",
+            "name": "Mini Souce",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 3,
+            "price": 3,
+            "qty": 46,
+            "addedAt": 1793770361873,
+            "addedAtTime": "11:32 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 46,
+            "kotPrintedAt": "11:34 AM",
+            "kotPrintedTimestamp": 1793770446150
+          },
+          {
+            "id": 1791613662019,
+            "cartItemId": "1791613662019-std--",
+            "name": "Dal Chinese",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 25,
+            "price": 25,
+            "qty": 40,
+            "addedAt": 1793770376323,
+            "addedAtTime": "11:32 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 40,
+            "kotPrintedAt": "11:34 AM",
+            "kotPrintedTimestamp": 1793770446150
+          },
+          {
+            "id": 1790767501638,
+            "cartItemId": "1790767501638-std--",
+            "name": "Dim Omelette",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 47,
+            "addedAt": 1793770399105,
+            "addedAtTime": "11:33 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 47,
+            "kotPrintedAt": "11:34 AM",
+            "kotPrintedTimestamp": 1793770446150
+          },
+          {
+            "id": 1790769117408,
+            "cartItemId": "1790769117408-std--",
+            "name": "Roll",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 25,
+            "price": 25,
+            "qty": 30,
+            "addedAt": 1793770455203,
+            "addedAtTime": "11:34 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 30,
+            "kotPrintedAt": "11:34 AM",
+            "kotPrintedTimestamp": 1793770475796
+          },
+          {
+            "id": 1790768999733,
+            "cartItemId": "1790768999733-std--",
+            "name": "Chicken Sandwich",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 52,
+            "addedAt": 1793770464753,
+            "addedAtTime": "11:34 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 52,
+            "kotPrintedAt": "11:34 AM",
+            "kotPrintedTimestamp": 1793770475796
+          },
+          {
+            "id": 1790766956012,
+            "cartItemId": "1790766956012-std--",
+            "name": "Beef Bhuna",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 130,
+            "price": 130,
+            "qty": 24,
+            "addedAt": 1793770500759,
+            "addedAtTime": "11:35 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 24,
+            "kotPrintedAt": "11:35 AM",
+            "kotPrintedTimestamp": 1793770552261
+          },
+          {
+            "id": 1791612330919,
+            "cartItemId": "1791612330919-std--",
+            "name": "Coffee",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 23,
+            "addedAt": 1793770676668,
+            "addedAtTime": "11:37 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 23,
+            "kotPrintedAt": "11:38 AM",
+            "kotPrintedTimestamp": 1793770695398
+          },
+          {
+            "id": 1791614148399,
+            "cartItemId": "1791614148399-std--",
+            "name": "Chinese Bhaji",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 19,
+            "addedAt": 1793770689514,
+            "addedAtTime": "11:38 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 19,
+            "kotPrintedAt": "11:38 AM",
+            "kotPrintedTimestamp": 1793770695398
+          },
+          {
+            "id": 1790769039391,
+            "cartItemId": "1790769039391-std--",
+            "name": "Kima Puri",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 35,
+            "addedAt": 1793770763294,
+            "addedAtTime": "11:39 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 35,
+            "kotPrintedAt": "11:40 AM",
+            "kotPrintedTimestamp": 1793770809904
+          },
+          {
+            "id": 1793770902459,
+            "cartItemId": "1793770902459-std--",
+            "name": "Fish Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 80,
+            "price": 80,
+            "qty": 18,
+            "addedAt": 1793770932958,
+            "addedAtTime": "11:42 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 18,
+            "kotPrintedAt": "11:42 AM",
+            "kotPrintedTimestamp": 1793770966943
+          },
+          {
+            "id": 1790768786192,
+            "cartItemId": "1790768786192-std--",
+            "name": "Egg Pudding",
+            "department": "Snacks",
+            "category": "Dessert Items",
+            "basePrice": 50,
+            "price": 50,
+            "qty": 15,
+            "addedAt": 1793770944016,
+            "addedAtTime": "11:42 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 15,
+            "kotPrintedAt": "11:42 AM",
+            "kotPrintedTimestamp": 1793770966943
+          },
+          {
+            "id": 1790767602187,
+            "cartItemId": "1790767602187-std--",
+            "name": "Lotte Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 80,
+            "price": 80,
+            "qty": 14,
+            "addedAt": 1793770955648,
+            "addedAtTime": "11:42 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 14,
+            "kotPrintedAt": "11:42 AM",
+            "kotPrintedTimestamp": 1793770966943
+          },
+          {
+            "id": 1793764664757,
+            "cartItemId": "1793764664757-std--",
+            "name": "Bhaji",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 13,
+            "addedAt": 1793770974625,
+            "addedAtTime": "11:42 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 13,
+            "kotPrintedAt": "11:43 AM",
+            "kotPrintedTimestamp": 1793771010912
+          },
+          {
+            "id": 1790767652677,
+            "cartItemId": "1790767652677-std--",
+            "name": "Narikel Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 70,
+            "price": 70,
+            "qty": 19,
+            "addedAt": 1793770984773,
+            "addedAtTime": "11:43 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 19,
+            "kotPrintedAt": "11:43 AM",
+            "kotPrintedTimestamp": 1793771010912
+          },
+          {
+            "id": 1790767959224,
+            "cartItemId": "1790767959224-std--",
+            "name": "Rui Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 70,
+            "price": 70,
+            "qty": 11,
+            "addedAt": 1793770990887,
+            "addedAtTime": "11:43 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 11,
+            "kotPrintedAt": "11:43 AM",
+            "kotPrintedTimestamp": 1793771010912
+          },
+          {
+            "id": 1790767614925,
+            "cartItemId": "1790767614925-std--",
+            "name": "Macher Dim",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 70,
+            "price": 70,
+            "qty": 10,
+            "addedAt": 1793771023332,
+            "addedAtTime": "11:43 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 10,
+            "kotPrintedAt": "11:43 AM",
+            "kotPrintedTimestamp": 1793771028870
+          },
+          {
+            "id": 1790769053932,
+            "cartItemId": "1790769053932-std--",
+            "name": "Nimki",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 8,
+            "addedAt": 1793771051094,
+            "addedAtTime": "11:44 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 8,
+            "kotPrintedAt": "11:45 AM",
+            "kotPrintedTimestamp": 1793771127187
+          },
+          {
+            "id": 1790767900730,
+            "cartItemId": "1790767900730-std--",
+            "name": "Potol Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 6,
+            "addedAt": 1793771072150,
+            "addedAtTime": "11:44 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 6,
+            "kotPrintedAt": "11:45 AM",
+            "kotPrintedTimestamp": 1793771127187
+          },
+          {
+            "id": 1793764707090,
+            "cartItemId": "1793764707090-std--",
+            "name": "Water 500ml",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 4,
+            "addedAt": 1793771083772,
+            "addedAtTime": "11:44 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 4,
+            "kotPrintedAt": "11:45 AM",
+            "kotPrintedTimestamp": 1793771127187
+          },
+          {
+            "id": 1793765106273,
+            "cartItemId": "1793765106273-std--",
+            "name": "Sprite,Coca-Cola,Fanta 1ltr",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 80,
+            "price": 80,
+            "qty": 3,
+            "addedAt": 1793771103318,
+            "addedAtTime": "11:45 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 3,
+            "kotPrintedAt": "11:45 AM",
+            "kotPrintedTimestamp": 1793771127187
+          },
+          {
+            "id": 1790769170854,
+            "cartItemId": "1790769170854-std--",
+            "name": "Lemon Tea",
+            "department": "Tea",
+            "category": "Tea",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 2,
+            "addedAt": 1793771118543,
+            "addedAtTime": "11:45 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 2,
+            "kotPrintedAt": "11:45 AM",
+            "kotPrintedTimestamp": 1793771127187
+          },
+          {
+            "id": 1793765080839,
+            "cartItemId": "1793765080839-std--",
+            "name": "Sprite,Coca-Cola,Fanta 500ml",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 50,
+            "price": 50,
+            "qty": 2,
+            "addedAt": 1793771124515,
+            "addedAtTime": "11:45 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 2,
+            "kotPrintedAt": "11:45 AM",
+            "kotPrintedTimestamp": 1793771127187
+          },
+          {
+            "id": 1790768802299,
+            "cartItemId": "1790768802299-std--",
+            "name": "Firni",
+            "department": "Snacks",
+            "category": "Dessert Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 2,
+            "addedAt": 1793771158227,
+            "addedAtTime": "11:45 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 2,
+            "kotPrintedAt": "11:46 AM",
+            "kotPrintedTimestamp": 1793771162869
+          },
+          {
+            "id": 1793764604128,
+            "cartItemId": "1793764604128-std--",
+            "name": "Chicken Tehari Full",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 70,
+            "price": 70,
+            "qty": 13,
+            "addedAt": 1793771295174,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 13,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767031883,
+            "cartItemId": "1790767031883-std--",
+            "name": "Chicken Soup",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 50,
+            "price": 50,
+            "qty": 8,
+            "addedAt": 1793771298549,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 8,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767640266,
+            "cartItemId": "1790767640266-std--",
+            "name": "Morog Polaw",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 180,
+            "price": 180,
+            "qty": 9,
+            "addedAt": 1793771300502,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 9,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767866225,
+            "cartItemId": "1790767866225-std--",
+            "name": "Plain Polaw",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 35,
+            "price": 35,
+            "qty": 10,
+            "addedAt": 1793771304496,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 10,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790768003820,
+            "cartItemId": "1790768003820-std--",
+            "name": "Sonali Roast",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 130,
+            "price": 130,
+            "qty": 4,
+            "addedAt": 1793771306087,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 4,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767984548,
+            "cartItemId": "1790767984548-std--",
+            "name": "Sim Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 4,
+            "addedAt": 1793771307886,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 4,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767971091,
+            "cartItemId": "1790767971091-std--",
+            "name": "Shak",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 10,
+            "price": 10,
+            "qty": 4,
+            "addedAt": 1793771309103,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 4,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767585859,
+            "cartItemId": "1790767585859-std--",
+            "name": "Kechki Fish",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 60,
+            "price": 60,
+            "qty": 3,
+            "addedAt": 1793771310390,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 3,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767336430,
+            "cartItemId": "1790767336430-std--",
+            "name": "Dhakaiya Teheri",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 160,
+            "price": 160,
+            "qty": 23,
+            "addedAt": 1793771312096,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 23,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790767454931,
+            "cartItemId": "1790767454931-std--",
+            "name": "Dim Khichuri",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 45,
+            "price": 45,
+            "qty": 3,
+            "addedAt": 1793771313369,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 3,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1791613852046,
+            "cartItemId": "1791613852046-std--",
+            "name": "Kuboos",
+            "department": "Grill & BBQ",
+            "category": "Grill & BBQ Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 9,
+            "addedAt": 1793771319921,
+            "addedAtTime": "11:48 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 9,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1793764735346,
+            "cartItemId": "1793764735346-std--",
+            "name": "Water 1ltr",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 1,
+            "addedAt": 1793771341562,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1793764761027,
+            "cartItemId": "1793764761027-std--",
+            "name": "Water 2ltr",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 40,
+            "price": 40,
+            "qty": 1,
+            "addedAt": 1793771342395,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1793765146772,
+            "cartItemId": "1793765146772-std--",
+            "name": "Clemon",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 1,
+            "addedAt": 1793771343344,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1793765126878,
+            "cartItemId": "1793765126878-std--",
+            "name": "Mojo",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 20,
+            "price": 20,
+            "qty": 12,
+            "addedAt": 1793771344032,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 12,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790779691892,
+            "cartItemId": "1790779691892-std--",
+            "name": "Mocha Juice",
+            "department": "Beverage",
+            "category": "Beverage Items",
+            "basePrice": 45,
+            "price": 45,
+            "qty": 1,
+            "addedAt": 1793771349035,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790768763450,
+            "cartItemId": "1790768763450-std--",
+            "name": "Doi",
+            "department": "Snacks",
+            "category": "Dessert Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 6,
+            "addedAt": 1793771354839,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 6,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790768736478,
+            "cartItemId": "1790768736478-std--",
+            "name": "Borhani",
+            "department": "Bangla Kitchen",
+            "category": "Dessert Items",
+            "basePrice": 50,
+            "price": 50,
+            "qty": 8,
+            "addedAt": 1793771356495,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 8,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          },
+          {
+            "id": 1790769103508,
+            "cartItemId": "1790769103508-std--",
+            "name": "Piyaju",
+            "department": "Snacks",
+            "category": "Snacks Items",
+            "basePrice": 5,
+            "price": 5,
+            "qty": 2,
+            "addedAt": 1793771370563,
+            "addedAtTime": "11:49 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 2,
+            "kotPrintedAt": "11:54 AM",
+            "kotPrintedTimestamp": 1793771698877
+          }
+        ],
+        "cash": 66375,
+        "card": 32252,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "bangla_qr_2749": 32252,
+          "Bangla QR": 32252,
+          "cash": 66375,
+          "Cash": 66375
+        },
+        "change": 0,
+        "total": 98627,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 98627,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793780378455
+      },
+      {
+        "id": 1793792005541,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-005540",
+        "tableId": "T-05",
+        "table": "T 5",
+        "subtotal": 366,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 5 [Zone: Floor 1] (W: N/A): Chicken Biryani (3)",
+        "items": [
+          {
+            "id": 1790766996490,
+            "cartItemId": "1790766996490-std--",
+            "name": "Chicken Biryani",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 122,
+            "price": 122,
+            "qty": 3,
+            "addedAt": 1793791892179,
+            "addedAtTime": "5:31 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 3,
+            "kotPrintedAt": "5:31 PM",
+            "kotPrintedTimestamp": 1793791895411
+          }
+        ],
+        "cash": 366,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 366,
+          "Cash": 366
+        },
+        "change": 0,
+        "total": 366,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 366,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793792005541
+      },
+      {
+        "id": 1793792026153,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-026153",
+        "tableId": "T-04",
+        "table": "T 4",
+        "subtotal": 130,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 4 [Zone: Floor 1] (W: N/A): Beef Bhuna (1)",
+        "items": [
+          {
+            "id": 1790766956012,
+            "cartItemId": "1790766956012-std--",
+            "name": "Beef Bhuna",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 130,
+            "price": 130,
+            "qty": 1,
+            "addedAt": 1793791821844,
+            "addedAtTime": "5:30 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "5:30 PM",
+            "kotPrintedTimestamp": 1793791824764
+          }
+        ],
+        "cash": 0,
+        "card": 130,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "bangla_qr_2749": 130,
+          "Bangla QR": 130
+        },
+        "change": 0,
+        "total": 130,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 130,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793792026153
+      },
+      {
+        "id": 1793793754558,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-754558",
+        "tableId": "T-06",
+        "table": "T 1",
+        "subtotal": 30,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 1 [Zone: Floor 2] (W: N/A): Potol Bharta (1)",
+        "items": [
+          {
+            "id": 1790767900730,
+            "cartItemId": "1790767900730-std--",
+            "name": "Potol Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 30,
+            "price": 30,
+            "qty": 1,
+            "addedAt": 1793793018443,
+            "addedAtTime": "5:50 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "6:02 PM",
+            "kotPrintedTimestamp": 1793793740510
+          }
+        ],
+        "cash": 30,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 30,
+          "Cash": 30
+        },
+        "change": 0,
+        "total": 30,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 30,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793793754558
+      },
+      {
+        "id": 1793794145844,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-145844",
+        "tableId": "T-09",
+        "table": "T 4",
+        "subtotal": 65,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 4 [Zone: Floor 2] (W: N/A): Jhal Chicken (1)",
+        "items": [
+          {
+            "id": 1790767534248,
+            "cartItemId": "1790767534248-std--",
+            "name": "Jhal Chicken",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 65,
+            "price": 65,
+            "qty": 1,
+            "addedAt": 1793784443452,
+            "addedAtTime": "3:27 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "4:57 PM",
+            "kotPrintedTimestamp": 1793789861427
+          }
+        ],
+        "cash": 0,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 65,
+        "dueCustomer": "Sajib Khan",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "customer_due_7842": 65,
+          "Customer Due": 65
+        },
+        "change": 0,
+        "total": 65,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 65,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793794145844
+      },
+      {
+        "id": 1793797513354,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-513354",
+        "tableId": "T-05",
+        "table": "T 5",
+        "subtotal": 180,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 5 [Zone: Floor 1] (W: N/A): Morog Polaw (1)",
+        "items": [
+          {
+            "id": 1790767640266,
+            "cartItemId": "1790767640266-std--",
+            "name": "Morog Polaw",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 180,
+            "price": 180,
+            "qty": 1,
+            "addedAt": 1793792071754,
+            "addedAtTime": "5:34 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "5:34 PM",
+            "kotPrintedTimestamp": 1793792090193
+          }
+        ],
+        "cash": 180,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 180,
+          "Cash": 180
+        },
+        "change": 0,
+        "total": 180,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 180,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793797513354
+      },
+      {
+        "id": 1793797519898,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-519898",
+        "tableId": "T-04",
+        "table": "T 4",
+        "subtotal": 130,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 4 [Zone: Floor 1] (W: N/A): Beef Bhuna (1)",
+        "items": [
+          {
+            "id": 1790766956012,
+            "cartItemId": "1790766956012-std--",
+            "name": "Beef Bhuna",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 130,
+            "price": 130,
+            "qty": 1,
+            "addedAt": 1793791821844,
+            "addedAtTime": "5:30 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "5:30 PM",
+            "kotPrintedTimestamp": 1793791824764
+          }
+        ],
+        "cash": 130,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 130,
+          "Cash": 130
+        },
+        "change": 0,
+        "total": 130,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 130,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793797519898
+      },
+      {
+        "id": 1793797538170,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-538170",
+        "tableId": "T-03",
+        "table": "T 3",
+        "subtotal": 130,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 3 [Zone: Floor 1] (W: N/A): Beef Bhuna (1)",
+        "items": [
+          {
+            "id": 1790766956012,
+            "cartItemId": "1790766956012-std--",
+            "name": "Beef Bhuna",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 130,
+            "price": 130,
+            "qty": 1,
+            "addedAt": 1793797525424,
+            "addedAtTime": "7:05 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "7:05 PM",
+            "kotPrintedTimestamp": 1793797528440
+          }
+        ],
+        "cash": 130,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 130,
+          "Cash": 130
+        },
+        "change": 0,
+        "total": 130,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 130,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793797538170
+      },
+      {
+        "id": 1793851909903,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-909903",
+        "tableId": "T-02",
+        "table": "T 2",
+        "subtotal": 45,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 2 [Zone: Floor 1] (W: N/A): Dim Khichuri (1)",
+        "items": [
+          {
+            "id": 1790767454931,
+            "cartItemId": "1790767454931-std--",
+            "name": "Dim Khichuri",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 45,
+            "price": 45,
+            "qty": 1,
+            "addedAt": 1793851761534,
+            "addedAtTime": "10:09 AM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "10:11 AM",
+            "kotPrintedTimestamp": 1793851894589
+          }
+        ],
+        "cash": 45,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 45,
+          "Cash": 45
+        },
+        "change": 0,
+        "total": 45,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 45,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793851909903
+      },
+      {
+        "id": 1793851916943,
+        "date": "2026-11-04",
+        "invoiceNo": "POS-916943",
+        "tableId": "T-01",
+        "table": "T 1",
+        "subtotal": 15,
+        "discountVal": 0,
+        "discountType": "taka",
+        "vatVal": 0,
+        "vatPercent": 0,
+        "vatMode": "inclusive",
+        "details": "T 1 [Zone: Floor 1] (W: N/A): Alo Bharta (1)",
+        "items": [
+          {
+            "id": 1790766923505,
+            "cartItemId": "1790766923505-std--",
+            "name": "Alo Bharta",
+            "department": "Bangla Kitchen",
+            "category": "Bangla Items",
+            "basePrice": 15,
+            "price": 15,
+            "qty": 1,
+            "addedAt": 1793789832211,
+            "addedAtTime": "4:57 PM",
+            "kotPrinted": true,
+            "kotPrintedQty": 1,
+            "kotPrintedAt": "4:57 PM",
+            "kotPrintedTimestamp": 1793789840612
+          }
+        ],
+        "cash": 15,
+        "card": 0,
+        "bkash": 0,
+        "nagad": 0,
+        "dueGiven": 0,
+        "dueCustomer": "",
+        "dueCollected": 0,
+        "advanceAdjusted": 0,
+        "paymentBreakdown": {
+          "cash": 15,
+          "Cash": 15
+        },
+        "change": 0,
+        "total": 15,
+        "channelCommissionPercent": 0,
+        "channelCommissionAmount": 0,
+        "netRestaurantRevenue": 15,
+        "sessionId": "SES-20261104-4211",
+        "waiterName": "Staff",
+        "cashierName": "Super Admin",
+        "cashierRole": "ADMIN",
+        "cashierId": "USR-01",
+        "sellerName": "Super Admin",
+        "sellerRole": "ADMIN",
+        "sellerId": "USR-01",
+        "orderCreatedBy": "Super Admin",
+        "orderCreatedRole": "ADMIN",
+        "shift": "Shift 1",
+        "createdAt": 1793851916943
+      }
+    ],
+    "expenses": [
+      {
+        "date": "2026-11-01",
+        "head": "Conveyance",
+        "amount": 70,
+        "paymentMethod": "Cash",
+        "note": "",
+        "accountId": "6080",
+        "accountCode": "6080",
+        "accountName": "Conveyance",
+        "id": 1793775388251
+      },
+      {
+        "date": "2026-11-01",
+        "head": "Cleaning Bill",
+        "amount": 150,
+        "paymentMethod": "Cash",
+        "note": "",
+        "accountId": "6070",
+        "accountCode": "6070",
+        "accountName": "Cleaning Bill",
+        "id": 1793775401610
+      },
+      {
+        "date": "2026-11-01",
+        "head": "Staff  Advance",
+        "amount": 100,
+        "paymentMethod": "Cash",
+        "note": "ekin",
+        "accountId": "6190",
+        "accountCode": "6190",
+        "accountName": "Staff Advance",
+        "id": 1793775428481
+      },
+      {
+        "date": "2026-11-01",
+        "head": "Staff  Advance",
+        "amount": 400,
+        "paymentMethod": "Cash",
+        "note": "sohag",
+        "accountId": "6190",
+        "accountCode": "6190",
+        "accountName": "Staff Advance",
+        "id": 1793775455944
+      },
+      {
+        "date": "2026-11-02",
+        "head": "Conveyance",
+        "amount": 100,
+        "paymentMethod": "Cash",
+        "note": "",
+        "accountId": "6080",
+        "accountCode": "6080",
+        "accountName": "Conveyance",
+        "id": 1793777820607
+      },
+      {
+        "date": "2026-11-03",
+        "head": "Staff  Advance",
+        "amount": 400,
+        "paymentMethod": "Cash",
+        "note": "sohag",
+        "accountId": "6190",
+        "accountCode": "6190",
+        "accountName": "Staff Advance",
+        "id": 1793777887181
+      },
+      {
+        "date": "2026-11-03",
+        "head": "Staff  Advance",
+        "amount": 500,
+        "paymentMethod": "Cash",
+        "note": "Arfat Naan",
+        "accountId": "6190",
+        "accountCode": "6190",
+        "accountName": "Staff Advance",
+        "id": 1793777903241
+      },
+      {
+        "date": "2026-11-03",
+        "head": "Cleaning Bill",
+        "amount": 3168,
+        "paymentMethod": "Cash",
+        "note": "",
+        "accountId": "6070",
+        "accountCode": "6070",
+        "accountName": "Cleaning Bill",
+        "id": 1793777955159
+      },
+      {
+        "date": "2026-11-03",
+        "head": "Printing & Branding",
+        "amount": 1200,
+        "paymentMethod": "Cash",
+        "note": "",
+        "accountId": "6110",
+        "accountCode": "6110",
+        "accountName": "Printing & Branding",
+        "id": 1793777981652
+      },
+      {
+        "date": "2026-11-03",
+        "head": "Cleaning Bill",
+        "amount": 150,
+        "paymentMethod": "Cash",
+        "note": "",
+        "accountId": "6070",
+        "accountCode": "6070",
+        "accountName": "Cleaning Bill",
+        "id": 1793777992784
+      },
+      {
+        "date": "2026-11-03",
+        "head": "Conveyance",
+        "amount": 140,
+        "paymentMethod": "Cash",
+        "note": "",
+        "accountId": "6080",
+        "accountCode": "6080",
+        "accountName": "Conveyance",
+        "id": 1793778018898
+      },
+      {
+        "date": "2026-11-03",
+        "head": "Printing & Branding",
+        "amount": 440,
+        "paymentMethod": "Cash",
+        "note": "Doi cup",
+        "accountId": "6110",
+        "accountCode": "6110",
+        "accountName": "Printing & Branding",
+        "id": 1793778058863
+      },
+      {
+        "date": "2026-11-02",
+        "head": "Staff  Advance",
+        "amount": 400,
+        "paymentMethod": "Cash",
+        "note": "sohag",
+        "accountId": "6190",
+        "accountCode": "6190",
+        "accountName": "Staff Advance",
+        "id": 1793778432774
+      }
+    ],
+    "payments": [],
+    "inventory": [],
     "dayEndRecords": [],
     "orderEditPermissions": {
       "ADMIN": true,
@@ -3966,5 +6069,5 @@
       "CHEF": false
     }
   },
-  "timestamp": 1792316936019
+  "timestamp": 1793852631251
 }
