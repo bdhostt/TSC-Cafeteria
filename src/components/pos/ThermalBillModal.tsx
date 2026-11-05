@@ -624,8 +624,9 @@ export const ThermalBillModal: React.FC = () => {
     lines.push(divider);
 
     lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo, width));
-    if (printableReceipt.orderRef) {
-      lines.push(line2Col('Order Ref :', printableReceipt.orderRef, width));
+    const orderRefVal = printableReceipt.orderRef || (printableReceipt.invoiceNo ? 'ORD-' + printableReceipt.invoiceNo.replace(/\D/g, '').slice(-5) : '');
+    if (orderRefVal) {
+      lines.push(line2Col('Order Ref :', orderRefVal, width));
     }
     let dateStr = receiptDateStr;
     let timeStr = receiptTimeStr;
@@ -1303,12 +1304,12 @@ export const ThermalBillModal: React.FC = () => {
                     )}
                   </div>
                 </div>
-                {printableReceipt.orderRef && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Order Ref:</span>
-                    <span className="font-semibold text-slate-800">{printableReceipt.orderRef}</span>
-                  </div>
-                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Order Ref:</span>
+                  <span className="font-semibold text-slate-800">
+                    {printableReceipt.orderRef || (printableReceipt.invoiceNo ? 'ORD-' + printableReceipt.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001')}
+                  </span>
+                </div>
                 {activeTemplate?.showDateTime !== false && (
                   <div className="flex justify-between">
                     <span><span className="text-slate-500">Date :</span> <span className="font-semibold text-slate-800">{receiptDateStr}</span></span>

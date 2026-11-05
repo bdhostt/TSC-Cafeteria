@@ -623,8 +623,9 @@ async function startServer() {
     // 4. Left & Right Justified: Invoice metadata (Flush to margins)
     pushBytes([0x1B, 0x61, 0x00]); // Left
     pushStr(line2Col("Invoice No :", bill.invoiceNo || "INV-0000", width));
-    if ((bill as any).orderRef) {
-      pushStr(line2Col("Order Ref :", (bill as any).orderRef, width));
+    const orderRefVal = (bill as any).orderRef || (bill.invoiceNo ? 'ORD-' + bill.invoiceNo.replace(/\D/g, '').slice(-5) : '');
+    if (orderRefVal) {
+      pushStr(line2Col("Order Ref :", orderRefVal, width));
     }
     let dateStr = "";
     let timeStr = "";
