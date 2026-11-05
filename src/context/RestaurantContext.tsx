@@ -3807,6 +3807,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setData(prev => {
       const table = prev.tables.find(t => t.id === tableId);
       if (!table) return prev;
+      if (table.status === 'billed') {
+        alert('This table order is already billed. Cannot add new items after bill print.');
+        return prev;
+      }
 
       const channelId = table.channelOrAgentId || 'dine_in';
       const agents = prev.commissionAgents || DEFAULT_COMMISSION_AGENTS;
@@ -3878,7 +3882,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const orderRef = t.orderRef || ('ORD-' + Date.now().toString().slice(-5));
         return {
           ...t,
-          status: (t.status === 'billed' || t.status === 'free') ? 'hold' : t.status,
+          status: t.status === 'free' ? 'hold' : t.status,
           cart: existingCart,
           waiter: assignedWaiter,
           orderRef,
@@ -3940,7 +3944,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ? cartItemIdOrIdx
           : existingCart.findIndex(c => (c.cartItemId || `${c.id}`) === cartItemIdOrIdx || c.id === Number(cartItemIdOrIdx));
 
+        if (table.status === 'billed') {
+          alert('This table order is already billed. Cannot change quantity after bill print.');
+          return table;
+        }
         if (itemIdx >= 0 && itemIdx < existingCart.length) {
+          if (table.status === 'billed' && delta > 0) {
+            alert('This table order is already billed. Cannot increase quantity after bill print.');
+            return table;
+          }
           const newQty = existingCart[itemIdx].qty + delta;
           if (newQty <= 0) {
             existingCart.splice(itemIdx, 1);
@@ -3988,6 +4000,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ? cartItemIdOrIdx
           : existingCart.findIndex(c => (c.cartItemId || `${c.id}`) === cartItemIdOrIdx || c.id === Number(cartItemIdOrIdx));
 
+        if (table.status === 'billed') {
+          alert('This table order is already billed. Cannot change quantity after bill print.');
+          return table;
+        }
         if (itemIdx >= 0 && itemIdx < existingCart.length) {
           existingCart[itemIdx] = {
             ...existingCart[itemIdx],
@@ -4224,6 +4240,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const table = data.tables.find(t => t.id === tableId);
     if (!table || table.cart.length === 0) {
       alert('No food items in this table order to print KOT!');
+      return;
+    }
+
+    if (table.status === 'billed') {
+      alert('This table order is already billed. Cannot submit KOT after bill has been printed.');
       return;
     }
 

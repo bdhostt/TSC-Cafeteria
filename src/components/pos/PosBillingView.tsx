@@ -180,6 +180,12 @@ export const PosBillingView: React.FC = () => {
   } = useRestaurant();
 
   const isWaiter = currentUser?.role === 'WAITER';
+  const hasActiveKotPrinter = Boolean(
+    (data.printers || []).some(p => p.isActive && (p.type === 'KOT' || p.type === 'ALL'))
+  );
+  const hasActiveBillPrinter = Boolean(
+    (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+  );
   const isRoleAllowed = Boolean(currentUser?.role && (data.orderEditPermissions?.[currentUser.role] ?? (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'CASHIER')));
   const canCancelOrEditOrder = 
     currentUser?.role === 'ADMIN' || 
@@ -818,8 +824,8 @@ export const PosBillingView: React.FC = () => {
                       {/* Bottom: Action bar */}
                       <div className={`border-t border-blue-700/60 flex items-center justify-between gap-1 ${isUltraCompact ? 'pt-1' : isCompact ? 'pt-1.5' : 'pt-2'} relative`}>
                         <div className="w-full flex items-center gap-1 pr-1.5">
-                          {/* Quick KOT Direct Print */}
-                          {hasUnprintedKot && (
+                          {/* Quick KOT Direct Print - only if KOT printer active and table not billed */}
+                          {hasActiveKotPrinter && hasUnprintedKot && !isBillPrinted && (
                             <button
                               type="button"
                               title="Direct Print KOT"
@@ -836,8 +842,8 @@ export const PosBillingView: React.FC = () => {
                             </button>
                           )}
 
-                          {/* Quick Bill Direct Print */}
-                          {!isBillPrinted && (
+                          {/* Quick Bill Direct Print - only if Bill printer active and table not billed */}
+                          {hasActiveBillPrinter && !isBillPrinted && (
                             <button
                               type="button"
                               title="Direct Print Bill"
@@ -1038,8 +1044,8 @@ export const PosBillingView: React.FC = () => {
                   key={dish.id}
                   id={`menu-item-btn-${dish.id}`}
                   onClick={() => {
-                    if (activeTable?.status === 'billed' && !canCancelOrEditOrder) {
-                      alert('This order is already billed. Only Admin or authorized staff can edit it.');
+                    if (activeTable?.status === 'billed') {
+                      alert('This table order is already billed. You cannot add new items after the bill has been printed.');
                       return;
                     }
                     if (hasOptions) {
@@ -1418,17 +1424,32 @@ export const PosBillingView: React.FC = () => {
                         <CartItemQtyInput
                           qty={item.qty}
                           minQty={isItemKotPrinted ? (item.kotPrintedQty || 1) : 1}
-                          disabled={Boolean(activeTable.linkedSaleId)}
-                          onCommit={(newQty) => setCartItemQty(activeTable.id, item.cartItemId || idx, newQty)}
+                          disabled={Boolean(activeTable.linkedSaleId) || isTableBilled}
+                          onCommit={(newQty) => {
+                            if (isTableBilled) {
+                              alert('This table order is already billed. Cannot change quantity after bill has been printed.');
+                              return;
+                            }
+                            setCartItemQty(activeTable.id, item.cartItemId || idx, newQty);
+                          }}
                           onVoidRequest={() => setVoidingItem({ item, index: idx })}
                         />
 
                         {/* Increment */}
                         <button
                           type="button"
-                          onClick={() => updateCartItemQty(activeTable.id, item.cartItemId || idx, 1)}
-                          className="w-6 h-6 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 flex items-center justify-center font-bold transition cursor-pointer"
-                          title="Increase quantity"
+                          disabled={isTableBilled}
+                          onClick={() => {
+                            if (isTableBilled) {
+                              alert('This table order is already billed. Cannot add quantity after bill has been printed.');
+                              return;
+                            }
+                            updateCartItemQty(activeTable.id, item.cartItemId || idx, 1);
+                          }}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold transition ${
+                            isTableBilled ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-blue-100 hover:bg-blue-200 text-blue-900 cursor-pointer'
+                          }`}
+                          title={isTableBilled ? 'Order is already billed' : 'Increase quantity'}
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -1742,38 +1763,54 @@ export const PosBillingView: React.FC = () => {
               );
             }
 
-            // State 2 (Picture 1): Cart has unprinted items -> Cancel & Submit (KOT & Hold) + Settle & Pay
-            if (hasUnprintedKotItems) {
-              return (
-                <div className="pt-1.5 sm:pt-2 shrink-0">
-                  <div className={`grid ${isWaiter ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2`}>
-                    {cancelBtn(false)}
-                    {submitKotBtn}
-                    {!isWaiter && settlePayBtn(false)}
-                  </div>
-                </div>
-              );
-            }
-
-            // State 3 (Picture 4 when bill ALREADY printed in 3 or 4): Hide Print Bill -> Only Cancel & Settle & Pay
+            // State: Bill is ALREADY printed -> Order is locked. Only Cancel & Settle & Pay
             if (isBillAlreadyPrinted) {
+              const billedButtons: React.ReactNode[] = [];
+              billedButtons.push(cancelBtn(isWaiter));
+              if (!isWaiter) {
+                billedButtons.push(settlePayBtn(false));
+              }
+              const billedGridCols = billedButtons.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
               return (
                 <div className="pt-1.5 sm:pt-2 shrink-0">
-                  <div className={`grid ${isWaiter ? 'grid-cols-1' : 'grid-cols-2'} gap-1.5 sm:gap-2`}>
-                    {cancelBtn(isWaiter)}
-                    {!isWaiter && settlePayBtn(false)}
+                  <div className={`grid ${billedGridCols} gap-1.5 sm:gap-2`}>
+                    {billedButtons.map((btn, bIdx) => (
+                      <React.Fragment key={bIdx}>{btn}</React.Fragment>
+                    ))}
                   </div>
                 </div>
               );
             }
 
-            // State 4 (When bill NOT yet printed): Show Cancel, Print Bill, Settle & Pay
+            // State: Order is active and NOT yet billed
+            const actionButtons: React.ReactNode[] = [];
+            actionButtons.push(cancelBtn(false));
+
+            if (hasUnprintedKotItems && hasActiveKotPrinter) {
+              actionButtons.push(submitKotBtn);
+            } else if (hasActiveBillPrinter) {
+              actionButtons.push(printBillBtn(false));
+            }
+
+            if (!isWaiter) {
+              actionButtons.push(settlePayBtn(false));
+            }
+
+            const colCount = actionButtons.length;
+            const gridClass = colCount === 1 
+              ? 'grid-cols-1' 
+              : colCount === 2 
+                ? 'grid-cols-2' 
+                : colCount === 3 
+                  ? 'grid-cols-3' 
+                  : 'grid-cols-4';
+
             return (
               <div className="pt-1.5 sm:pt-2 shrink-0">
-                <div className={`grid ${isWaiter ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2`}>
-                  {cancelBtn(false)}
-                  {printBillBtn(false)}
-                  {!isWaiter && settlePayBtn(false)}
+                <div className={`grid ${gridClass} gap-1.5 sm:gap-2`}>
+                  {actionButtons.map((btn, bIdx) => (
+                    <React.Fragment key={bIdx}>{btn}</React.Fragment>
+                  ))}
                 </div>
               </div>
             );
