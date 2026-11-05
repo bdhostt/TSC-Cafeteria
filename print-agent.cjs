@@ -5,7 +5,7 @@ const path = require('path');
 const net = require('net');
 const { exec, execFile } = require('child_process');
 
-const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://tsc-cafeteria.onrender.com').replace(/\/+$/, '');
+const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://posdemo.bdhostt.com').replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 250;
 
@@ -612,7 +612,9 @@ function buildBillEscPosBuffer(bill) {
 
   pushStr(divider);
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON for Bill Type
-  const bannerText = bill.headerTitle || (bill.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
+  const bannerText = bill.isSettled 
+    ? (bill.headerTitle && bill.headerTitle.includes('PAID') ? bill.headerTitle : 'PAID CASH MEMO') 
+    : (bill.headerTitle || 'INVOICE / GUEST BILL');
   pushStr(bannerText + '\n');
   pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
   pushStr(divider);
@@ -620,10 +622,8 @@ function buildBillEscPosBuffer(bill) {
   // 4. Left & Right Justified: Invoice Metadata (Flush to margins)
   pushBytes([0x1B, 0x61, 0x00]);
   pushStr(line2Col('Invoice No :', bill.invoiceNo || 'INV-0000', width));
-  const orderRefVal = bill.orderRef || (bill.invoiceNo ? 'ORD-' + bill.invoiceNo.replace(/\D/g, '').slice(-5) : '');
-  if (orderRefVal) {
-    pushStr(line2Col('Order Ref :', orderRefVal, width));
-  }
+  const orderRefVal = bill.orderRef || (bill.invoiceNo ? 'ORD-' + bill.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001');
+  pushStr(line2Col('Order Ref :', orderRefVal, width));
 
   let dateStr = '';
   let timeStr = '';

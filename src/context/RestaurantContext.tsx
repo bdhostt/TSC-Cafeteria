@@ -5311,6 +5311,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
     dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
 
+    // Pop up Paid Cash Memo on screen for immediate visual verification and reprint
+    setPrintableReceipt(memoReceipt);
+
     closeSettleModal();
     setPosView('floor');
   };

@@ -586,7 +586,9 @@ export const ThermalBillModal: React.FC = () => {
     }
 
     // CUSTOMER BILL / CASH MEMO (Standard 48-col 80mm or 32-col 58mm receipt)
-    const titleText = activeTemplate?.headerTitle || printableReceipt.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
+    const titleText = printableReceipt.isSettled 
+      ? (printableReceipt.headerTitle && printableReceipt.headerTitle.includes('PAID') ? printableReceipt.headerTitle : 'PAID CASH MEMO')
+      : (activeTemplate?.headerTitle || printableReceipt.headerTitle || 'INVOICE / GUEST BILL');
     const lines: string[] = [];
 
     lines.push(centerLine(restaurantName || 'BD HOSTT POS', width));
@@ -624,10 +626,8 @@ export const ThermalBillModal: React.FC = () => {
     lines.push(divider);
 
     lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo, width));
-    const orderRefVal = printableReceipt.orderRef || (printableReceipt.invoiceNo ? 'ORD-' + printableReceipt.invoiceNo.replace(/\D/g, '').slice(-5) : '');
-    if (orderRefVal) {
-      lines.push(line2Col('Order Ref :', orderRefVal, width));
-    }
+    const orderRefVal = printableReceipt.orderRef || (printableReceipt.invoiceNo ? 'ORD-' + printableReceipt.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001');
+    lines.push(line2Col('Order Ref :', orderRefVal, width));
     let dateStr = receiptDateStr;
     let timeStr = receiptTimeStr;
     const rawDt = printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`;
@@ -1287,7 +1287,7 @@ export const ThermalBillModal: React.FC = () => {
                   </p>
                 )}
                 <div className="mt-2 inline-block px-2 py-0.5 bg-slate-200 text-slate-800 rounded text-[10px] font-bold uppercase tracking-wider font-sans">
-                  {activeTemplate?.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'TABLE RUNNING BILL')}
+                  {printableReceipt.isSettled ? 'PAID CASH MEMO' : (activeTemplate?.headerTitle || 'TABLE RUNNING BILL')}
                 </div>
               </div>
 

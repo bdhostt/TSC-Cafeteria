@@ -615,7 +615,9 @@ async function startServer() {
 
     pushStr(divider);
     pushBytes([0x1B, 0x45, 0x01]); // Bold ON
-    const bannerText = (bill as any).headerTitle || (bill.isSettled ? "PAID CASH MEMO" : "INVOICE / GUEST BILL");
+    const bannerText = bill.isSettled 
+      ? ((bill as any).headerTitle && (bill as any).headerTitle.includes('PAID') ? (bill as any).headerTitle : "PAID CASH MEMO") 
+      : ((bill as any).headerTitle || "INVOICE / GUEST BILL");
     pushStr(`${bannerText}\n`);
     pushBytes([0x1B, 0x45, 0x00]); // Bold OFF
     pushStr(divider);
@@ -623,10 +625,8 @@ async function startServer() {
     // 4. Left & Right Justified: Invoice metadata (Flush to margins)
     pushBytes([0x1B, 0x61, 0x00]); // Left
     pushStr(line2Col("Invoice No :", bill.invoiceNo || "INV-0000", width));
-    const orderRefVal = (bill as any).orderRef || (bill.invoiceNo ? 'ORD-' + bill.invoiceNo.replace(/\D/g, '').slice(-5) : '');
-    if (orderRefVal) {
-      pushStr(line2Col("Order Ref :", orderRefVal, width));
-    }
+    const orderRefVal = (bill as any).orderRef || (bill.invoiceNo ? 'ORD-' + bill.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001');
+    pushStr(line2Col("Order Ref :", orderRefVal, width));
     let dateStr = "";
     let timeStr = "";
     const rawDt = bill.dateTime || new Date().toLocaleString("en-US");

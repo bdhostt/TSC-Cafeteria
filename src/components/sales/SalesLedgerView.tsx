@@ -292,6 +292,9 @@ export const SalesLedgerView: React.FC = () => {
         orderRef = refMatch[1].trim();
       }
     }
+    if (!orderRef) {
+      orderRef = sale.invoiceNo ? 'ORD-' + sale.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001';
+    }
 
     setPrintableReceipt({
       restaurantName: data.restaurantProfile?.name || 'BD HOSTT POS',
@@ -718,7 +721,12 @@ export const SalesLedgerView: React.FC = () => {
                           <span>{sale.invoiceNo}</span>
                           <ReceiptText className="w-3 h-3 text-blue-500 opacity-0 group-hover:opacity-100 transition shrink-0" />
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono">{sale.date}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-slate-500 font-mono">{sale.date}</span>
+                          <span className="text-[9px] px-1 py-0.2 rounded font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            {sale.orderRef || (sale.details?.match(/Ref:\s*([^):]+)/i)?.[1]?.trim()) || (sale.invoiceNo ? 'ORD-' + sale.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001')}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 max-w-xs">
                         <div className="text-slate-800 font-medium line-clamp-1 group-hover:text-slate-900">{sale.details}</div>

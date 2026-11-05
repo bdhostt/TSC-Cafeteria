@@ -193,11 +193,14 @@ export const SplitPaymentModal: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-0.5 rounded-md bg-[#004b9b] text-white font-extrabold text-sm">
                 {activeSettlingTable.name}
               </span>
               <h3 className="font-extrabold text-slate-900 text-lg">Bill Settlement & Split Payment</h3>
+              <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-black text-xs border border-amber-300 font-mono tracking-wider">
+                Ref: {activeSettlingTable.orderRef || (activeSettlingTable.orderCreatedAt ? ('ORD-' + String(activeSettlingTable.orderCreatedAt).slice(-5)) : 'ORD-NEW')}
+              </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
               <span>Order Taker: <strong className="text-slate-800 font-bold">{activeSettlingTable.orderCreatedBy || 'Staff'} {activeSettlingTable.orderCreatedRole ? `(${activeSettlingTable.orderCreatedRole})` : ''}</strong></span>
