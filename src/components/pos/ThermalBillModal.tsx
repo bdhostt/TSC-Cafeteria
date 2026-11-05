@@ -407,6 +407,9 @@ export const ThermalBillModal: React.FC = () => {
       kotLines.push(centerLine(`STATION: ${stationName}`, width));
       const invoiceVal = (printableReceipt.invoiceNo || 'KOT-0000') + (isCancelKot ? ' (VOID)' : '');
       kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${invoiceVal}`, width));
+      if (printableReceipt.isAddonKot) {
+        kotLines.push(centerLine('** RUNNING ORDER ADD-ON **', width));
+      }
       kotLines.push(divider);
 
       // Metadata (Left and Right flush)
@@ -621,6 +624,9 @@ export const ThermalBillModal: React.FC = () => {
     lines.push(divider);
 
     lines.push(line2Col('Invoice No :', printableReceipt.invoiceNo, width));
+    if (printableReceipt.orderRef) {
+      lines.push(line2Col('Order Ref :', printableReceipt.orderRef, width));
+    }
     let dateStr = receiptDateStr;
     let timeStr = receiptTimeStr;
     const rawDt = printableReceipt.dateTime || `${receiptDateStr}, ${receiptTimeStr}`;

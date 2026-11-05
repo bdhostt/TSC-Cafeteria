@@ -285,12 +285,21 @@ export const SalesLedgerView: React.FC = () => {
     const subtotal = sale.subtotal || sale.total;
     const discountDeduction = Math.max(0, subtotal - sale.total);
 
+    let orderRef = sale.orderRef;
+    if (!orderRef && detailsStr) {
+      const refMatch = detailsStr.match(/Ref:\s*([^):]+)/i);
+      if (refMatch) {
+        orderRef = refMatch[1].trim();
+      }
+    }
+
     setPrintableReceipt({
       restaurantName: data.restaurantProfile?.name || 'BD HOSTT POS',
       restaurantAddress: data.restaurantProfile?.address || 'Chattogram, Bangladesh',
       restaurantHotline: data.restaurantProfile?.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || '0029381-01',
       invoiceNo: sale.invoiceNo || `POS-${sale.id}`,
+      orderRef,
       dateTime: sale.date || new Date().toISOString().split('T')[0],
       tableName,
       tableZone,

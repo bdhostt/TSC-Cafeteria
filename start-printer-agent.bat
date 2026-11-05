@@ -10,7 +10,7 @@ echo.
 echo  Primary Printer : 80 Printer (192.168.1.87 - LAN)
 echo  Secondary Fallback: Kot Printer (USB001 - Direct Hardware)
 echo.
-set CLOUD_URL=https://tsc-cafeteria.onrender.com
+set CLOUD_URL=https://posdemo.bdhostt.com
 if not "%~1"=="" set CLOUD_URL=%~1
 echo  Cloud Target    : %CLOUD_URL%
 echo.

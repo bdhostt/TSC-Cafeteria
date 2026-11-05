@@ -418,6 +418,7 @@ export interface SaleRecord {
   id: number;
   date: string;
   invoiceNo: string;
+  orderRef?: string;
   details: string;
   subtotal?: number;
   items?: TableCartItem[];

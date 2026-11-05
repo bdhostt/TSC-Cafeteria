@@ -5120,6 +5120,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const changeReturn = Math.max(0, totalEntered - netTotal);
     const cashRetained = Math.max(0, computedCash - changeReturn);
     const invoiceNo = 'POS-' + Date.now().toString().slice(-6);
+    const effectiveOrderRef = table.orderRef 
+      || (table.orderCreatedAt ? ('ORD-' + String(table.orderCreatedAt).slice(-5)) : ('ORD-' + Date.now().toString().slice(-5)));
     const today = (data.businessDay?.isOpen && data.businessDay.date) ? data.businessDay.date : (data.session?.startDate || new Date().toISOString().split('T')[0]);
     const itemSummary = table.cart.map(i => `${i.name} (${i.qty})`).join(', ');
 
@@ -5131,6 +5133,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       id: Date.now(),
       date: today,
       invoiceNo,
+      orderRef: effectiveOrderRef,
       tableId: table.id,
       table: table.name,
       subtotal: subtotal,
@@ -5139,7 +5142,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       vatVal: vatVal,
       vatPercent: isVatEnabled ? vatPercent : 0,
       vatMode,
-      details: `${table.name} [Zone: ${table.zone || 'Floor 1'}] (W: ${assignedWaiter || 'N/A'}${agent ? `, Ch: ${agent.name}` : ''}): ${itemSummary}`,
+      details: `${table.name} [Zone: ${table.zone || 'Floor 1'}] (W: ${assignedWaiter || 'N/A'}${agent ? `, Ch: ${agent.name}` : ''}, Ref: ${effectiveOrderRef}): ${itemSummary}`,
       items: JSON.parse(JSON.stringify(table.cart)),
       cash: cashRetained,
       card: computedCard,
@@ -5246,7 +5249,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
       invoiceNo,
-      orderRef: table.orderRef,
+      orderRef: effectiveOrderRef,
       dateTime: new Date().toLocaleString('en-US'),
       tableName: table.name,
       tableZone: table.zone || 'Floor 1',
