@@ -130,7 +130,12 @@ export const ThermalBillModal: React.FC = () => {
   // Initial matched printer
   const defaultMatchedPrinter = useMemo(() => {
     const targetType = isKot ? 'KOT' : 'BILL';
-    const found = printers.find(p => p.isActive && (p.type === targetType || p.type === 'ALL'));
+    const found = printers.find(p => p.isActive && p.isDefault && (p.type === targetType || p.type === 'ALL'))
+      || printers.find(p => p.isActive && (p.type === targetType || p.type === 'ALL'))
+      || printers.find(p => p.isActive && p.isDefault)
+      || printers.find(p => p.isActive)
+      || printers[0]
+      || null;
     return found || printers[0] || null;
   }, [printers, isKot]);
 
@@ -257,7 +262,9 @@ export const ThermalBillModal: React.FC = () => {
           showPrices: activeTemplate?.showPrices !== false,
           showPaymentBreakdown: activeTemplate?.showPaymentBreakdown !== false,
           footerMessage: activeTemplate?.footerMessage,
-          footerNotes: activeTemplate?.footerNotes
+          footerNotes: activeTemplate?.footerNotes,
+          targetPrinterName: selectedPrinter?.name || defaultMatchedPrinter?.name,
+          targetPrinterId: selectedPrinter?.id || defaultMatchedPrinter?.id
         };
 
         await dispatchHardwarePrint('/api/hardware/print-bill', billPayload);

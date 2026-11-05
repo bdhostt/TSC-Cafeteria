@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useRestaurant, isSaleActive } from '../../context/RestaurantContext';
+import { useRestaurant, isSaleActive, DEFAULT_PRINTERS } from '../../context/RestaurantContext';
 import { 
   Search, 
   Utensils, 
@@ -180,6 +180,9 @@ export const PosBillingView: React.FC = () => {
   } = useRestaurant();
 
   const isWaiter = currentUser?.role === 'WAITER';
+  const configuredPrinters = (data?.printers && data.printers.length > 0) ? data.printers : DEFAULT_PRINTERS;
+  const hasActiveBillPrinter = configuredPrinters.some(p => p.isActive !== false && (p.type === 'BILL' || p.type === 'ALL'));
+  const hasActiveKotPrinter = configuredPrinters.some(p => p.isActive !== false && (p.type === 'KOT' || p.type === 'ALL'));
   const isRoleAllowed = Boolean(currentUser?.role && (data.orderEditPermissions?.[currentUser.role] ?? (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'CASHIER')));
   const canCancelOrEditOrder = 
     currentUser?.role === 'ADMIN' || 
@@ -819,7 +822,7 @@ export const PosBillingView: React.FC = () => {
                       <div className={`border-t border-blue-700/60 flex items-center justify-between gap-1 ${isUltraCompact ? 'pt-1' : isCompact ? 'pt-1.5' : 'pt-2'} relative`}>
                         <div className="w-full flex items-center gap-1 pr-1.5">
                           {/* Quick KOT Direct Print */}
-                          {hasUnprintedKot && (
+                          {hasActiveKotPrinter && hasUnprintedKot && (
                             <button
                               type="button"
                               title="Direct Print KOT"
@@ -837,7 +840,7 @@ export const PosBillingView: React.FC = () => {
                           )}
 
                           {/* Quick Bill Direct Print */}
-                          {!isBillPrinted && (
+                          {hasActiveBillPrinter && !isBillPrinted && (
                             <button
                               type="button"
                               title="Direct Print Bill"
@@ -1767,12 +1770,12 @@ export const PosBillingView: React.FC = () => {
               );
             }
 
-            // State 4 (When bill NOT yet printed): Show Cancel, Print Bill, Settle & Pay
+            // State 4 (When bill NOT yet printed): Show Cancel, Print Bill (only if active bill printer exists), Settle & Pay
             return (
               <div className="pt-1.5 sm:pt-2 shrink-0">
-                <div className={`grid ${isWaiter ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2`}>
+                <div className={`grid ${(!hasActiveBillPrinter || isWaiter) ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2`}>
                   {cancelBtn(false)}
-                  {printBillBtn(false)}
+                  {hasActiveBillPrinter && printBillBtn(false)}
                   {!isWaiter && settlePayBtn(false)}
                 </div>
               </div>

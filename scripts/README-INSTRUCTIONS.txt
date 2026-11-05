@@ -25,7 +25,7 @@ How to Install (English Instructions):
 
 ====================================================================
 Support & Configuration:
-Default Cloud Target: https://tsc-cafeteria.onrender.com
+Default Cloud Target: https://posdemo.bdhostt.com
 Default Local Bridge: http://127.0.0.1:9123
 Default LAN Printer: 80 Printer (192.168.1.87)
 Default USB Printer: Kot Printer (USB001)

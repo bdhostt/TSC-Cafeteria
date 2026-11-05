@@ -3527,19 +3527,41 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       id,
       isActive: printer.isActive !== undefined ? printer.isActive : true
     };
-    setData(prev => ({
-      ...prev,
-      printers: [...(prev.printers || DEFAULT_PRINTERS), newPrinter]
-    }));
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => {
+      const currentList = prev.printers || DEFAULT_PRINTERS;
+      const targetType = newPrinter.type || 'KOT';
+      const updatedList = newPrinter.isDefault
+        ? currentList.map(p => (p.type === targetType || p.type === 'ALL' || targetType === 'ALL') ? { ...p, isDefault: false } : p)
+        : currentList;
+      return {
+        ...prev,
+        printers: [...updatedList, newPrinter]
+      };
+    });
   };
 
   const updatePrinter = (id: string, updates: Partial<PrinterConfig>) => {
-    setData(prev => ({
-      ...prev,
-      printers: (prev.printers || DEFAULT_PRINTERS).map(p => 
-        p.id === id ? { ...p, ...updates } : p
-      )
-    }));
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => {
+      const currentList = prev.printers || DEFAULT_PRINTERS;
+      const targetPrinter = currentList.find(p => p.id === id);
+      const targetType = updates.type || targetPrinter?.type || 'KOT';
+
+      return {
+        ...prev,
+        printers: currentList.map(p => {
+          if (p.id === id) {
+            return { ...p, ...updates };
+          }
+          // If setting this printer as default, automatically unset isDefault on any other printer of same type!
+          if (updates.isDefault && (p.type === targetType || p.type === 'ALL' || targetType === 'ALL')) {
+            return { ...p, isDefault: false };
+          }
+          return p;
+        })
+      };
+    });
   };
 
   const deletePrinter = (id: string) => {
@@ -4890,8 +4912,22 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (showModal) {
       setPrintableReceipt(billPayload);
     } else {
+      const printersList = (data?.printers && data.printers.length > 0) ? data.printers : DEFAULT_PRINTERS;
+      const defaultBillPrinter = printersList.find(p => p.isActive && p.isDefault && (p.type === 'BILL' || p.type === 'ALL'))
+        || printersList.find(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+        || printersList.find(p => p.isActive && p.isDefault)
+        || printersList.find(p => p.isActive)
+        || null;
+
+      if (!defaultBillPrinter) {
+        alert('No active Bill printer is configured in Settings ➔ Printers Config!');
+        return;
+      }
+
       const billHardwarePayload = {
         ...billPayload,
+        targetPrinterName: defaultBillPrinter?.name,
+        targetPrinterId: defaultBillPrinter?.id,
         items: table.cart.map(i => ({
           name: i.name,
           qty: i.qty,
@@ -5241,20 +5277,31 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       footerNotes: defaultPrimaryBillTemplate?.footerNotes
     };
 
-    const memoPayload = {
-      ...memoReceipt,
-      items: table.cart.map(i => ({
-        name: i.name,
-        qty: i.qty,
-        price: i.price,
-        variation: i.selectedVariation?.name,
-        addons: i.selectedAddons?.map(a => a.name),
-        notes: i.notes
-      }))
-    };
+    const printersList = (data?.printers && data.printers.length > 0) ? data.printers : DEFAULT_PRINTERS;
+    const defaultBillPrinter = printersList.find(p => p.isActive && p.isDefault && (p.type === 'BILL' || p.type === 'ALL'))
+      || printersList.find(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+      || printersList.find(p => p.isActive && p.isDefault)
+      || printersList.find(p => p.isActive)
+      || null;
 
-    // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
-    dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
+    if (defaultBillPrinter) {
+      const memoPayload = {
+        ...memoReceipt,
+        targetPrinterName: defaultBillPrinter.name,
+        targetPrinterId: defaultBillPrinter.id,
+        items: table.cart.map(i => ({
+          name: i.name,
+          qty: i.qty,
+          price: i.price,
+          variation: i.selectedVariation?.name,
+          addons: i.selectedAddons?.map(a => a.name),
+          notes: i.notes
+        }))
+      };
+
+      // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
+      dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
+    }
 
     closeSettleModal();
     setPosView('floor');

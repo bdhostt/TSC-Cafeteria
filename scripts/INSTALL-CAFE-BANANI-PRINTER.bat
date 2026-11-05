@@ -43,7 +43,7 @@ set "SRC_DIR=%~dp0"
 :: If run as a standalone Direct .BAT from Downloads without the extracted ZIP files, auto-download package from cloud
 if not exist "%SRC_DIR%print-agent.cjs" (
     echo       Downloading printer agent files from cloud server...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$zip = Join-Path $env:TEMP 'pos-printer-setup.zip'; Invoke-WebRequest -Uri 'https://tsc-cafeteria.onrender.com/api/download/printer-agent-zip' -OutFile $zip -UseBasicParsing; Expand-Archive -Path $zip -DestinationPath '%INSTALL_DIR%' -Force"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$zip = Join-Path $env:TEMP 'pos-printer-setup.zip'; Invoke-WebRequest -Uri 'https://posdemo.bdhostt.com/api/download/printer-agent-zip' -OutFile $zip -UseBasicParsing; Expand-Archive -Path $zip -DestinationPath '%INSTALL_DIR%' -Force"
 ) else (
     :: Copy files from local folder
     copy /y "%SRC_DIR%print-agent.cjs" "%INSTALL_DIR%\" >nul

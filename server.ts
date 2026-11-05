@@ -1507,7 +1507,7 @@ async function startServer() {
 
       if (isWindows) {
         const installedPrinters = await getWindowsPrinters();
-        const targetPrinter = resolveThermalPrinter(installedPrinters);
+        const targetPrinter = resolveThermalPrinter(installedPrinters, billData.targetPrinterName);
 
         console.log(`🖨️ [Hardware Bill Print] Printing bill for ${billData.tableName} on "${targetPrinter}"`);
         const rawBuffer = buildBillEscPosBuffer(billData);
@@ -1552,7 +1552,7 @@ async function startServer() {
 
       if (isWindows) {
         const installedPrinters = await getWindowsPrinters();
-        const targetPrinter = resolveThermalPrinter(installedPrinters);
+        const targetPrinter = resolveThermalPrinter(installedPrinters, billData.targetPrinterName);
 
         console.log(`🖨️ [Hardware Z-Report Print] Printing shift Z-Report for session ${reportData.session.id} on "${targetPrinter}"`);
         const rawBuffer = buildZReportEscPosBuffer(reportData);
@@ -1592,7 +1592,7 @@ async function startServer() {
 
       if (isWindows) {
         const installedPrinters = await getWindowsPrinters();
-        const targetPrinter = resolveThermalPrinter(installedPrinters);
+        const targetPrinter = resolveThermalPrinter(installedPrinters, billData.targetPrinterName);
 
         console.log(`🖨️ [Hardware Waiter Slip Print] Printing slip for waiter ${slipData.waiterName} on "${targetPrinter}"`);
         const rawBuffer = buildWaiterSlipEscPosBuffer(slipData);
@@ -1632,7 +1632,7 @@ async function startServer() {
 
       if (isWindows) {
         const installedPrinters = await getWindowsPrinters();
-        const targetPrinter = resolveThermalPrinter(installedPrinters);
+        const targetPrinter = resolveThermalPrinter(installedPrinters, billData.targetPrinterName);
 
         console.log(`🖨️ [Hardware Day-End Print] Printing master day-end for date ${dayData.dayRecord.date} on "${targetPrinter}"`);
         const rawBuffer = buildDayEndEscPosBuffer(dayData);
@@ -1672,7 +1672,7 @@ async function startServer() {
 
       if (isWindows) {
         const installedPrinters = await getWindowsPrinters();
-        const targetPrinter = resolveThermalPrinter(installedPrinters);
+        const targetPrinter = resolveThermalPrinter(installedPrinters, billData.targetPrinterName);
 
         console.log(`🖨️ [Hardware Chef Slip Print] Printing production slip for chef ${shiftData.shift.chefName} on "${targetPrinter}"`);
         const rawBuffer = buildChefSlipEscPosBuffer(shiftData);

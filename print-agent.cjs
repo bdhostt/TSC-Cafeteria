@@ -5,7 +5,7 @@ const path = require('path');
 const net = require('net');
 const { exec, execFile } = require('child_process');
 
-const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://tsc-cafeteria.onrender.com').replace(/\/+$/, '');
+const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://posdemo.bdhostt.com').replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 250;
 
@@ -259,22 +259,35 @@ function printTcpRaw(host, port, rawBuffer, timeoutMs = 450) {
 
 function resolveThermalPrinter(installedPrinters, requestedName) {
   const printers = (installedPrinters || []).filter(p => !VIRTUAL_PRINTER_REGEX.test(p));
-  const lanPrinter = printers.find(p => /80\s*printer/i.test(p));
 
-  if (lanPrinter) {
-    return lanPrinter;
-  }
-
+  // 1. If a specific printer name was requested from POS config, match it FIRST!
   if (requestedName && !VIRTUAL_PRINTER_REGEX.test(requestedName)) {
     const trimmedReq = requestedName.trim();
     const exact = printers.find(p => p.toLowerCase() === trimmedReq.toLowerCase());
     if (exact) return exact;
 
+    const fuzzy = printers.find(p => p.toLowerCase().includes(trimmedReq.toLowerCase()) || trimmedReq.toLowerCase().includes(p.toLowerCase()));
+    if (fuzzy) return fuzzy;
+
+    if (/80\s*printer/i.test(trimmedReq) || trimmedReq.includes('80')) {
+      const match80 = printers.find(p => /80\s*printer/i.test(p));
+      if (match80) return match80;
+    }
+
     if (/kot/i.test(trimmedReq)) {
       const matchKot = printers.find(p => /kot/i.test(p));
       if (matchKot) return matchKot;
     }
+
+    if (/bill|cash|receipt|memo/i.test(trimmedReq)) {
+      const matchBill = printers.find(p => /bill|cash|receipt|pos/i.test(p));
+      if (matchBill) return matchBill;
+    }
   }
+
+  // 2. Default fallback matching
+  const lanPrinter = printers.find(p => /80\s*printer/i.test(p));
+  if (lanPrinter) return lanPrinter;
 
   const kot = printers.find(p => /kot\s*printer/i.test(p)) || printers.find(p => /kot/i.test(p));
   if (kot) return kot;
@@ -1167,7 +1180,7 @@ async function processPrintJob(job) {
   }
 
   if (job.type === 'BILL') {
-    const targetPrinter = resolveThermalPrinter(installedPrinters);
+    const targetPrinter = resolveThermalPrinter(installedPrinters, job.payload.targetPrinterName);
     console.log(' ➔ Printing Bill for Table ' + (job.payload.tableName || 'N/A') + ' on "' + targetPrinter + '"...');
     const buffer = buildBillEscPosBuffer(job.payload);
     const ok = await printSlipFast(targetPrinter, buffer);
@@ -1179,7 +1192,7 @@ async function processPrintJob(job) {
   }
 
   if (job.type === 'ZREPORT') {
-    const targetPrinter = resolveThermalPrinter(installedPrinters);
+    const targetPrinter = resolveThermalPrinter(installedPrinters, job.payload.targetPrinterName);
     console.log(' ➔ Printing Shift Z-Report on "' + targetPrinter + '"...');
     const buffer = buildZReportEscPosBuffer(job.payload);
     const ok = await printSlipFast(targetPrinter, buffer);
@@ -1191,7 +1204,7 @@ async function processPrintJob(job) {
   }
 
   if (job.type === 'WAITER_SLIP') {
-    const targetPrinter = resolveThermalPrinter(installedPrinters);
+    const targetPrinter = resolveThermalPrinter(installedPrinters, job.payload.targetPrinterName);
     console.log(' ➔ Printing Waiter Slip for ' + (job.payload.waiterName || 'Staff') + ' on "' + targetPrinter + '"...');
     const buffer = buildWaiterSlipEscPosBuffer(job.payload);
     const ok = await printSlipFast(targetPrinter, buffer);
@@ -1203,7 +1216,7 @@ async function processPrintJob(job) {
   }
 
   if (job.type === 'CHEF_SLIP') {
-    const targetPrinter = resolveThermalPrinter(installedPrinters);
+    const targetPrinter = resolveThermalPrinter(installedPrinters, job.payload.targetPrinterName);
     console.log(' ➔ Printing Kitchen Chef Slip on "' + targetPrinter + '"...');
     const buffer = buildChefSlipEscPosBuffer(job.payload);
     const ok = await printSlipFast(targetPrinter, buffer);
@@ -1215,7 +1228,7 @@ async function processPrintJob(job) {
   }
 
   if (job.type === 'DAYEND') {
-    const targetPrinter = resolveThermalPrinter(installedPrinters);
+    const targetPrinter = resolveThermalPrinter(installedPrinters, job.payload.targetPrinterName);
     console.log(' ➔ Printing Daily Master Day-End Z-Report on "' + targetPrinter + '"...');
     const buffer = buildDayEndEscPosBuffer(job.payload);
     const ok = await printSlipFast(targetPrinter, buffer);
