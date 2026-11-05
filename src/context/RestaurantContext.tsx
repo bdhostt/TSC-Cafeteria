@@ -3875,11 +3875,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const updatedTables = prev.tables.map(t => {
         if (t.id !== tableId) return t;
         const assignedWaiter = t.waiter || (currentUser?.role === 'WAITER' ? currentUser.name : '');
+        const orderRef = t.orderRef || ('ORD-' + Date.now().toString().slice(-5));
         return {
           ...t,
           status: (t.status === 'billed' || t.status === 'free') ? 'hold' : t.status,
           cart: existingCart,
           waiter: assignedWaiter,
+          orderRef,
           orderCreatedBy: t.orderCreatedBy || currentUser?.name || 'Cashier',
           orderCreatedRole: t.orderCreatedRole || currentUser?.role || 'CASHIER',
           orderCreatedId: t.orderCreatedId || currentUser?.id,
@@ -4225,8 +4227,30 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return;
     }
 
+    // Determine unprinted items (items with unsentQty > 0)
+    const unprintedItems = table.cart.map(item => {
+      const alreadyPrintedQty = item.kotPrintedQty || (item.kotPrinted ? item.qty : 0);
+      const unsentQty = Math.max(0, item.qty - alreadyPrintedQty);
+      return {
+        ...item,
+        unsentQty
+      };
+    }).filter(i => i.unsentQty > 0);
 
-    // Mark all current items in cart as KOT printed
+    if (unprintedItems.length === 0) {
+      alert('All items in this table order have already been sent to the kitchen via KOT!');
+      return;
+    }
+
+    const orderRef = table.orderRef || ('ORD-' + Date.now().toString().slice(-5));
+    const nextKotCount = (table.kotCount || 0) + 1;
+    const isAddonKot = nextKotCount > 1;
+    const invoiceNo = isAddonKot 
+      ? `KOT-${orderRef}-#${nextKotCount} (ADD-ON)` 
+      : `KOT-${orderRef}`;
+    const dateTime = new Date().toLocaleString('en-US');
+
+    // Mark all current items in cart as KOT printed up to their current full quantity
     setData(prev => ({
       ...prev,
       tables: prev.tables.map(t => {
@@ -4244,6 +4268,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ...t,
           status: t.status === 'free' ? 'hold' : t.status,
           orderCreatedAt: t.orderCreatedAt || now,
+          orderRef,
+          kotCount: nextKotCount,
           cart: updatedCart
         };
       })
@@ -4251,9 +4277,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const agents = data.commissionAgents || DEFAULT_COMMISSION_AGENTS;
     const agent = agents.find(a => a.id === table.channelOrAgentId);
-    const subtotal = table.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const invoiceNo = 'KOT-' + Date.now().toString().slice(-5);
-    const dateTime = new Date().toLocaleString('en-US');
+
+    // Items specifically for this KOT dispatch (only newly added/unsent quantities)
+    const itemsToSend: TableCartItem[] = unprintedItems.map(i => ({
+      ...i,
+      qty: i.unsentQty
+    }));
+    const subtotal = itemsToSend.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
     const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
     const defaultPrimaryKotTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'KOT' || t.templateType === 'BOTH'))
@@ -4266,6 +4296,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (showModal) {
       setPrintableReceipt({
         invoiceNo,
+        orderRef,
+        kotSequence: nextKotCount,
+        isAddonKot,
         dateTime,
         tableName: table.name,
         tableZone: table.zone || 'Floor 1',
@@ -4273,7 +4306,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         customer: table.customer || 'Walk-in Customer',
         channelOrAgent: agent?.name || (table.channelOrAgentId !== 'dine_in' ? table.channelOrAgentId : undefined),
         channelCommissionPercent: agent?.commissionPercent,
-        items: table.cart,
+        items: itemsToSend,
         subtotal,
         discountDeduction: 0,
         discountType: 'taka',
@@ -4288,7 +4321,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } else {
       // Direct submit / print: dispatch directly to hardware printer in background
       const menuCatalog = Array.isArray(data?.menuItems) ? data.menuItems : [];
-      const enriched = table.cart.map(item => {
+      const enriched = itemsToSend.map(item => {
         const itemName = item.name ? String(item.name).trim() : '';
         const itemId = item.id != null ? String(item.id) : null;
         const menuObj = menuCatalog.find(m => {
@@ -4366,6 +4399,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         waiter: table.waiter || 'Staff',
         customer: table.customer || 'Walk-in Customer',
         invoiceNo,
+        orderRef,
+        kotSequence: nextKotCount,
+        isAddonKot,
         dateTime,
         showPrices: isGlobalKotPricesEnabled,
         showWaiter: defaultPrimaryKotTemplate?.showWaiter !== false,
@@ -4663,7 +4699,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           orderCreatedId: undefined,
           orderCreatedAt: undefined,
           billedAt: undefined,
-          billedAtTime: undefined
+          billedAtTime: undefined,
+          orderRef: undefined,
+          kotCount: 0,
+          billCount: 0
         } : t)
       };
     });
@@ -4794,11 +4833,21 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const billNow = Date.now();
     const billTimeStr = new Date(billNow).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
+    const orderRef = table.orderRef || ('ORD-' + Date.now().toString().slice(-5));
+    const nextBillCount = (table.billCount || 0) + 1;
+    const isUpdatedBill = nextBillCount > 1;
+    const billInvoiceNo = isUpdatedBill 
+      ? `BILL-${orderRef}-v${nextBillCount} (UPDATED)` 
+      : `BILL-${orderRef}-v1`;
+    const billDateTime = new Date().toLocaleString('en-US');
+
     setData(prev => ({
       ...prev,
       tables: prev.tables.map(t => t.id === tableId ? { 
         ...t, 
         status: 'billed',
+        orderRef,
+        billCount: nextBillCount,
         billedAt: t.billedAt || billNow,
         billedAtTime: t.billedAtTime || billTimeStr
       } : t)
@@ -4834,9 +4883,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const commissionAmount = agent ? Math.round((subtotal * agent.commissionPercent) / 100) : 0;
     const netRestaurantRevenue = Math.max(0, netTotal - commissionAmount);
 
-    const billInvoiceNo = 'BILL-' + Date.now().toString().slice(-6);
-    const billDateTime = new Date().toLocaleString('en-US');
-
     const allTemplates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : DEFAULT_PRINT_TEMPLATES;
     const defaultPrimaryBillTemplate = allTemplates.find(t => t.isActive && t.isDefault && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
       || allTemplates.find(t => t.isActive && (t.templateType === 'BILL' || t.templateType === 'BOTH'))
@@ -4848,6 +4894,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
       invoiceNo: billInvoiceNo,
+      orderRef,
+      billVersion: nextBillCount,
       dateTime: billDateTime,
       tableName: table.name,
       tableZone: table.zone || 'Floor 1',
@@ -5173,7 +5221,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           orderCreatedId: undefined,
           orderCreatedAt: undefined,
           billedAt: undefined,
-          billedAtTime: undefined
+          billedAtTime: undefined,
+          orderRef: undefined,
+          kotCount: 0,
+          billCount: 0
         } : t)
       };
     });
@@ -5195,6 +5246,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       restaurantHotline: data.restaurantProfile?.phone || DEFAULT_RESTAURANT_PROFILE.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || DEFAULT_RESTAURANT_PROFILE.binOrVat || '0029381-01',
       invoiceNo,
+      orderRef: table.orderRef,
       dateTime: new Date().toLocaleString('en-US'),
       tableName: table.name,
       tableZone: table.zone || 'Floor 1',

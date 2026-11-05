@@ -857,6 +857,13 @@ export const ThermalBillModal: React.FC = () => {
           </div>
         </div>
 
+        {/* Running Order Add-on Notice */}
+        {printableReceipt.isAddonKot && !isCancelKot && (
+          <div className="my-2 p-1.5 bg-blue-50 border border-blue-200 text-blue-900 rounded text-center text-xs font-bold">
+            ⚡ RUNNING ADD-ON (EXTRA ITEM / QTY)
+          </div>
+        )}
+
         {/* Cancel Warning Box if Cancel Kot */}
         {isCancelKot && (
           <div className="my-2 p-1.5 bg-rose-600 text-white rounded text-center text-xs font-bold">
@@ -1279,9 +1286,16 @@ export const ThermalBillModal: React.FC = () => {
 
               {/* Invoice Info with Table & Zone */}
               <div className="py-2 border-b border-dashed border-slate-300 space-y-1 text-[11px]">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-500">Invoice No:</span>
-                  <span className="font-bold">{printableReceipt.invoiceNo}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    <span className="font-bold">{printableReceipt.invoiceNo}</span>
+                    {printableReceipt.billVersion && printableReceipt.billVersion > 1 && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-100 text-blue-900 border border-blue-200">
+                        Rev #{printableReceipt.billVersion}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {activeTemplate?.showDateTime !== false && (
                   <div className="flex justify-between">

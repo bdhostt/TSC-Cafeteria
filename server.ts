@@ -358,6 +358,9 @@ async function startServer() {
     pushStr(`STATION: ${cleanStation.toUpperCase()}\n`);
     const invoiceVal = (req.invoiceNo || 'KOT-0000') + (total > 1 ? `-${index}` : '');
     pushStr(`KOT NO: ${invoiceVal}\n`);
+    if ((req as any).isAddonKot) {
+      pushStr(`** RUNNING ORDER ADD-ON **\n`);
+    }
     if (slip.category) {
       pushStr(`Category: ${slip.category}\n`);
     }
@@ -1723,7 +1726,7 @@ async function startServer() {
           console.log(` ➔ Printing KOT Slip ${i + 1}/${slips.length} on "${targetPrinter}"...`);
 
           const rawBuffer = buildKotEscPosBuffer(
-            { tableName, tableZone, waiter, customer, invoiceNo, dateTime, showPrices: req.body.showPrices, showWaiter: req.body.showWaiter, showCustomer: req.body.showCustomer, showDateTime: req.body.showDateTime, paperWidth: req.body.paperWidth },
+            { tableName, tableZone, waiter, customer, invoiceNo, dateTime, showPrices: req.body.showPrices, showWaiter: req.body.showWaiter, showCustomer: req.body.showCustomer, showDateTime: req.body.showDateTime, paperWidth: req.body.paperWidth, isAddonKot: req.body.isAddonKot },
             slip,
             i + 1,
             slips.length,
