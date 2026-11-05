@@ -620,6 +620,9 @@ function buildBillEscPosBuffer(bill) {
   // 4. Left & Right Justified: Invoice Metadata (Flush to margins)
   pushBytes([0x1B, 0x61, 0x00]);
   pushStr(line2Col('Invoice No :', bill.invoiceNo || 'INV-0000', width));
+  if (bill.orderRef) {
+    pushStr(line2Col('Order Ref :', bill.orderRef, width));
+  }
 
   let dateStr = '';
   let timeStr = '';

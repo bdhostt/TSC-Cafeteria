@@ -1297,6 +1297,12 @@ export const ThermalBillModal: React.FC = () => {
                     )}
                   </div>
                 </div>
+                {printableReceipt.orderRef && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Order Ref:</span>
+                    <span className="font-semibold text-slate-800">{printableReceipt.orderRef}</span>
+                  </div>
+                )}
                 {activeTemplate?.showDateTime !== false && (
                   <div className="flex justify-between">
                     <span><span className="text-slate-500">Date :</span> <span className="font-semibold text-slate-800">{receiptDateStr}</span></span>

@@ -4838,7 +4838,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const isUpdatedBill = nextBillCount > 1;
     const billInvoiceNo = isUpdatedBill 
       ? `BILL-${orderRef}-v${nextBillCount} (UPDATED)` 
-      : `BILL-${orderRef}-v1`;
+      : `BILL-${orderRef}`;
     const billDateTime = new Date().toLocaleString('en-US');
 
     setData(prev => ({
