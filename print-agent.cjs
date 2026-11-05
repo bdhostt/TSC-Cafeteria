@@ -5,6 +5,18 @@ const path = require('path');
 const net = require('net');
 const { exec, execFile } = require('child_process');
 
+const LOG_FILE = path.join(__dirname, 'agent.log');
+function writeToLog(type, ...args) {
+  const line = `[${new Date().toLocaleTimeString('en-US')}] [${type}] ` + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n';
+  try { fs.appendFileSync(LOG_FILE, line); } catch (e) {}
+}
+const origLog = console.log;
+const origErr = console.error;
+const origWarn = console.warn;
+console.log = (...args) => { origLog(...args); writeToLog('INFO', ...args); };
+console.error = (...args) => { origErr(...args); writeToLog('ERROR', ...args); };
+console.warn = (...args) => { origWarn(...args); writeToLog('WARN', ...args); };
+
 const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://posdemo.bdhostt.com').replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 250;
