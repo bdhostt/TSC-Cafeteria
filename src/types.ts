@@ -154,6 +154,9 @@ export interface Table {
   linkedInvoiceNo?: string;
   isPaidOrder?: boolean;
   paidAmount?: number;
+  orderRef?: string;
+  kotCount?: number;
+  billCount?: number;
 }
 
 export interface Session {
@@ -415,6 +418,7 @@ export interface SaleRecord {
   id: number;
   date: string;
   invoiceNo: string;
+  orderRef?: string;
   details: string;
   subtotal?: number;
   items?: TableCartItem[];
@@ -748,6 +752,10 @@ export interface AppData {
 
 export interface PrintableReceipt {
   invoiceNo: string;
+  orderRef?: string;
+  kotSequence?: number;
+  isAddonKot?: boolean;
+  billVersion?: number;
   dateTime: string;
   tableName: string;
   tableZone?: string;

@@ -537,11 +537,6 @@ export const PrintersConfigView: React.FC = () => {
                     </span>
                   </div>
 
-                  {!printer.isActive && (
-                    <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black border border-rose-200">
-                      Inactive
-                    </span>
-                  )}
                   {printer.isDefault && (
                     <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-200">
                       Default

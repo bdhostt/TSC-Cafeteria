@@ -39,6 +39,9 @@ export const SalesLedgerView: React.FC = () => {
     setPrintableReceipt, 
     currentUser 
   } = useRestaurant();
+  const hasActiveBillPrinter = Boolean(
+    (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+  );
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -285,12 +288,24 @@ export const SalesLedgerView: React.FC = () => {
     const subtotal = sale.subtotal || sale.total;
     const discountDeduction = Math.max(0, subtotal - sale.total);
 
+    let orderRef = sale.orderRef;
+    if (!orderRef && detailsStr) {
+      const refMatch = detailsStr.match(/Ref:\s*([^):]+)/i);
+      if (refMatch) {
+        orderRef = refMatch[1].trim();
+      }
+    }
+    if (!orderRef) {
+      orderRef = sale.invoiceNo ? 'ORD-' + sale.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001';
+    }
+
     setPrintableReceipt({
       restaurantName: data.restaurantProfile?.name || 'BD HOSTT POS',
       restaurantAddress: data.restaurantProfile?.address || 'Chattogram, Bangladesh',
       restaurantHotline: data.restaurantProfile?.phone || '+880 1756-007600',
       restaurantBin: data.restaurantProfile?.binOrVat || '0029381-01',
       invoiceNo: sale.invoiceNo || `POS-${sale.id}`,
+      orderRef,
       dateTime: sale.date || new Date().toISOString().split('T')[0],
       tableName,
       tableZone,
@@ -694,7 +709,7 @@ export const SalesLedgerView: React.FC = () => {
                   return (
                     <tr 
                       key={sale.id} 
-                      onClick={() => handleOpenReceipt(sale, 'PAID_MEMO')}
+                      onClick={() => hasActiveBillPrinter && handleOpenReceipt(sale, 'PAID_MEMO')}
                       className={`transition cursor-pointer group ${
                         active 
                           ? 'hover:bg-amber-50/70' 
@@ -707,9 +722,14 @@ export const SalesLedgerView: React.FC = () => {
                           active ? 'text-slate-900 group-hover:text-blue-700' : 'text-slate-500'
                         }`}>
                           <span>{sale.invoiceNo}</span>
-                          <ReceiptText className="w-3 h-3 text-blue-500 opacity-0 group-hover:opacity-100 transition shrink-0" />
+                          {hasActiveBillPrinter && <ReceiptText className="w-3 h-3 text-blue-500 opacity-0 group-hover:opacity-100 transition shrink-0" />}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono">{sale.date}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-slate-500 font-mono">{sale.date}</span>
+                          <span className="text-[9px] px-1 py-0.2 rounded font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            {sale.orderRef || (sale.details?.match(/Ref:\s*([^):]+)/i)?.[1]?.trim()) || (sale.invoiceNo ? 'ORD-' + sale.invoiceNo.replace(/\D/g, '').slice(-5) : 'ORD-00001')}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 max-w-xs">
                         <div className="text-slate-800 font-medium line-clamp-1 group-hover:text-slate-900">{sale.details}</div>
@@ -811,15 +831,19 @@ export const SalesLedgerView: React.FC = () => {
                               >
                                 Restore
                               </button>
-                              <span className="text-slate-300">•</span>
-                              <button
-                                type="button"
-                                onClick={() => handlePrintVoidSlip(sale)}
+                              {hasActiveBillPrinter && (
+                                <>
+                                  <span className="text-slate-300">•</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePrintVoidSlip(sale)}
                                 className="text-[10px] text-rose-600 hover:text-rose-800 underline font-medium cursor-pointer"
                                 title="Print Void Receipt / Slip"
                               >
                                 Slip
                               </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         )}
@@ -868,14 +892,16 @@ export const SalesLedgerView: React.FC = () => {
                               >
                                 <UserCheck className="w-3.5 h-3.5" />
                               </button>
+                              {hasActiveBillPrinter && (
                               <button
                                 type="button"
-                                onClick={() => handleOpenReceipt(sale, 'PAID_MEMO')}
+                                onClick={() => hasActiveBillPrinter && handleOpenReceipt(sale, 'PAID_MEMO')}
                                 className="p-1.5 text-blue-600 hover:text-blue-800 rounded-lg hover:bg-blue-100/70 transition cursor-pointer"
                                 title="View & Print Bill / Cash Memo Receipt"
                               >
                                 <ReceiptText className="w-3.5 h-3.5" />
                               </button>
+                            )}
                             </>
                           )}
                           <button

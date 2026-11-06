@@ -9,23 +9,25 @@ export async function dispatchHardwarePrint(endpoint: string, payload: any): Pro
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-  // 1. Instant Local Agent Dispatch (Try local agent on 127.0.0.1:9123 first for 0ms latency)
-  try {
-    const localUrl = `http://127.0.0.1:9123${endpoint}`;
-    const localRes = await fetch(localUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(800)
-    });
-    if (localRes.ok) {
-      const data = await localRes.json().catch(() => ({}));
-      if (data && data.success === true) {
-        return true;
+  // 1. Instant Local Agent Dispatch (only attempt when on localhost or plain HTTP to avoid mixed-content hang)
+  if (!isHttps || isLocalhost) {
+    try {
+      const localUrl = `http://127.0.0.1:9123${endpoint}`;
+      const localRes = await fetch(localUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(600)
+      });
+      if (localRes.ok) {
+        const data = await localRes.json().catch(() => ({}));
+        if (data && data.success === true) {
+          return true;
+        }
       }
+    } catch {
+      // Local agent unavailable, fallback to cloud queue
     }
-  } catch {
-    // Local agent unavailable or blocked by browser policy on remote device, fallback immediately to cloud queue
   }
 
   // 2. Cloud Server Queue Fallback

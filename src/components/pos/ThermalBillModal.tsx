@@ -56,7 +56,11 @@ export const ThermalBillModal: React.FC = () => {
   }
 
   // Available configured printers & templates
-  const printers = (data?.printers && data.printers.length > 0) ? data.printers : [];
+const allPrinters = (data?.printers && data.printers.length > 0) ? data.printers : [];
+  const printers = useMemo(() => allPrinters.filter(p => p.isActive), [allPrinters]);
+  const hasActiveKotPrinter = useMemo(() => allPrinters.some(p => p.isActive && (p.type === 'KOT' || p.type === 'ALL')), [allPrinters]);
+  const hasActiveBillPrinter = useMemo(() => allPrinters.some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL')), [allPrinters]);
+  const hasMatchingActivePrinter = isKot ? hasActiveKotPrinter : hasActiveBillPrinter;
   const templates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : [];
 
   // Match items with their menu catalog department & category
@@ -130,12 +134,7 @@ export const ThermalBillModal: React.FC = () => {
   // Initial matched printer
   const defaultMatchedPrinter = useMemo(() => {
     const targetType = isKot ? 'KOT' : 'BILL';
-    const found = printers.find(p => p.isActive && p.isDefault && (p.type === targetType || p.type === 'ALL'))
-      || printers.find(p => p.isActive && (p.type === targetType || p.type === 'ALL'))
-      || printers.find(p => p.isActive && p.isDefault)
-      || printers.find(p => p.isActive)
-      || printers[0]
-      || null;
+    const found = printers.find(p => p.isActive && (p.type === targetType || p.type === 'ALL'));
     return found || printers[0] || null;
   }, [printers, isKot]);
 
@@ -414,6 +413,9 @@ export const ThermalBillModal: React.FC = () => {
       kotLines.push(centerLine(`STATION: ${stationName}`, width));
       const invoiceVal = (printableReceipt.invoiceNo || 'KOT-0000') + (isCancelKot ? ' (VOID)' : '');
       kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${invoiceVal}`, width));
+      if (printableReceipt.isAddonKot) {
+        kotLines.push(centerLine('** RUNNING ORDER (NEW ORDER) **', width));
+      }
       kotLines.push(divider);
 
       // Metadata (Left and Right flush)
@@ -590,7 +592,9 @@ export const ThermalBillModal: React.FC = () => {
     }
 
     // CUSTOMER BILL / CASH MEMO (Standard 48-col 80mm or 32-col 58mm receipt)
-    const titleText = activeTemplate?.headerTitle || printableReceipt.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'INVOICE / GUEST BILL');
+    const titleText = printableReceipt.isSettled 
+      ? (printableReceipt.headerTitle && printableReceipt.headerTitle.includes('PAID') ? printableReceipt.headerTitle : 'PAID CASH MEMO')
+      : (activeTemplate?.headerTitle || printableReceipt.headerTitle || 'INVOICE / GUEST BILL');
     const lines: string[] = [];
 
     lines.push(centerLine(restaurantName || 'BD HOSTT POS', width));
@@ -863,6 +867,13 @@ export const ThermalBillModal: React.FC = () => {
             {isCancelKot ? 'VOID KOT #' : 'KOT #'} {printableReceipt.invoiceNo}{ticketIndex ? `-${ticketIndex}` : ''}
           </div>
         </div>
+
+        {/* Running Order Add-on Notice */}
+        {printableReceipt.isAddonKot && !isCancelKot && (
+          <div className="my-2 p-1.5 bg-blue-50 border border-blue-200 text-blue-900 rounded text-center text-xs font-bold">
+            ⚡ RUNNING (NEW ORDER)
+          </div>
+        )}
 
         {/* Cancel Warning Box if Cancel Kot */}
         {isCancelKot && (
@@ -1280,16 +1291,24 @@ export const ThermalBillModal: React.FC = () => {
                   </p>
                 )}
                 <div className="mt-2 inline-block px-2 py-0.5 bg-slate-200 text-slate-800 rounded text-[10px] font-bold uppercase tracking-wider font-sans">
-                  {activeTemplate?.headerTitle || (printableReceipt.isSettled ? 'PAID CASH MEMO' : 'TABLE RUNNING BILL')}
+                  {printableReceipt.isSettled ? 'PAID CASH MEMO' : (activeTemplate?.headerTitle || 'TABLE RUNNING BILL')}
                 </div>
               </div>
 
               {/* Invoice Info with Table & Zone */}
               <div className="py-2 border-b border-dashed border-slate-300 space-y-1 text-[11px]">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-500">Invoice No:</span>
-                  <span className="font-bold">{printableReceipt.invoiceNo}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    <span className="font-bold">{printableReceipt.invoiceNo}</span>
+                    {printableReceipt.billVersion && printableReceipt.billVersion > 1 && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-100 text-blue-900 border border-blue-200">
+                        Rev #{printableReceipt.billVersion}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
                 {activeTemplate?.showDateTime !== false && (
                   <div className="flex justify-between">
                     <span><span className="text-slate-500">Date :</span> <span className="font-semibold text-slate-800">{receiptDateStr}</span></span>
@@ -1526,9 +1545,18 @@ export const ThermalBillModal: React.FC = () => {
             </button>
           )}
 
-          <button
-            type="button"
-            id="btn-trigger-print"
+          {!hasMatchingActivePrinter ? (
+            <div
+              className="flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm bg-slate-200 text-slate-500 flex items-center justify-center gap-2 cursor-not-allowed border border-slate-300"
+              title={isKot ? "No active KOT printer configured in Settings" : "No active Bill printer configured in Settings"}
+            >
+              <Printer className="w-4 h-4 text-slate-400" />
+              <span>{isKot ? "KOT Printer Inactive" : "Bill Printer Inactive"}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              id="btn-trigger-print"
             disabled={isPrinting}
             onClick={handlePrint}
             className={`flex-1 py-3 px-4 rounded-xl font-black text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
@@ -1559,6 +1587,7 @@ export const ThermalBillModal: React.FC = () => {
               </>
             )}
           </button>
+          )}
 
           <button
             type="button"
