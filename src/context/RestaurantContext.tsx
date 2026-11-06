@@ -2465,6 +2465,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const applyIncomingTables = (incomingTables: Table[], newSale?: SaleRecord, serverTimestamp?: number) => {
     if (!Array.isArray(incomingTables)) return;
 
+    // Protection against race condition / stale snapshot pulse flicker:
+    // If local user made an edit in the last 2.5 seconds, do not overwrite local tables from an incoming pulse
+    const isRecentlyEditedLocally = (Date.now() - (lastLocalEditTimeRef.current || 0)) < 2500;
+    if (isRecentlyEditedLocally) {
+      if (serverTimestamp && serverTimestamp > (lastSyncedTimestampRef.current || 0)) {
+        lastSyncedTimestampRef.current = serverTimestamp;
+      }
+      return;
+    };
+
     const curTablesStr = JSON.stringify(dataRef.current.tables);
     const inTablesStr = JSON.stringify(incomingTables);
     if (curTablesStr === inTablesStr && (!newSale || dataRef.current.sales?.some(s => s.invoiceNo === newSale.invoiceNo))) {
