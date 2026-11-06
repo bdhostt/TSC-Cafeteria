@@ -2466,8 +2466,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!Array.isArray(incomingTables)) return;
 
     // Protection against race condition / stale snapshot pulse flicker:
-    // If local user made an edit in the last 2.5 seconds, do not overwrite local tables from an incoming pulse
-    const isRecentlyEditedLocally = (Date.now() - (lastLocalEditTimeRef.current || 0)) < 2500;
+    // If local user made an edit in the last 4 seconds, do not overwrite local tables from an incoming pulse
+    const isRecentlyEditedLocally = (Date.now() - (lastLocalEditTimeRef.current || 0)) < 4000;
     if (isRecentlyEditedLocally) {
       if (serverTimestamp && serverTimestamp > (lastSyncedTimestampRef.current || 0)) {
         lastSyncedTimestampRef.current = serverTimestamp;
@@ -4230,6 +4230,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       alert('Please select a waiter for this table!');
       return;
     }
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       tables: prev.tables.map(t => t.id === tableId ? { ...t, status: 'hold' } : t)
@@ -4304,6 +4305,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const dateTime = new Date().toLocaleString('en-US');
 
     // Mark all current items in cart as KOT printed up to their current full quantity
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       tables: prev.tables.map(t => {
@@ -4470,6 +4472,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const directSubmitKotAndHold = async (tableId: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     openPrintKot(tableId, false);
     setPosView('floor');
   };
@@ -4896,6 +4899,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       : posInvoiceNo;
     const billDateTime = new Date().toLocaleString('en-US');
 
+    lastLocalEditTimeRef.current = Date.now();
     setData(prev => ({
       ...prev,
       tables: prev.tables.map(t => t.id === tableId ? { 
@@ -5012,6 +5016,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const directPrintBill = async (tableId: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     openPrintBill(tableId, false);
   };
 

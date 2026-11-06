@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "tsx watch server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --minify --outfile=dist/server.cjs",
+    "pack:cpanel": "node scripts/pack-cpanel.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist', {recursive:true,force:true}); if(fs.existsSync('server.js')) fs.unlinkSync('server.js');\"",

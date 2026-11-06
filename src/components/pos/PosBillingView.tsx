@@ -215,11 +215,9 @@ export const PosBillingView: React.FC = () => {
   const [voidingItem, setVoidingItem] = useState<{ item: TableCartItem; index: number } | null>(null);
   const [releasingTable, setReleasingTable] = useState<Table | null>(null);
   const [selectedDishForCustomization, setSelectedDishForCustomization] = useState<MenuItem | null>(null);
-  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
-  const [pendingUnlockDish, setPendingUnlockDish] = useState<MenuItem | null>(null);
+  // Billed table is strictly locked in POS
   const canUnlockBilledTable = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' || Boolean(currentUser?.canEditSubmittedOrders);
   const [assigningTable, setAssigningTable] = useState<Table | null>(null);
-  const [billedTablePrompt, setBilledTablePrompt] = useState<Table | null>(null);
   const [isSubmittingKot, setIsSubmittingKot] = useState(false);
 
   // Special Note for Cart Item
@@ -238,15 +236,6 @@ export const PosBillingView: React.FC = () => {
   }, []);
 
   const handleTableCardClick = (table: Table) => {
-    if (table.status === 'billed') {
-      if (canUnlockBilledTable) {
-        setBilledTablePrompt(table);
-        return;
-      } else {
-        alert("This table's bill has already been printed. Awaiting payment settlement.");
-        return;
-      }
-    }
     selectTable(table.id);
   };
 
@@ -1084,12 +1073,7 @@ export const PosBillingView: React.FC = () => {
                   id={`menu-item-btn-${dish.id}`}
                   onClick={() => {
                     if (activeTable?.status === 'billed') {
-                      if (canUnlockBilledTable) {
-                        setPendingUnlockDish(dish);
-                        setIsUnlockModalOpen(true);
-                      } else {
-                        alert('এই টেবিলের বিল প্রস্তুত ও লকড রয়েছে। নতুন আইটেম যোগ করতে হলে অ্যাডমিন বা ম্যানেজারের আনলক পারমিশন প্রয়োজন।');
-                      }
+                      alert('This table is already billed and locked. Adding items is disabled. Please settle payment.');
                       return;
                     }
                     if (hasOptions) {
@@ -1258,24 +1242,10 @@ export const PosBillingView: React.FC = () => {
                     )}
                   </div>
                   <div className="text-[10.5px] text-amber-800 font-medium">
-                    বিল প্রিন্ট সম্পন্ন। নতুন আইটেম যোগ করতে চাইলে টেবিলটি আনলক করুন।
+                    বিল প্রিন্ট সম্পন্ন ও টেবিল লক করা আছে। পেমেন্ট সেটেল করুন।
                   </div>
                 </div>
               </div>
-              {canUnlockBilledTable && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPendingUnlockDish(null);
-                    setIsUnlockModalOpen(true);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-[11px] flex items-center gap-1.5 shadow cursor-pointer transition shrink-0 ml-2"
-                  title="Unlock table to add new items"
-                >
-                  <Unlock className="w-3.5 h-3.5" />
-                  <span>আনলক করুন</span>
-                </button>
-              )}
             </div>
           )}
 
@@ -1727,9 +1697,14 @@ export const PosBillingView: React.FC = () => {
               <button
                 id="btn-submit-pos-order"
                 type="button"
-                disabled={activeTable.cart.length === 0}
-                onClick={() => {
-                  directSubmitKotAndHold(activeTable.id);
+                disabled={activeTable.cart.length === 0 || isSubmittingKot}
+                onClick={async () => {
+                  setIsSubmittingKot(true);
+                  try {
+                    await directSubmitKotAndHold(activeTable.id);
+                  } finally {
+                    setIsSubmittingKot(false);
+                  }
                 }}
                 className="py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] sm:text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer w-full"
                 title="Submit Order: Sends KOT to Kitchen & Holds Order on Table"
@@ -1909,138 +1884,9 @@ export const PosBillingView: React.FC = () => {
         />
       )}
 
-      {/* Unlock Billed Table Confirmation Modal */}
-      {isUnlockModalOpen && activeTable && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
-            <div className="p-5 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex items-center gap-3">
-              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs">
-                <Lock className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-black text-base">টেবিল বিল লক করা আছে</h3>
-                <p className="text-amber-100 text-xs font-semibold">
-                  {activeTable.name} • {activeTable.zone || 'Floor 1'} • Invoice: {activeTable.linkedInvoiceNo || 'N/A'}
-                </p>
-              </div>
-            </div>
-            <div className="p-5 space-y-3 text-slate-700">
-              <p className="text-sm leading-relaxed font-medium">
-                এই টেবিলের বিল অলরেডি প্রিন্ট হয়ে গেছে।
-                {pendingUnlockDish ? (
-                  <>
-                    <br />
-                    আপনি <b>{pendingUnlockDish.name}</b> যোগ করতে চেয়েছেন।
-                  </>
-                ) : null}
-              </p>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-semibold space-y-1">
-                <div>❓ <b>আপনি কি টেবিলটি আনলক করে এই একই ইনভয়েসে নতুন আইটেম যোগ করতে চান?</b></div>
-                <div className="text-[11px] text-amber-700 font-normal">
-                  • আনলক করলে একই ইনভয়েস নম্বর <b>({activeTable.linkedInvoiceNo})</b> বজায় থাকবে।<br />
-                  • নতুন আইটেমের জন্য কিচেনে KOT <b>(NEW ORDER)</b> হিসেবে যাবে।
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsUnlockModalOpen(false);
-                  setPendingUnlockDish(null);
-                }}
-                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer transition"
-              >
-                না, লকড রাখুন (শুধু পেমেন্ট)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  unlockBilledTable(activeTable.id);
-                  setIsUnlockModalOpen(false);
-                  if (pendingUnlockDish) {
-                    const dish = pendingUnlockDish;
-                    setPendingUnlockDish(null);
-                    const hasOptions = (dish.variations && dish.variations.length > 0) || (dish.addons && dish.addons.length > 0);
-                    if (hasOptions) {
-                      setSelectedDishForCustomization(dish);
-                    } else {
-                      addToCart(activeTable.id, dish.id);
-                    }
-                  }
-                }}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-xs shadow flex items-center gap-1.5 cursor-pointer transition"
-              >
-                <Unlock className="w-4 h-4" />
-                <span>হ্যাঁ, আনলক করুন</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
 
-            {/* English Prompt when Admin/Super Admin clicks a Billed Table */}
-      {billedTablePrompt && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200">
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm leading-tight text-white">
-                    Table Locked ({billedTablePrompt.name})
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-medium">
-                    {billedTablePrompt.zone || 'Floor 1'} • Invoice: {billedTablePrompt.linkedInvoiceNo || 'N/A'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setBilledTablePrompt(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-5 text-slate-700 space-y-3">
-              <p className="text-xs leading-relaxed text-slate-600 font-semibold">
-                This table is already billed. Do you want to unlock it to add new order items?
-              </p>
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const tId = billedTablePrompt.id;
-                    setBilledTablePrompt(null);
-                    selectTable(tId);
-                  }}
-                  className="py-2.5 px-3 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs text-center cursor-pointer transition shadow-2xs"
-                >
-                  No, Keep Billed
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const tId = billedTablePrompt.id;
-                    setBilledTablePrompt(null);
-                    unlockBilledTable(tId);
-                    selectTable(tId);
-                  }}
-                  className="py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs text-center cursor-pointer transition shadow-md flex items-center justify-center gap-1.5 active:scale-95"
-                >
-                  <Unlock className="w-3.5 h-3.5" />
-                  <span>Yes, Unlock Table</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+            
 
       {/* Release Table Modal */}
       {releasingTable && (
