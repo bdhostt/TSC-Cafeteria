@@ -44,6 +44,7 @@ import {
   BookOpen,
   ArrowRightLeft,
   Lock,
+  Unlock,
   Sun,
   Moon,
   LogOut,
