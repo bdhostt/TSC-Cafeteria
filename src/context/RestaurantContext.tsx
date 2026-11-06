@@ -5384,6 +5384,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       || printersList.find(p => p.isActive)
       || null;
 
+    const hasActiveBillPrinter = Boolean(
+      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+    );
+    if (hasActiveBillPrinter && (table.billCount || 0) === 0 && table.status !== 'billed') {
+      openPrintBill(tableId, false);
+    }
+
     if (defaultBillPrinter) {
       const memoPayload = {
         ...memoReceipt,
@@ -5403,9 +5410,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
     }
 
-    // Pop up Paid Cash Memo on screen for immediate visual verification and reprint
-    setPrintableReceipt(memoReceipt);
-
+    // Close settle modal without on-screen preview popup
     closeSettleModal();
     setPosView('floor');
   };
