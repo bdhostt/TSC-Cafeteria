@@ -219,6 +219,8 @@ export const PosBillingView: React.FC = () => {
   const [pendingUnlockDish, setPendingUnlockDish] = useState<MenuItem | null>(null);
   const canUnlockBilledTable = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' || Boolean(currentUser?.canEditSubmittedOrders);
   const [assigningTable, setAssigningTable] = useState<Table | null>(null);
+  const [billedTablePrompt, setBilledTablePrompt] = useState<Table | null>(null);
+  const [isSubmittingKot, setIsSubmittingKot] = useState(false);
 
   // Special Note for Cart Item
   const [editingNoteItem, setEditingNoteItem] = useState<{ item: TableCartItem; index: number } | null>(null);
@@ -234,6 +236,19 @@ export const PosBillingView: React.FC = () => {
     const timer = setInterval(() => setNowTime(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleTableCardClick = (table: Table) => {
+    if (table.status === 'billed') {
+      if (canUnlockBilledTable) {
+        setBilledTablePrompt(table);
+        return;
+      } else {
+        alert("This table's bill has already been printed. Awaiting payment settlement.");
+        return;
+      }
+    }
+    selectTable(table.id);
+  };
 
   // Floor Plan Filters
   const [selectedFloorZone, setSelectedFloorZone] = useState<string>('ALL');
@@ -821,16 +836,11 @@ export const PosBillingView: React.FC = () => {
                     /* Occupied / Hold / Billed Table */
                     <>
                       {/* Top: Name and Zone centered */}
-                      <div onClick={() => selectTable(table.id)} className="cursor-pointer flex flex-col items-center text-center">
+                      <div onClick={() => handleTableCardClick(table)} className="cursor-pointer flex flex-col items-center text-center">
                         <div className="flex items-center justify-center gap-1.5 max-w-full">
                           <h3 className={`${titleSize} font-black text-white truncate`}>
                             {table.name}
                           </h3>
-                          {isBilled && (
-                            <span className="p-0.5 rounded bg-amber-400 text-amber-950 shrink-0" title="Table is billed & locked">
-                              <Lock className="w-2.5 h-2.5" />
-                            </span>
-                          )}
                         </div>
                         <div className={`inline-flex items-center gap-1 font-bold text-blue-100 ${zoneBadgeClass}`}>
                           <MapPin className="w-2.5 h-2.5 shrink-0" />
@@ -839,7 +849,7 @@ export const PosBillingView: React.FC = () => {
                       </div>
 
                       {/* Middle: Cart Overview */}
-                      <div onClick={() => selectTable(table.id)} className={`cursor-pointer text-center ${isUltraCompact ? 'my-0.5' : isCompact ? 'my-1' : isLarge ? 'my-3' : 'my-2'}`}>
+                      <div onClick={() => handleTableCardClick(table)} className={`cursor-pointer text-center ${isUltraCompact ? 'my-0.5' : isCompact ? 'my-1' : isLarge ? 'my-3' : 'my-2'}`}>
                         <div className={`${isUltraCompact ? 'text-xs font-black' : isCompact ? 'text-sm font-black' : isLarge ? 'text-2xl font-black' : 'text-lg font-black'} text-white`}>
                           ৳ {tableSubtotal.toLocaleString()}
                         </div>
@@ -1725,7 +1735,7 @@ export const PosBillingView: React.FC = () => {
                 title="Submit Order: Sends KOT to Kitchen & Holds Order on Table"
               >
                 <ChefHat className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Submit (KOT)</span>
+                <span className="truncate">{isSubmittingKot ? 'Submitting...' : 'Submit (KOT)'}</span>
               </button>
             );
 
@@ -1856,7 +1866,7 @@ export const PosBillingView: React.FC = () => {
             const actionButtons: React.ReactNode[] = [];
             actionButtons.push(cancelBtn(false));
 
-            if (hasUnprintedKotItems && activeTableHasActiveKotPrinter) {
+            if ((hasUnprintedKotItems || isSubmittingKot) && activeTableHasActiveKotPrinter) {
               actionButtons.push(submitKotBtn);
             } else if (hasActiveBillPrinter) {
               actionButtons.push(printBillBtn(false));
@@ -1964,6 +1974,69 @@ export const PosBillingView: React.FC = () => {
                 <Unlock className="w-4 h-4" />
                 <span>হ্যাঁ, আনলক করুন</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+            {/* English Prompt when Admin/Super Admin clicks a Billed Table */}
+      {billedTablePrompt && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm leading-tight text-white">
+                    Table Locked ({billedTablePrompt.name})
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    {billedTablePrompt.zone || 'Floor 1'} • Invoice: {billedTablePrompt.linkedInvoiceNo || 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBilledTablePrompt(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 text-slate-700 space-y-3">
+              <p className="text-xs leading-relaxed text-slate-600 font-semibold">
+                This table is already billed. Do you want to unlock it to add new order items?
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tId = billedTablePrompt.id;
+                    setBilledTablePrompt(null);
+                    selectTable(tId);
+                  }}
+                  className="py-2.5 px-3 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs text-center cursor-pointer transition shadow-2xs"
+                >
+                  No, Keep Billed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tId = billedTablePrompt.id;
+                    setBilledTablePrompt(null);
+                    unlockBilledTable(tId);
+                    selectTable(tId);
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs text-center cursor-pointer transition shadow-md flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <Unlock className="w-3.5 h-3.5" />
+                  <span>Yes, Unlock Table</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
