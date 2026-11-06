@@ -236,6 +236,14 @@ export const PosBillingView: React.FC = () => {
   }, []);
 
   const handleTableCardClick = (table: Table) => {
+    if (table.status === 'billed') {
+      if (isWaiter) {
+        alert("This table's bill has already been printed. Awaiting payment settlement.");
+      } else {
+        openSettleModal(table.id);
+      }
+      return;
+    }
     selectTable(table.id);
   };
 
