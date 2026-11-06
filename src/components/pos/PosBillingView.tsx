@@ -179,6 +179,7 @@ export const PosBillingView: React.FC = () => {
     finishLinkedOrderInPos
   } = useRestaurant();
 
+  const activeTable = data.tables?.find(t => t.id === activeTableId) || data.tables?.[0];
   const isWaiter = currentUser?.role === 'WAITER';
   const hasActiveKotPrinter = Boolean(
     (data.printers || []).some(p => p.isActive && (p.type === 'KOT' || p.type === 'ALL'))
@@ -467,7 +468,6 @@ export const PosBillingView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const activeTable = data.tables.find(t => t.id === activeTableId) || data.tables[0];
   const allZones = data.tableZones && data.tableZones.length > 0 
     ? data.tableZones 
     : ['Floor 1', 'Floor 2', 'VIP Lounge', 'Rooftop Garden'];
