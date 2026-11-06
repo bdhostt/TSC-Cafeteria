@@ -1966,7 +1966,7 @@ export const PosBillingView: React.FC = () => {
             </div>
           </div>
         </div>
-      
+      )}
 
       {/* Release Table Modal */}
       {releasingTable && (
