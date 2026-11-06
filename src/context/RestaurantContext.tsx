@@ -2269,6 +2269,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const lastSyncedStringRef = useRef<string>("");
   const lastSyncedTimestampRef = useRef<number>(0);
+  const lastFullSyncTimestampRef = useRef<number>(0);
   const isUpdatingFromSync = useRef<boolean>(false);
   const isInitialSyncDoneRef = useRef<boolean>(false);
   const lastLocalEditTimeRef = useRef<number>(0);
@@ -2402,6 +2403,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       lastSyncedStringRef.current = serverStateStr;
       if (serverTimestamp) {
         lastSyncedTimestampRef.current = serverTimestamp;
+        lastFullSyncTimestampRef.current = serverTimestamp;
         try {
           localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(serverTimestamp));
         } catch {}
@@ -2467,13 +2469,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Protection against race condition / stale snapshot pulse flicker:
     // If local user made an edit in the last 4 seconds, do not overwrite local tables from an incoming pulse
-    const isRecentlyEditedLocally = (Date.now() - (lastLocalEditTimeRef.current || 0)) < 4000;
-    if (isRecentlyEditedLocally) {
+    const isRecentlyEditedLocally = (Date.now() - (lastLocalEditTimeRef.current || 0)) < 2500;
+    const isServerAhead = Boolean(serverTimestamp && serverTimestamp >= (lastLocalEditTimeRef.current || 0));
+    if (isRecentlyEditedLocally && !isServerAhead) {
       if (serverTimestamp && serverTimestamp > (lastSyncedTimestampRef.current || 0)) {
         lastSyncedTimestampRef.current = serverTimestamp;
       }
       return;
-    };
+    }
 
     const curTablesStr = JSON.stringify(dataRef.current.tables);
     const inTablesStr = JSON.stringify(incomingTables);
@@ -2652,9 +2655,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
         if (res.ok) {
           const json = await res.json();
-          if (json.changed && json.tables) {
-            applyIncomingTables(json.tables, undefined, json.timestamp);
-            if (json.salesCount && json.salesCount !== (dataRef.current.sales?.length || 0)) {
+          if (json.changed) {
+            if (json.tables) {
+              applyIncomingTables(json.tables, undefined, json.timestamp);
+            }
+            const hasFullUpdate = json.fullUpdateTimestamp && json.fullUpdateTimestamp > (lastFullSyncTimestampRef.current || 0);
+            const hasSalesMismatch = json.salesCount !== undefined && json.salesCount !== (dataRef.current.sales?.length || 0);
+            if (hasFullUpdate || hasSalesMismatch) {
               syncFromServer(false);
             }
           }
@@ -2721,11 +2728,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           } catch (e) {}
         }
 
-        // Debounced full state push to MongoDB/Disk (1.5s debounce so it never floods server)
+        // Instant zero-delay full state push to MongoDB/Disk (100ms micro-batch)
         if (debounceSyncTimerRef.current) clearTimeout(debounceSyncTimerRef.current);
         debounceSyncTimerRef.current = setTimeout(() => {
           syncToServer(data);
-        }, 1500);
+        }, 100);
       }
     } catch (e) {
       console.error("Error saving app data:", e);

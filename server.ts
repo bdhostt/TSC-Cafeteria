@@ -15,6 +15,7 @@ const STATE_FILE = path.join(process.cwd(), "restaurant_data.json");
 const STATE_KEY = "default_cafe_banani";
 let cachedState: any = null;
 let lastServerUpdate = 0;
+let lastFullStateUpdate = 0;
 let isLoadedFromMongo = false;
 
 // Try to load fallback state from JSON backup on startup (used only until MongoDB connects)
@@ -2041,6 +2042,7 @@ async function startServer() {
     return res.json({
       changed: true,
       timestamp: lastServerUpdate,
+      fullUpdateTimestamp: lastFullStateUpdate,
       tables: cachedState?.tables || [],
       salesCount: cachedState?.sales?.length || 0
     });
@@ -2052,7 +2054,7 @@ async function startServer() {
   app.get("/api/restaurant/state", async (req, res) => {
     try {
       const now = Date.now();
-      if (!cachedState || (now - lastMongoSyncCheck > 2500)) {
+      if (!cachedState || (now - lastMongoSyncCheck > 1000)) {
         if (!isDbConnected()) {
           await connectToDatabase();
         }
@@ -2102,6 +2104,7 @@ async function startServer() {
         normalizeLogo(clientData);
         cachedState = clientData;
         lastServerUpdate = Date.now();
+        lastFullStateUpdate = lastServerUpdate;
         lastMongoSyncCheck = lastServerUpdate;
 
         // Persist to MongoDB asynchronously in background without blocking HTTP response
