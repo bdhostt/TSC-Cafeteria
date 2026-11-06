@@ -186,6 +186,22 @@ export const PosBillingView: React.FC = () => {
   const hasActiveBillPrinter = Boolean(
     (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
   );
+  const activeTableHasActiveKotPrinter = useMemo(() => {
+    const activeKotPrinters = (data.printers || []).filter(p => p.isActive && (p.type === 'KOT' || p.type === 'ALL'));
+    if (activeKotPrinters.length === 0) return false;
+    if (!activeTable || !activeTable.cart || activeTable.cart.length === 0) return true;
+    const unprintedItems = activeTable.cart.filter(i => {
+      const alreadyPrintedQty = i.kotPrintedQty || (i.kotPrinted ? i.qty : 0);
+      return (i.qty - alreadyPrintedQty) > 0;
+    });
+    if (unprintedItems.length === 0) return false;
+    const hasGenericOrDef = activeKotPrinters.some(p => p.isDefault || !p.departments || p.departments.length === 0);
+    if (hasGenericOrDef) return true;
+    return unprintedItems.some(i => {
+      const dept = i.department || 'Main Kitchen';
+      return activeKotPrinters.some(p => p.departments?.includes(dept));
+    });
+  }, [data.printers, activeTable]);
   const isRoleAllowed = Boolean(currentUser?.role && (data.orderEditPermissions?.[currentUser.role] ?? (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'CASHIER')));
   const canCancelOrEditOrder = 
     currentUser?.role === 'ADMIN' || 
@@ -197,6 +213,9 @@ export const PosBillingView: React.FC = () => {
   const [voidingItem, setVoidingItem] = useState<{ item: TableCartItem; index: number } | null>(null);
   const [releasingTable, setReleasingTable] = useState<Table | null>(null);
   const [selectedDishForCustomization, setSelectedDishForCustomization] = useState<MenuItem | null>(null);
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
+  const [pendingUnlockDish, setPendingUnlockDish] = useState<MenuItem | null>(null);
+  const canUnlockBilledTable = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' || Boolean(currentUser?.canEditSubmittedOrders);
   const [assigningTable, setAssigningTable] = useState<Table | null>(null);
 
   // Special Note for Cart Item
@@ -802,9 +821,16 @@ export const PosBillingView: React.FC = () => {
                     <>
                       {/* Top: Name and Zone centered */}
                       <div onClick={() => selectTable(table.id)} className="cursor-pointer flex flex-col items-center text-center">
-                        <h3 className={`${titleSize} font-black text-white truncate`}>
-                          {table.name}
-                        </h3>
+                        <div className="flex items-center justify-center gap-1.5 max-w-full">
+                          <h3 className={`${titleSize} font-black text-white truncate`}>
+                            {table.name}
+                          </h3>
+                          {isBilled && (
+                            <span className="p-0.5 rounded bg-amber-400 text-amber-950 shrink-0" title="Table is billed & locked">
+                              <Lock className="w-2.5 h-2.5" />
+                            </span>
+                          )}
+                        </div>
                         <div className={`inline-flex items-center gap-1 font-bold text-blue-100 ${zoneBadgeClass}`}>
                           <MapPin className="w-2.5 h-2.5 shrink-0" />
                           <span className="truncate">{zoneLabel}</span>
@@ -906,7 +932,9 @@ export const PosBillingView: React.FC = () => {
           </div>
         )}
         {/* Release Table Modal (if triggered in floor view) */}
-        {releasingTable && (
+        
+
+      {releasingTable && (
           <ReleaseTableModal
             table={releasingTable}
             onClose={() => setReleasingTable(null)}
@@ -1045,7 +1073,12 @@ export const PosBillingView: React.FC = () => {
                   id={`menu-item-btn-${dish.id}`}
                   onClick={() => {
                     if (activeTable?.status === 'billed') {
-                      alert('This table order is already billed. You cannot add new items after the bill has been printed.');
+                      if (canUnlockBilledTable) {
+                        setPendingUnlockDish(dish);
+                        setIsUnlockModalOpen(true);
+                      } else {
+                        alert('এই টেবিলের বিল প্রস্তুত ও লকড রয়েছে। নতুন আইটেম যোগ করতে হলে অ্যাডমিন বা ম্যানেজারের আনলক পারমিশন প্রয়োজন।');
+                      }
                       return;
                     }
                     if (hasOptions) {
@@ -1196,6 +1229,42 @@ export const PosBillingView: React.FC = () => {
                 <Ban className="w-3 h-3" />
                 <span>Void Full Order</span>
               </button>
+            </div>
+          )}
+
+          {/* Billed Table Lock Alert Banner */}
+          {activeTable.status === 'billed' && !activeTable.linkedSaleId && (
+            <div className="mx-2 mt-1.5 p-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex items-center justify-between text-xs shadow-2xs shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-amber-600 text-white shrink-0">
+                  <Lock className="w-3.5 h-3.5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-1.5 font-black text-xs text-amber-900">
+                    <span>বিল প্রস্তুত ও টেবিল লকড</span>
+                    {activeTable.linkedInvoiceNo && (
+                      <span className="font-mono text-blue-900 bg-white px-1.5 py-0.2 rounded border border-amber-300 font-extrabold">{activeTable.linkedInvoiceNo}</span>
+                    )}
+                  </div>
+                  <div className="text-[10.5px] text-amber-800 font-medium">
+                    বিল প্রিন্ট সম্পন্ন। নতুন আইটেম যোগ করতে চাইলে টেবিলটি আনলক করুন।
+                  </div>
+                </div>
+              </div>
+              {canUnlockBilledTable && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingUnlockDish(null);
+                    setIsUnlockModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-[11px] flex items-center gap-1.5 shadow cursor-pointer transition shrink-0 ml-2"
+                  title="Unlock table to add new items"
+                >
+                  <Unlock className="w-3.5 h-3.5" />
+                  <span>আনলক করুন</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -1786,7 +1855,7 @@ export const PosBillingView: React.FC = () => {
             const actionButtons: React.ReactNode[] = [];
             actionButtons.push(cancelBtn(false));
 
-            if (hasUnprintedKotItems && hasActiveKotPrinter) {
+            if (hasUnprintedKotItems && activeTableHasActiveKotPrinter) {
               actionButtons.push(submitKotBtn);
             } else if (hasActiveBillPrinter) {
               actionButtons.push(printBillBtn(false));
@@ -1828,6 +1897,76 @@ export const PosBillingView: React.FC = () => {
           onClose={() => setVoidingItem(null)}
         />
       )}
+
+      {/* Unlock Billed Table Confirmation Modal */}
+      {isUnlockModalOpen && activeTable && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+            <div className="p-5 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex items-center gap-3">
+              <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs">
+                <Lock className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-black text-base">টেবিল বিল লক করা আছে</h3>
+                <p className="text-amber-100 text-xs font-semibold">
+                  {activeTable.name} • {activeTable.zone || 'Floor 1'} • Invoice: {activeTable.linkedInvoiceNo || 'N/A'}
+                </p>
+              </div>
+            </div>
+            <div className="p-5 space-y-3 text-slate-700">
+              <p className="text-sm leading-relaxed font-medium">
+                এই টেবিলের বিল অলরেডি প্রিন্ট হয়ে গেছে।
+                {pendingUnlockDish ? (
+                  <>
+                    <br />
+                    আপনি <b>{pendingUnlockDish.name}</b> যোগ করতে চেয়েছেন।
+                  </>
+                ) : null}
+              </p>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-semibold space-y-1">
+                <div>❓ <b>আপনি কি টেবিলটি আনলক করে এই একই ইনভয়েসে নতুন আইটেম যোগ করতে চান?</b></div>
+                <div className="text-[11px] text-amber-700 font-normal">
+                  • আনলক করলে একই ইনভয়েস নম্বর <b>({activeTable.linkedInvoiceNo})</b> বজায় থাকবে।<br />
+                  • নতুন আইটেমের জন্য কিচেনে KOT <b>(NEW ORDER)</b> হিসেবে যাবে।
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUnlockModalOpen(false);
+                  setPendingUnlockDish(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer transition"
+              >
+                না, লকড রাখুন (শুধু পেমেন্ট)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  unlockBilledTable(activeTable.id);
+                  setIsUnlockModalOpen(false);
+                  if (pendingUnlockDish) {
+                    const dish = pendingUnlockDish;
+                    setPendingUnlockDish(null);
+                    const hasOptions = (dish.variations && dish.variations.length > 0) || (dish.addons && dish.addons.length > 0);
+                    if (hasOptions) {
+                      setSelectedDishForCustomization(dish);
+                    } else {
+                      addToCart(activeTable.id, dish.id);
+                    }
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-xs shadow flex items-center gap-1.5 cursor-pointer transition"
+              >
+                <Unlock className="w-4 h-4" />
+                <span>হ্যাঁ, আনলক করুন</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      
 
       {/* Release Table Modal */}
       {releasingTable && (

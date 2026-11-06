@@ -1347,6 +1347,7 @@ interface RestaurantContextType {
   setTableChannel: (tableId: string, channelOrAgentId: string) => void;
   applyTablePromoCode: (tableId: string, promoCode: string) => boolean;
   holdTableOrder: (tableId: string) => void;
+  unlockBilledTable: (tableId: string) => void;
   updateGlobalTableDimensions: (dims: { width: number; height: number }) => void;
 
   // Commission Agents & Delivery Partners
@@ -3880,12 +3881,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (t.id !== tableId) return t;
         const assignedWaiter = t.waiter || (currentUser?.role === 'WAITER' ? currentUser.name : '');
         const orderRef = t.orderRef || ('ORD-' + Date.now().toString().slice(-5));
+        const linkedInvoiceNo = t.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
         return {
           ...t,
           status: t.status === 'free' ? 'hold' : t.status,
           cart: existingCart,
           waiter: assignedWaiter,
           orderRef,
+          linkedInvoiceNo,
           orderCreatedBy: t.orderCreatedBy || currentUser?.name || 'Cashier',
           orderCreatedRole: t.orderCreatedRole || currentUser?.role || 'CASHIER',
           orderCreatedId: t.orderCreatedId || currentUser?.id,
@@ -4225,6 +4228,24 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setPosView('floor');
   };
 
+  const unlockBilledTable = (tableId: string) => {
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => ({
+      ...prev,
+      tables: prev.tables.map(t => {
+        if (t.id === tableId) {
+          return {
+            ...t,
+            status: 'hold',
+            isBillPrinted: false
+          };
+        }
+        return t;
+      })
+    }));
+  };
+
+
   const updateGlobalTableDimensions = (dims: { width: number; height: number }) => {
     setData(prev => ({
       ...prev,
@@ -4266,8 +4287,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const orderRef = table.orderRef || ('ORD-' + Date.now().toString().slice(-5));
     const nextKotCount = (table.kotCount || 0) + 1;
     const isAddonKot = nextKotCount > 1;
+    const linkedInvoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
     const invoiceNo = isAddonKot 
-      ? `KOT-${orderRef}-#${nextKotCount} (ADD-ON)` 
+      ? `KOT-${orderRef}-#${nextKotCount} (NEW ORDER)` 
       : `KOT-${orderRef}`;
     const dateTime = new Date().toLocaleString('en-US');
 
@@ -4290,6 +4312,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           status: t.status === 'free' ? 'hold' : t.status,
           orderCreatedAt: t.orderCreatedAt || now,
           orderRef,
+          linkedInvoiceNo,
           kotCount: nextKotCount,
           cart: updatedCart
         };
@@ -4857,9 +4880,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const orderRef = table.orderRef || ('ORD-' + Date.now().toString().slice(-5));
     const nextBillCount = (table.billCount || 0) + 1;
     const isUpdatedBill = nextBillCount > 1;
+    const posInvoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
     const billInvoiceNo = isUpdatedBill 
-      ? `BILL-${orderRef}-v${nextBillCount} (UPDATED)` 
-      : `BILL-${orderRef}`;
+      ? `${posInvoiceNo}-v${nextBillCount}`
+      : posInvoiceNo;
     const billDateTime = new Date().toLocaleString('en-US');
 
     setData(prev => ({
@@ -4868,6 +4892,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ...t, 
         status: 'billed',
         orderRef,
+        linkedInvoiceNo: posInvoiceNo,
         billCount: nextBillCount,
         billedAt: t.billedAt || billNow,
         billedAtTime: t.billedAtTime || billTimeStr
@@ -5140,7 +5165,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const changeReturn = Math.max(0, totalEntered - netTotal);
     const cashRetained = Math.max(0, computedCash - changeReturn);
-    const invoiceNo = 'POS-' + Date.now().toString().slice(-6);
+    const invoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
     const effectiveOrderRef = table.orderRef 
       || (table.orderCreatedAt ? ('ORD-' + String(table.orderCreatedAt).slice(-5)) : ('ORD-' + Date.now().toString().slice(-5)));
     const today = (data.businessDay?.isOpen && data.businessDay.date) ? data.businessDay.date : (data.session?.startDate || new Date().toISOString().split('T')[0]);
@@ -7965,6 +7990,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setTableChannel,
       applyTablePromoCode,
       holdTableOrder,
+      unlockBilledTable,
       updateGlobalTableDimensions,
       addCommissionAgent,
       updateCommissionAgent,

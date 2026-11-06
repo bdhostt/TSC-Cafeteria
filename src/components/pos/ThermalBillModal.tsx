@@ -56,7 +56,11 @@ export const ThermalBillModal: React.FC = () => {
   }
 
   // Available configured printers & templates
-  const printers = (data?.printers && data.printers.length > 0) ? data.printers : [];
+const allPrinters = (data?.printers && data.printers.length > 0) ? data.printers : [];
+  const printers = useMemo(() => allPrinters.filter(p => p.isActive), [allPrinters]);
+  const hasActiveKotPrinter = useMemo(() => allPrinters.some(p => p.isActive && (p.type === 'KOT' || p.type === 'ALL')), [allPrinters]);
+  const hasActiveBillPrinter = useMemo(() => allPrinters.some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL')), [allPrinters]);
+  const hasMatchingActivePrinter = isKot ? hasActiveKotPrinter : hasActiveBillPrinter;
   const templates = (data?.printTemplates && data.printTemplates.length > 0) ? data.printTemplates : [];
 
   // Match items with their menu catalog department & category
@@ -408,7 +412,7 @@ export const ThermalBillModal: React.FC = () => {
       const invoiceVal = (printableReceipt.invoiceNo || 'KOT-0000') + (isCancelKot ? ' (VOID)' : '');
       kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${invoiceVal}`, width));
       if (printableReceipt.isAddonKot) {
-        kotLines.push(centerLine('** RUNNING ORDER ADD-ON **', width));
+        kotLines.push(centerLine('** RUNNING ORDER (NEW ORDER) **', width));
       }
       kotLines.push(divider);
 
@@ -865,7 +869,7 @@ export const ThermalBillModal: React.FC = () => {
         {/* Running Order Add-on Notice */}
         {printableReceipt.isAddonKot && !isCancelKot && (
           <div className="my-2 p-1.5 bg-blue-50 border border-blue-200 text-blue-900 rounded text-center text-xs font-bold">
-            ⚡ RUNNING ADD-ON (EXTRA ITEM / QTY)
+            ⚡ RUNNING (NEW ORDER)
           </div>
         )}
 
@@ -1539,9 +1543,18 @@ export const ThermalBillModal: React.FC = () => {
             </button>
           )}
 
-          <button
-            type="button"
-            id="btn-trigger-print"
+          {!hasMatchingActivePrinter ? (
+            <div
+              className="flex-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm bg-slate-200 text-slate-500 flex items-center justify-center gap-2 cursor-not-allowed border border-slate-300"
+              title={isKot ? "No active KOT printer configured in Settings" : "No active Bill printer configured in Settings"}
+            >
+              <Printer className="w-4 h-4 text-slate-400" />
+              <span>{isKot ? "KOT Printer Inactive" : "Bill Printer Inactive"}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              id="btn-trigger-print"
             disabled={isPrinting}
             onClick={handlePrint}
             className={`flex-1 py-3 px-4 rounded-xl font-black text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
@@ -1572,6 +1585,7 @@ export const ThermalBillModal: React.FC = () => {
               </>
             )}
           </button>
+          )}
 
           <button
             type="button"
