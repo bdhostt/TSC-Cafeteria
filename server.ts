@@ -327,7 +327,7 @@ async function startServer() {
 
   // Build ESC/POS binary buffer for a compact single-page KOT slip
   function buildKotEscPosBuffer(
-    req: { tableName: string; tableZone?: string; waiter?: string; customer?: string; invoiceNo: string; dateTime?: string; showPrices?: boolean; showWaiter?: boolean; showCustomer?: boolean; showDateTime?: boolean; paperWidth?: string },
+    req: { tableName: string; tableZone?: string; waiter?: string; customer?: string; invoiceNo: string; dateTime?: string; showPrices?: boolean; showWaiter?: boolean; showCustomer?: boolean; showDateTime?: boolean; paperWidth?: string; isAddonKot?: boolean },
     slip: { station: string; category?: string; showPrices?: boolean; showWaiter?: boolean; showCustomer?: boolean; showDateTime?: boolean; paperWidth?: string; items: { name: string; qty: number; price?: number; variation?: string; addons?: string[]; notes?: string }[] },
     index: number,
     total: number,

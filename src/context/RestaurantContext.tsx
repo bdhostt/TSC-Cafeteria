@@ -3962,10 +3962,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return table;
         }
         if (itemIdx >= 0 && itemIdx < existingCart.length) {
-          if (table.status === 'billed' && delta > 0) {
-            alert('This table order is already billed. Cannot increase quantity after bill print.');
-            return table;
-          }
           const newQty = existingCart[itemIdx].qty + delta;
           if (newQty <= 0) {
             existingCart.splice(itemIdx, 1);
@@ -3979,7 +3975,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const isNowEmpty = existingCart.length === 0;
         return {
           ...table,
-          status: isNowEmpty ? 'free' : (table.status === 'billed' ? 'hold' : table.status),
+          status: isNowEmpty ? 'free' : table.status,
           waiter: isNowEmpty ? '' : table.waiter,
           customer: isNowEmpty ? 'Walk-in Customer' : table.customer,
           discountVal: isNowEmpty ? 0 : table.discountVal,
