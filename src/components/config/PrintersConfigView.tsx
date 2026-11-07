@@ -74,6 +74,8 @@ export const PrintersConfigView: React.FC = () => {
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [isDefault, setIsDefault] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [printOnBill, setPrintOnBill] = useState(true);
+  const [printOnSettle, setPrintOnSettle] = useState(true);
   const [notes, setNotes] = useState('');
 
   // Test Print Simulation State
@@ -230,6 +232,8 @@ export const PrintersConfigView: React.FC = () => {
     setSelectedCats([]);
     setIsDefault(false);
     setIsActive(true);
+    setPrintOnBill(true);
+    setPrintOnSettle(true);
     setNotes('');
     setIsModalOpen(true);
     scanSystemPrinters(true);
@@ -250,6 +254,8 @@ export const PrintersConfigView: React.FC = () => {
     setSelectedCats(p.categories || []);
     setIsDefault(Boolean(p.isDefault));
     setIsActive(p.isActive !== false);
+    setPrintOnBill(p.printOnBill !== false);
+    setPrintOnSettle(p.printOnSettle !== false);
     setNotes(p.notes || '');
     setIsModalOpen(true);
     scanSystemPrinters(true);
@@ -276,6 +282,8 @@ export const PrintersConfigView: React.FC = () => {
       categories: selectedCats,
       isDefault,
       isActive,
+      printOnBill: (type === 'BILL' || type === 'ALL') ? printOnBill : true,
+      printOnSettle: (type === 'BILL' || type === 'ALL') ? printOnSettle : true,
       notes: notes.trim()
     };
 
@@ -598,6 +606,35 @@ export const PrintersConfigView: React.FC = () => {
                         </span>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Specific Action Status Badges for BILL / ALL printers */}
+                {(printer.type === 'BILL' || printer.type === 'ALL') && (
+                  <div className="pt-2 mt-2 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
+                    <span 
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border ${
+                        printer.printOnBill !== false 
+                          ? 'bg-amber-50 text-amber-900 border-amber-200' 
+                          : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
+                      }`}
+                      title={printer.printOnBill !== false ? 'Guest Bill Print (বাটন ১ ও ৩) Active' : 'Guest Bill Print Muted'}
+                    >
+                      <ReceiptText className="w-2.5 h-2.5" />
+                      <span>Bill Print: {printer.printOnBill !== false ? 'ON' : 'OFF'}</span>
+                    </span>
+
+                    <span 
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border ${
+                        printer.printOnSettle !== false 
+                          ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+                          : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
+                      }`}
+                      title={printer.printOnSettle !== false ? 'Settle & Pay Cash Memo (বাটন ২) Active' : 'Settle Memo Print Muted'}
+                    >
+                      <Check className="w-2.5 h-2.5" />
+                      <span>Settle Print: {printer.printOnSettle !== false ? 'ON' : 'OFF'}</span>
+                    </span>
                   </div>
                 )}
 
@@ -1112,6 +1149,65 @@ export const PrintersConfigView: React.FC = () => {
                   <span className="text-xs font-bold text-slate-700">Active Status</span>
                 </label>
               </div>
+
+              {/* Granular Active Statuses for BILL and ALL printers */}
+              {(type === 'BILL' || type === 'ALL') && (
+                <div className="p-3 bg-linear-to-r from-amber-50/70 via-slate-50 to-emerald-50/70 border border-slate-200 rounded-xl space-y-2.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5 text-slate-600" />
+                      Hardware Print Action Control
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">Auto-cut thermal paper print</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition ${
+                      printOnBill 
+                        ? 'bg-white border-amber-300 text-slate-900 shadow-2xs ring-1 ring-amber-300/40' 
+                        : 'bg-slate-100/80 border-slate-200 text-slate-400'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={printOnBill}
+                        onChange={e => setPrintOnBill(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-xs font-black">Active Status for Print Bill</span>
+                          <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 text-[9px] font-black">বাটন ১ ও ৩</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                          Guest Bill / কাঁচা স্লিপ বাটনে চাপলে পেপার প্রিন্ট বের হবে
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition ${
+                      printOnSettle 
+                        ? 'bg-white border-emerald-300 text-slate-900 shadow-2xs ring-1 ring-emerald-300/40' 
+                        : 'bg-slate-100/80 border-slate-200 text-slate-400'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={printOnSettle}
+                        onChange={e => setPrintOnSettle(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-xs font-black">Active Status for Settle & Pay</span>
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 text-[9px] font-black">বাটন ২</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                          পেমেন্ট সেটেল করার পর পেইড ক্যাশ মেমো রসিদ প্রিন্ট বের হবে
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Notes */}
               <div>

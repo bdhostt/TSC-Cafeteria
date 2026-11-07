@@ -126,7 +126,9 @@
         "isDefault": true,
         "isActive": true,
         "notes": "",
-        "id": "PRN-5820"
+        "id": "PRN-5820",
+        "printOnBill": true,
+        "printOnSettle": true
       }
     ],
     "printTemplates": [

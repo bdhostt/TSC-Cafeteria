@@ -572,6 +572,8 @@ export const DEFAULT_PRINTERS: PrinterConfig[] = [
     categories: [],
     isDefault: true,
     isActive: true,
+    printOnBill: true,
+    printOnSettle: true,
     notes: "Front desk billing printer with automatic paper cutter"
   },
   {
@@ -3672,7 +3674,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const newPrinter: PrinterConfig = {
       ...printer,
       id,
-      isActive: printer.isActive !== undefined ? printer.isActive : true
+      isActive: printer.isActive !== undefined ? printer.isActive : true,
+      printOnBill: printer.printOnBill !== undefined ? printer.printOnBill : true,
+      printOnSettle: printer.printOnSettle !== undefined ? printer.printOnSettle : true
     };
     setData(prev => ({
       ...prev,
@@ -5143,10 +5147,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const hasActiveBillPrinter = Boolean(
       (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
     );
+    const hasActiveBillHardwarePrinter = Boolean(
+      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL') && p.printOnBill !== false)
+    );
 
     if (showModal) {
       setPrintableReceipt(billPayload);
-    } else if (hasActiveBillPrinter) {
+    } else if (hasActiveBillHardwarePrinter) {
       const billHardwarePayload = {
         ...billPayload,
         items: table.cart.map(i => ({
@@ -5544,27 +5551,30 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
 
-    const hasActiveBillPrinter = Boolean(
-      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+    const hasActiveGuestBillPrinter = Boolean(
+      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL') && p.printOnBill !== false)
+    );
+    const hasActiveSettlePrinter = Boolean(
+      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL') && p.printOnSettle !== false)
     );
 
-    if (hasActiveBillPrinter) {
-      // If Bill printer is ACTIVE and table was never billed, print Guest Bill first without corrupting table state
-      if ((table.billCount || 0) === 0 && table.status !== 'billed') {
-        const guestBillInvoiceNo = 'BILL-' + effectiveOrderRef;
-        const guestBillPayload = {
-          ...memoReceipt,
-          invoiceNo: guestBillInvoiceNo,
-          receiptType: 'BILL' as const,
-          isSettled: false,
-          paymentBreakdown: undefined,
-          changeReturn: undefined,
-          items: memoPayload.items
-        };
-        dispatchHardwarePrint('/api/hardware/print-bill', guestBillPayload);
-      }
+    // If Bill printer is ACTIVE for Guest Bill (বাটন ৩ ও ১) and table was never billed, print Guest Bill first
+    if (hasActiveGuestBillPrinter && (table.billCount || 0) === 0 && table.status !== 'billed') {
+      const guestBillInvoiceNo = 'BILL-' + effectiveOrderRef;
+      const guestBillPayload = {
+        ...memoReceipt,
+        invoiceNo: guestBillInvoiceNo,
+        receiptType: 'BILL' as const,
+        isSettled: false,
+        paymentBreakdown: undefined,
+        changeReturn: undefined,
+        items: memoPayload.items
+      };
+      dispatchHardwarePrint('/api/hardware/print-bill', guestBillPayload);
+    }
 
-      // Unified hardware print dispatch for Paid Cash Memo
+    // Unified hardware print dispatch for Paid Cash Memo if Settle Print is active (বাটন ২)
+    if (hasActiveSettlePrinter) {
       dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
     }
 

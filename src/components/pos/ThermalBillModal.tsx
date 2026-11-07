@@ -216,61 +216,68 @@ const allPrinters = (data?.printers && data.printers.length > 0) ? data.printers
     setIsPrinting(true);
     setHardwarePrintStatus(null);
 
-    // 1. Customer Bill / Cash Memo: Dispatch directly to Kot Printer via hardware bridge (No browser PDF dialog)
+    // 1. Customer Bill / Cash Memo: Dispatch directly to Printer via hardware bridge (No browser PDF dialog)
     if (!isKot) {
-      try {
-        const billPayload = {
-          restaurantName: printableReceipt.restaurantName,
-          restaurantAddress: printableReceipt.restaurantAddress,
-          restaurantHotline: printableReceipt.restaurantHotline,
-          restaurantBin: printableReceipt.restaurantBin,
-          invoiceNo: printableReceipt.invoiceNo,
-          dateTime: printableReceipt.dateTime,
-          tableName: printableReceipt.tableName,
-          tableZone: printableReceipt.tableZone,
-          channelOrAgent: printableReceipt.channelOrAgent,
-          waiter: printableReceipt.waiter,
-          orderTakenBy: printableReceipt.orderTakenBy,
-          settleBillRole: printableReceipt.settleBillRole,
-          customer: printableReceipt.customer,
-          items: displayedItems.map(i => ({
-            name: i.name,
-            qty: i.qty,
-            price: i.price,
-            variation: i.selectedVariation?.name,
-            addons: i.selectedAddons?.map(a => a.name),
-            notes: i.notes
-          })),
-          subtotal: printableReceipt.subtotal,
-          discountDeduction: printableReceipt.discountDeduction,
-          discountType: printableReceipt.discountType,
-          discountVal: printableReceipt.discountVal,
-          netTotal: printableReceipt.netTotal,
-          paymentBreakdown: (printableReceipt as any).paymentBreakdown,
-          changeReturn: (printableReceipt as any).changeReturn,
-          isSettled: printableReceipt.isSettled,
-          paperWidth: activeTemplate?.paperWidth || (printableReceipt as any)?.paperWidth || '80mm',
-          headerTitle: activeTemplate?.headerTitle || printableReceipt.headerTitle,
-          showLogo: activeTemplate?.showLogo !== false,
-          showAddress: activeTemplate?.showAddress !== false,
-          showPhone: activeTemplate?.showPhone !== false,
-          showBinVat: Boolean(activeTemplate?.showBinVat ?? printableReceipt.showBinVat),
-          showTableZone: activeTemplate?.showTableZone !== false,
-          showWaiter: activeTemplate?.showWaiter !== false,
-          showCustomer: activeTemplate?.showCustomer !== false,
-          showPrices: activeTemplate?.showPrices !== false,
-          showPaymentBreakdown: activeTemplate?.showPaymentBreakdown !== false,
-          footerMessage: activeTemplate?.footerMessage,
-          footerNotes: activeTemplate?.footerNotes
-        };
+      const isSettledMemo = printableReceipt.isSettled || printableReceipt.receiptType === 'PAID_MEMO';
+      const isActionActive = isSettledMemo 
+        ? (activePrinter?.printOnSettle !== false) 
+        : (activePrinter?.printOnBill !== false);
 
-        await dispatchHardwarePrint('/api/hardware/print-bill', billPayload);
-      } catch (err) {
-        console.warn('Hardware bill print error:', err);
+      if (isActionActive) {
+        try {
+          const billPayload = {
+            restaurantName: printableReceipt.restaurantName,
+            restaurantAddress: printableReceipt.restaurantAddress,
+            restaurantHotline: printableReceipt.restaurantHotline,
+            restaurantBin: printableReceipt.restaurantBin,
+            invoiceNo: printableReceipt.invoiceNo,
+            dateTime: printableReceipt.dateTime,
+            tableName: printableReceipt.tableName,
+            tableZone: printableReceipt.tableZone,
+            channelOrAgent: printableReceipt.channelOrAgent,
+            waiter: printableReceipt.waiter,
+            orderTakenBy: printableReceipt.orderTakenBy,
+            settleBillRole: printableReceipt.settleBillRole,
+            customer: printableReceipt.customer,
+            items: displayedItems.map(i => ({
+              name: i.name,
+              qty: i.qty,
+              price: i.price,
+              variation: i.selectedVariation?.name,
+              addons: i.selectedAddons?.map(a => a.name),
+              notes: i.notes
+            })),
+            subtotal: printableReceipt.subtotal,
+            discountDeduction: printableReceipt.discountDeduction,
+            discountType: printableReceipt.discountType,
+            discountVal: printableReceipt.discountVal,
+            netTotal: printableReceipt.netTotal,
+            paymentBreakdown: (printableReceipt as any).paymentBreakdown,
+            changeReturn: (printableReceipt as any).changeReturn,
+            isSettled: printableReceipt.isSettled,
+            paperWidth: activeTemplate?.paperWidth || (printableReceipt as any)?.paperWidth || '80mm',
+            headerTitle: activeTemplate?.headerTitle || printableReceipt.headerTitle,
+            showLogo: activeTemplate?.showLogo !== false,
+            showAddress: activeTemplate?.showAddress !== false,
+            showPhone: activeTemplate?.showPhone !== false,
+            showBinVat: Boolean(activeTemplate?.showBinVat ?? printableReceipt.showBinVat),
+            showTableZone: activeTemplate?.showTableZone !== false,
+            showWaiter: activeTemplate?.showWaiter !== false,
+            showCustomer: activeTemplate?.showCustomer !== false,
+            showPrices: activeTemplate?.showPrices !== false,
+            showPaymentBreakdown: activeTemplate?.showPaymentBreakdown !== false,
+            footerMessage: activeTemplate?.footerMessage,
+            footerNotes: activeTemplate?.footerNotes
+          };
+
+          await dispatchHardwarePrint('/api/hardware/print-bill', billPayload);
+        } catch (err) {
+          console.warn('Hardware bill print error:', err);
+        }
       }
 
       setIsPrinting(false);
-      setHardwarePrintStatus('✅ Bill sent to Kot Printer!');
+      setHardwarePrintStatus(isActionActive ? '✅ Bill sent to Printer!' : 'ℹ️ Physical print is muted for this action in settings');
       setTimeout(() => {
         closePrintReceipt();
       }, 600);
