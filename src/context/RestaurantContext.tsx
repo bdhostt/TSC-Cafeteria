@@ -5397,7 +5397,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
 
-    // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
+    const hasActiveBillPrinter = Boolean(
+      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+    );
+
+    // If Bill printer is ACTIVE and table was never billed, print Guest Bill first without corrupting table state
+    if (hasActiveBillPrinter && (table.billCount || 0) === 0 && table.status !== 'billed') {
+      const guestBillInvoiceNo = 'BILL-' + effectiveOrderRef;
+      const guestBillPayload = {
+        ...memoReceipt,
+        invoiceNo: guestBillInvoiceNo,
+        receiptType: 'BILL' as const,
+        isSettled: false,
+        paymentBreakdown: undefined,
+        changeReturn: undefined,
+        items: memoPayload.items
+      };
+      dispatchHardwarePrint('/api/hardware/print-bill', guestBillPayload);
+    }
+
+    // Unified hardware print dispatch for Paid Cash Memo
     dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
 
     // Close settle modal without on-screen preview popup

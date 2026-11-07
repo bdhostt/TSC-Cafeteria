@@ -1119,7 +1119,8 @@ function getJobDedupKey(job) {
     const inv = p.invoiceNo || p.id || '';
     const tbl = p.tableName || '';
     const tot = p.netTotal || (p.slips ? p.slips.length : '');
-    key = (job.type || '') + '_' + inv + '_' + tbl + '_' + tot;
+    const rType = p.receiptType || (p.isSettled ? 'PAID_MEMO' : 'BILL');
+    key = (job.type || '') + '_' + rType + '_' + inv + '_' + tbl + '_' + tot;
   }
   return key;
 }
@@ -1134,7 +1135,7 @@ function isDuplicateJob(job) {
   const key = getJobDedupKey(job);
   if (recentJobsCache.has(key)) {
     const diff = now - recentJobsCache.get(key);
-    if (diff < 15000) {
+    if (diff < 3000) {
       console.log('⚠️ [Deduplication] Blocked duplicate print job (' + key + ') received within ' + diff + 'ms.');
       return true;
     }
