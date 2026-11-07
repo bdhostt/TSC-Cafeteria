@@ -618,7 +618,7 @@ export const PrintersConfigView: React.FC = () => {
                           ? 'bg-amber-50 text-amber-900 border-amber-200' 
                           : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
                       }`}
-                      title={printer.printOnBill !== false ? 'Guest Bill Print (বাটন ১ ও ৩) Active' : 'Guest Bill Print Muted'}
+                      title={printer.printOnBill !== false ? 'Guest Bill Print Active' : 'Guest Bill Print Muted'}
                     >
                       <ReceiptText className="w-2.5 h-2.5" />
                       <span>Bill Print: {printer.printOnBill !== false ? 'ON' : 'OFF'}</span>
@@ -630,7 +630,7 @@ export const PrintersConfigView: React.FC = () => {
                           ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
                           : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
                       }`}
-                      title={printer.printOnSettle !== false ? 'Settle & Pay Cash Memo (বাটন ২) Active' : 'Settle Memo Print Muted'}
+                      title={printer.printOnSettle !== false ? 'Settle & Pay Cash Memo Print Active' : 'Settle Memo Print Muted'}
                     >
                       <Check className="w-2.5 h-2.5" />
                       <span>Settle Print: {printer.printOnSettle !== false ? 'ON' : 'OFF'}</span>
@@ -1176,10 +1176,9 @@ export const PrintersConfigView: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1 flex-wrap">
                           <span className="text-xs font-black">Active Status for Print Bill</span>
-                          <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 text-[9px] font-black">বাটন ১ ও ৩</span>
                         </div>
                         <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
-                          Guest Bill / কাঁচা স্লিপ বাটনে চাপলে পেপার প্রিন্ট বের হবে
+                          Prints guest bill slip on hardware printer
                         </p>
                       </div>
                     </label>
@@ -1198,10 +1197,9 @@ export const PrintersConfigView: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1 flex-wrap">
                           <span className="text-xs font-black">Active Status for Settle & Pay</span>
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 text-[9px] font-black">বাটন ২</span>
                         </div>
                         <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
-                          পেমেন্ট সেটেল করার পর পেইড ক্যাশ মেমো রসিদ প্রিন্ট বের হবে
+                          Prints paid cash memo slip on hardware after payment
                         </p>
                       </div>
                     </label>

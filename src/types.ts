@@ -36,8 +36,8 @@ export interface CommissionAgent {
   phone?: string;
   contactPerson?: string;
   isActive: boolean;
-  printOnBill?: boolean; // Active status for Print Bill (Guest Bill / বাটন ১ ও ৩)
-  printOnSettle?: boolean; // Active status for Settle & Pay (Paid Cash Memo / বাটন ২)
+  printOnBill?: boolean; // Active status for Print Bill (Guest Bill)
+  printOnSettle?: boolean; // Active status for Settle & Pay (Paid Cash Memo)
   notes?: string;
 }
 
