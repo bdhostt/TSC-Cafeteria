@@ -2015,9 +2015,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (saved) {
         const parsed = JSON.parse(saved);
         const mergedTables = (parsed.tables || DEFAULT_DATA.tables).map((t: Table, idx: number) => {
-          const isCleanFree = t.status === 'free' && (!t.cart || t.cart.length === 0);
+          const isCleanFree = (!t.cart || t.cart.length === 0) && !t.linkedSaleId;
           return {
             ...t,
+            status: isCleanFree ? 'free' : t.status,
             zone: t.zone || (t.id.startsWith('VIP') ? 'VIP Lounge' : t.id.startsWith('RT') ? 'Rooftop Garden' : idx >= 3 ? 'Floor 2' : 'Floor 1'),
             waiter: isCleanFree ? '' : (t.waiter || ''),
             cart: isCleanFree ? [] : (t.cart || []),
@@ -2335,9 +2336,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     if (result.data.tables) {
       result.data.tables = result.data.tables.map((t: Table) => {
-        if (t.status === 'free' && (!t.cart || t.cart.length === 0)) {
+        if ((!t.cart || t.cart.length === 0) && !t.linkedSaleId) {
           return {
             ...t,
+            status: 'free',
             waiter: '',
             customer: 'Walk-in Customer',
             cart: [],
@@ -2348,7 +2350,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             orderCreatedId: undefined,
             orderCreatedAt: undefined,
             billedAt: undefined,
-            billedAtTime: undefined
+            billedAtTime: undefined,
+            orderRef: undefined,
+            kotCount: 0,
+            billCount: 0
           };
         }
         return t;
@@ -5037,6 +5042,24 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     const table = data.tables.find(t => t.id === tableId);
     if (!table || table.cart.length === 0) {
+      if (table && table.status !== 'free' && !table.linkedSaleId) {
+        setData(prev => ({
+          ...prev,
+          tables: prev.tables.map(t => t.id === tableId ? {
+            ...t,
+            status: 'free',
+            cart: [],
+            waiter: '',
+            customer: 'Walk-in Customer',
+            discountVal: 0,
+            channelOrAgentId: 'dine_in',
+            orderRef: undefined,
+            billCount: 0,
+            billedAt: undefined,
+            billedAtTime: undefined
+          } : t)
+        }));
+      }
       alert('No payable bill found on this table!');
       return;
     }
@@ -5372,14 +5395,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }))
     };
 
-    const hasActiveBillPrinter = Boolean(
-      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
-    );
 
-    // If Bill printer is ACTIVE and table was never billed, print Guest Bill first
-    if (hasActiveBillPrinter && (table.billCount || 0) === 0 && table.status !== 'billed') {
-      openPrintBill(tableId, false);
-    }
 
     // Unified hardware print dispatch (instant local port 9123 or queued via cloud)
     dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
