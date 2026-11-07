@@ -4436,7 +4436,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const isAddonKot = nextKotCount > 1;
     const linkedInvoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
     const invoiceNo = isAddonKot 
-      ? `KOT-${orderRef}-#${nextKotCount} (NEW ORDER)` 
+      ? `KOT-${orderRef}-#${nextKotCount}` 
       : `KOT-${orderRef}`;
     const dateTime = new Date().toLocaleString('en-US');
 
