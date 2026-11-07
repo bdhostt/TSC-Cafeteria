@@ -359,9 +359,6 @@ async function startServer() {
     pushStr(`STATION: ${cleanStation.toUpperCase()}\n`);
     const invoiceVal = (req.invoiceNo || 'KOT-0000') + (total > 1 ? `-${index}` : '');
     pushStr(`KOT NO: ${invoiceVal}\n`);
-    if ((req as any).isAddonKot) {
-      pushStr(`** RUNNING ORDER (NEW ORDER) **\n`);
-    }
     if (slip.category) {
       pushStr(`Category: ${slip.category}\n`);
     }

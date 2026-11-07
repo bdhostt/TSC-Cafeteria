@@ -411,9 +411,6 @@ const allPrinters = (data?.printers && data.printers.length > 0) ? data.printers
       kotLines.push(centerLine(`STATION: ${stationName}`, width));
       const invoiceVal = (printableReceipt.invoiceNo || 'KOT-0000') + (isCancelKot ? ' (VOID)' : '');
       kotLines.push(centerLine(`${isCancelKot ? 'VOID KOT NO:' : 'KOT NO:'} ${invoiceVal}`, width));
-      if (printableReceipt.isAddonKot) {
-        kotLines.push(centerLine('** RUNNING ORDER (NEW ORDER) **', width));
-      }
       kotLines.push(divider);
 
       // Metadata (Left and Right flush)
