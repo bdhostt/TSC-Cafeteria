@@ -2335,6 +2335,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     if (result.data.tables) {
+      const localTables = dataRef.current?.tables || [];
+      const now = Date.now();
       result.data.tables = result.data.tables.map((t: Table) => {
         if ((!t.cart || t.cart.length === 0) && !t.linkedSaleId) {
           return {
@@ -2356,11 +2358,46 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             billCount: 0
           };
         }
+        const lt = localTables.find(l => l.id === t.id);
+        if (!lt) return t;
+
+        // If local table was freed locally within the last 4 seconds, keep it free
+        if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - lastLocalEditTimeRef.current < 4000)) {
+          return lt;
+        }
+
+        // Never downgrade already-printed KOT items
+        if (Array.isArray(t.cart) && Array.isArray(lt.cart) && lt.cart.length > 0) {
+          const mergedCart = t.cart.map(inItem => {
+            const lItem = lt.cart.find(li => 
+              (li.cartItemId && inItem.cartItemId && li.cartItemId === inItem.cartItemId) ||
+              (li.id != null && inItem.id != null && String(li.id) === String(inItem.id) && li.name === inItem.name)
+            );
+            if (lItem) {
+              const isLocalPrinted = lItem.kotPrinted || (lItem.kotPrintedQty || 0) > 0;
+              const maxKotQty = Math.max(lItem.kotPrintedQty || 0, inItem.kotPrintedQty || 0);
+              if (isLocalPrinted) {
+                return {
+                  ...inItem,
+                  kotPrinted: true,
+                  kotPrintedQty: maxKotQty > 0 ? maxKotQty : inItem.qty,
+                  kotPrintedAt: inItem.kotPrintedAt || lItem.kotPrintedAt,
+                  kotPrintedTimestamp: inItem.kotPrintedTimestamp || lItem.kotPrintedTimestamp
+                };
+              }
+            }
+            return inItem;
+          });
+          return {
+            ...t,
+            cart: mergedCart
+          };
+        }
+
         return t;
       });
 
       // Smart Table Protection: only protect draft cart if user is actively in 'order' screen
-      // When user is on the floor view ('floor'), NEVER lock tables: show 100% live server state across all devices!
       const isActivelyOnOrderScreen = posView === 'order';
       if (isActivelyOnOrderScreen && activeTableId && !isInitial) {
         const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
@@ -2492,17 +2529,82 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     lastSyncedTablesStrRef.current = inTablesStr;
 
+    const now = Date.now();
+    const sanitizedIncoming = incomingTables.map(t => {
+      if ((!t.cart || t.cart.length === 0) && !t.linkedSaleId) {
+        return {
+          ...t,
+          status: 'free' as const,
+          waiter: '',
+          customer: 'Walk-in Customer',
+          cart: [],
+          discountVal: 0,
+          channelOrAgentId: 'dine_in',
+          orderCreatedBy: undefined,
+          orderCreatedRole: undefined,
+          orderCreatedId: undefined,
+          orderCreatedAt: undefined,
+          billedAt: undefined,
+          billedAtTime: undefined,
+          orderRef: undefined,
+          kotCount: 0,
+          billCount: 0
+        };
+      }
+      return t;
+    });
+
+    const currentLocalTables = dataRef.current.tables || [];
+    const mergedTables = sanitizedIncoming.map(st => {
+      const lt = currentLocalTables.find(l => l.id === st.id);
+      if (!lt) return st;
+
+      // If local table was settled recently (< 4000ms), do not let stale server cart revive it
+      if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - lastLocalEditTimeRef.current < 4000)) {
+        return lt;
+      }
+
+      // Never downgrade already-printed KOT items
+      if (Array.isArray(st.cart) && Array.isArray(lt.cart) && lt.cart.length > 0) {
+        const mergedCart = st.cart.map(inItem => {
+          const lItem = lt.cart.find(li => 
+            (li.cartItemId && inItem.cartItemId && li.cartItemId === inItem.cartItemId) ||
+            (li.id != null && inItem.id != null && String(li.id) === String(inItem.id) && li.name === inItem.name)
+          );
+          if (lItem) {
+            const isLocalPrinted = lItem.kotPrinted || (lItem.kotPrintedQty || 0) > 0;
+            const maxKotQty = Math.max(lItem.kotPrintedQty || 0, inItem.kotPrintedQty || 0);
+            if (isLocalPrinted) {
+              return {
+                ...inItem,
+                kotPrinted: true,
+                kotPrintedQty: maxKotQty > 0 ? maxKotQty : inItem.qty,
+                kotPrintedAt: inItem.kotPrintedAt || lItem.kotPrintedAt,
+                kotPrintedTimestamp: inItem.kotPrintedTimestamp || lItem.kotPrintedTimestamp
+              };
+            }
+          }
+          return inItem;
+        });
+        return {
+          ...st,
+          cart: mergedCart
+        };
+      }
+      return st;
+    });
+
     setData(prev => {
       const isActivelyOnOrderScreen = posViewRef.current === 'order';
       const curActiveId = activeTableIdRef.current;
-      let finalTables = incomingTables;
+      let finalTables = mergedTables;
 
       if (isActivelyOnOrderScreen && curActiveId) {
         const localActive = prev.tables?.find(t => t.id === curActiveId);
         const hasUnprintedDraft = localActive && Array.isArray(localActive.cart) && localActive.cart.some(item => !item.kotPrinted);
 
         if (hasUnprintedDraft && localActive) {
-          finalTables = incomingTables.map(st => {
+          finalTables = mergedTables.map(st => {
             if (st.id === curActiveId) {
               return {
                 ...st,
@@ -3508,6 +3610,28 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsStartSessionModalOpen(true);
       return;
     }
+    const targetTable = data.tables?.find(t => t.id === tableId);
+    if (targetTable && (!targetTable.cart || targetTable.cart.length === 0) && !targetTable.linkedSaleId && targetTable.status !== 'free') {
+      const sanitized = data.tables.map(t => t.id === tableId ? {
+        ...t,
+        status: 'free' as const,
+        waiter: '',
+        customer: 'Walk-in Customer',
+        channelOrAgentId: 'dine_in',
+        cart: [],
+        discountVal: 0,
+        orderRef: undefined,
+        kotCount: 0,
+        billCount: 0
+      } : t);
+      lastLocalEditTimeRef.current = Date.now();
+      lastSyncedTablesStrRef.current = JSON.stringify(sanitized);
+      setData(prev => ({
+        ...prev,
+        tables: sanitized
+      }));
+      syncPosTablesToServer(sanitized);
+    }
     setActiveTableId(tableId);
     setPosView('order');
   };
@@ -4313,31 +4437,35 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const dateTime = new Date().toLocaleString('en-US');
 
     // Mark all current items in cart as KOT printed up to their current full quantity
-    lastLocalEditTimeRef.current = Date.now();
+    const now = Date.now();
+    const timeStr = new Date(now).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const updatedTables = data.tables.map(t => {
+      if (t.id !== tableId) return t;
+      const updatedCart = t.cart.map(item => ({
+        ...item,
+        kotPrinted: true,
+        kotPrintedQty: item.qty,
+        kotPrintedAt: item.kotPrintedAt || timeStr,
+        kotPrintedTimestamp: item.kotPrintedTimestamp || now
+      }));
+      return {
+        ...t,
+        status: t.status === 'free' ? 'hold' : t.status,
+        orderCreatedAt: t.orderCreatedAt || now,
+        orderRef,
+        linkedInvoiceNo,
+        kotCount: nextKotCount,
+        cart: updatedCart
+      };
+    });
+
+    lastLocalEditTimeRef.current = now;
+    lastSyncedTablesStrRef.current = JSON.stringify(updatedTables);
     setData(prev => ({
       ...prev,
-      tables: prev.tables.map(t => {
-        if (t.id !== tableId) return t;
-        const now = Date.now();
-        const timeStr = new Date(now).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-        const updatedCart = t.cart.map(item => ({
-          ...item,
-          kotPrinted: true,
-          kotPrintedQty: item.qty,
-          kotPrintedAt: item.kotPrintedAt || timeStr,
-          kotPrintedTimestamp: item.kotPrintedTimestamp || now
-        }));
-        return {
-          ...t,
-          status: t.status === 'free' ? 'hold' : t.status,
-          orderCreatedAt: t.orderCreatedAt || now,
-          orderRef,
-          linkedInvoiceNo,
-          kotCount: nextKotCount,
-          cart: updatedCart
-        };
-      })
+      tables: updatedTables
     }));
+    syncPosTablesToServer(updatedTables, undefined, 'KOT_SUBMIT');
 
     const agents = data.commissionAgents || DEFAULT_COMMISSION_AGENTS;
     const agent = agents.find(a => a.id === table.channelOrAgentId);
@@ -4475,7 +4603,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         slips: slipsToPrint
       };
 
-      dispatchHardwarePrint('/api/hardware/print-kot', kotHardwarePayload);
+      const hasActiveKotPrinter = Boolean(
+        (data.printers || []).some(p => p.isActive && (p.type === 'KOT' || p.type === 'ALL'))
+      );
+      if (hasActiveKotPrinter) {
+        dispatchHardwarePrint('/api/hardware/print-kot', kotHardwarePayload);
+      }
     }
   };
 
@@ -4907,19 +5040,23 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       : posInvoiceNo;
     const billDateTime = new Date().toLocaleString('en-US');
 
+    const updatedBillTables = data.tables.map(t => t.id === tableId ? { 
+      ...t, 
+      status: 'billed' as const,
+      orderRef,
+      linkedInvoiceNo: posInvoiceNo,
+      billCount: nextBillCount,
+      billedAt: t.billedAt || billNow,
+      billedAtTime: t.billedAtTime || billTimeStr
+    } : t);
+
     lastLocalEditTimeRef.current = Date.now();
+    lastSyncedTablesStrRef.current = JSON.stringify(updatedBillTables);
     setData(prev => ({
       ...prev,
-      tables: prev.tables.map(t => t.id === tableId ? { 
-        ...t, 
-        status: 'billed',
-        orderRef,
-        linkedInvoiceNo: posInvoiceNo,
-        billCount: nextBillCount,
-        billedAt: t.billedAt || billNow,
-        billedAtTime: t.billedAtTime || billTimeStr
-      } : t)
+      tables: updatedBillTables
     }));
+    syncPosTablesToServer(updatedBillTables, undefined, 'BILL_PRINT');
 
     const agents = data.commissionAgents || DEFAULT_COMMISSION_AGENTS;
     const agent = agents.find(a => a.id === table.channelOrAgentId);
@@ -5003,9 +5140,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       footerNotes: defaultPrimaryBillTemplate?.footerNotes
     };
 
+    const hasActiveBillPrinter = Boolean(
+      (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
+    );
+
     if (showModal) {
       setPrintableReceipt(billPayload);
-    } else {
+    } else if (hasActiveBillPrinter) {
       const billHardwarePayload = {
         ...billPayload,
         items: table.cart.map(i => ({
@@ -5260,6 +5401,30 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       createdAt: Date.now()
     };
 
+    const freedTables = data.tables.map(t => t.id === tableId ? {
+      ...t,
+      status: 'free' as const,
+      waiter: '',
+      customer: 'Walk-in Customer',
+      channelOrAgentId: 'dine_in',
+      discountType: 'taka' as const,
+      discountVal: 0,
+      cart: [],
+      orderCreatedBy: undefined,
+      orderCreatedRole: undefined,
+      orderCreatedId: undefined,
+      orderCreatedAt: undefined,
+      billedAt: undefined,
+      billedAtTime: undefined,
+      orderRef: undefined,
+      kotCount: 0,
+      billCount: 0
+    } : t);
+
+    lastLocalEditTimeRef.current = Date.now();
+    lastSyncedTablesStrRef.current = JSON.stringify(freedTables);
+    syncPosTablesToServer(freedTables, newSale, 'TABLE_SETTLE');
+
     // Update state
     setData(prev => {
       let unadjustedAdvanceToDeduct = computedAdvance;
@@ -5297,25 +5462,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         customers: updatedCustomers,
         customerAdvances: updatedCustomerAdvances,
         sales: [...prev.sales, newSale],
-        tables: prev.tables.map(t => t.id === tableId ? {
-          ...t,
-          status: 'free',
-          waiter: '',
-          customer: 'Walk-in Customer',
-          channelOrAgentId: 'dine_in',
-          discountType: 'taka',
-          discountVal: 0,
-          cart: [],
-          orderCreatedBy: undefined,
-          orderCreatedRole: undefined,
-          orderCreatedId: undefined,
-          orderCreatedAt: undefined,
-          billedAt: undefined,
-          billedAtTime: undefined,
-          orderRef: undefined,
-          kotCount: 0,
-          billCount: 0
-        } : t)
+        tables: freedTables
       };
     });
 
@@ -5401,23 +5548,25 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       (data.printers || []).some(p => p.isActive && (p.type === 'BILL' || p.type === 'ALL'))
     );
 
-    // If Bill printer is ACTIVE and table was never billed, print Guest Bill first without corrupting table state
-    if (hasActiveBillPrinter && (table.billCount || 0) === 0 && table.status !== 'billed') {
-      const guestBillInvoiceNo = 'BILL-' + effectiveOrderRef;
-      const guestBillPayload = {
-        ...memoReceipt,
-        invoiceNo: guestBillInvoiceNo,
-        receiptType: 'BILL' as const,
-        isSettled: false,
-        paymentBreakdown: undefined,
-        changeReturn: undefined,
-        items: memoPayload.items
-      };
-      dispatchHardwarePrint('/api/hardware/print-bill', guestBillPayload);
-    }
+    if (hasActiveBillPrinter) {
+      // If Bill printer is ACTIVE and table was never billed, print Guest Bill first without corrupting table state
+      if ((table.billCount || 0) === 0 && table.status !== 'billed') {
+        const guestBillInvoiceNo = 'BILL-' + effectiveOrderRef;
+        const guestBillPayload = {
+          ...memoReceipt,
+          invoiceNo: guestBillInvoiceNo,
+          receiptType: 'BILL' as const,
+          isSettled: false,
+          paymentBreakdown: undefined,
+          changeReturn: undefined,
+          items: memoPayload.items
+        };
+        dispatchHardwarePrint('/api/hardware/print-bill', guestBillPayload);
+      }
 
-    // Unified hardware print dispatch for Paid Cash Memo
-    dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
+      // Unified hardware print dispatch for Paid Cash Memo
+      dispatchHardwarePrint('/api/hardware/print-bill', memoPayload);
+    }
 
     // Close settle modal without on-screen preview popup
     closeSettleModal();

@@ -1,4 +1,4 @@
-# TSC Cafeteria - Restaurant POS & Management System
+# POS DEMO - Restaurant POS & Management System
 
 A full-stack, enterprise-grade Point of Sale (POS) and Restaurant Management solution built for modern dining operations, fast food, and cafeteria environments.
 
@@ -40,8 +40,8 @@ Double-click `start-localhost.bat` in the project root. This will automatically 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/bdhostt/TSC-Cafeteria.git
-   cd TSC-Cafeteria
+   git clone https://github.com/sajibkhan33/posdemo
+   cd posdemo
    ```
 
 2. **Install dependencies:**
@@ -102,8 +102,8 @@ For cPanel hosting using the CloudLinux **Setup Node.js App** (Passenger):
 1. **Node.js Selector Setup:**
    - **Node.js version:** `20.x` or `22.x`
    - **Application mode:** `Production`
-   - **Application root:** `tsc` (or your chosen directory)
-   - **Application URL:** `tsc.yourdomain.com`
+   - **Application root:** `posdemo` (or your chosen directory)
+   - **Application URL:** `posdemo.yourdomain.com`
    - **Application startup file:** `app.js`
 2. **Build & Upload:**
    - Run `npm run build` locally.

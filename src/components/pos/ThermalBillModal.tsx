@@ -863,12 +863,7 @@ const allPrinters = (data?.printers && data.printers.length > 0) ? data.printers
           </div>
         </div>
 
-        {/* Running Order Add-on Notice */}
-        {printableReceipt.isAddonKot && !isCancelKot && (
-          <div className="my-2 p-1.5 bg-blue-50 border border-blue-200 text-blue-900 rounded text-center text-xs font-bold">
-            ⚡ RUNNING (NEW ORDER)
-          </div>
-        )}
+
 
         {/* Cancel Warning Box if Cancel Kot */}
         {isCancelKot && (

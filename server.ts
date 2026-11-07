@@ -1977,13 +1977,40 @@ async function startServer() {
   });
 
   // Dedicated Ultra-Fast Real-Time POS Sync (3.8KB payload, <5ms round-trip)
+    function sanitizeTables(tables: any[]) {
+    if (!Array.isArray(tables)) return tables;
+    return tables.map(t => {
+      if ((!t.cart || t.cart.length === 0) && !t.linkedSaleId) {
+        return {
+          ...t,
+          status: 'free',
+          waiter: '',
+          customer: 'Walk-in Customer',
+          cart: [],
+          discountVal: 0,
+          channelOrAgentId: 'dine_in',
+          orderCreatedBy: undefined,
+          orderCreatedRole: undefined,
+          orderCreatedId: undefined,
+          orderCreatedAt: undefined,
+          billedAt: undefined,
+          billedAtTime: undefined,
+          orderRef: undefined,
+          kotCount: 0,
+          billCount: 0
+        };
+      }
+      return t;
+    });
+  }
+
   app.post("/api/restaurant/pos-sync", async (req, res) => {
     try {
       const { tables, newSale, action = 'TABLES_UPDATE' } = req.body;
       const now = Date.now();
 
       if (Array.isArray(tables) && cachedState) {
-        cachedState.tables = tables;
+        cachedState.tables = sanitizeTables(tables);
         if (newSale && newSale.invoiceNo) {
           if (!Array.isArray(cachedState.sales)) cachedState.sales = [];
           const exists = cachedState.sales.some((s: any) => s.invoiceNo === newSale.invoiceNo);
@@ -2040,7 +2067,7 @@ async function startServer() {
       changed: true,
       timestamp: lastServerUpdate,
       fullUpdateTimestamp: lastFullStateUpdate,
-      tables: cachedState?.tables || [],
+      tables: sanitizeTables(cachedState?.tables || []),
       salesCount: cachedState?.sales?.length || 0
     });
   });
@@ -2099,6 +2126,7 @@ async function startServer() {
 
       if (clientData) {
         normalizeLogo(clientData);
+        if (clientData.tables) clientData.tables = sanitizeTables(clientData.tables);
         cachedState = clientData;
         lastServerUpdate = Date.now();
         lastFullStateUpdate = lastServerUpdate;

@@ -746,11 +746,12 @@ export const PosBillingView: React.FC = () => {
           >
             {filteredTables.map(table => {
               const tableSubtotal = table.cart.reduce((s, i) => s + (i.price * i.qty), 0);
-              const isFree = table.status === 'free';
-              const isHold = table.status === 'hold';
-              const isBilled = table.status === 'billed';
-              const hasUnprintedKot = table.cart.length > 0 && table.cart.some(item => !item.kotPrinted || item.qty > (item.kotPrintedQty || 0));
-              const isBillPrinted = table.status === 'billed';
+              const isReallyEmpty = (!table.cart || table.cart.length === 0) && !table.linkedSaleId;
+              const isFree = table.status === 'free' || isReallyEmpty;
+              const isHold = !isReallyEmpty && table.status === 'hold';
+              const isBilled = !isReallyEmpty && table.status === 'billed';
+              const hasUnprintedKot = !isReallyEmpty && table.cart.length > 0 && table.cart.some(item => !item.kotPrinted || item.qty > (item.kotPrintedQty || 0));
+              const isBillPrinted = !isReallyEmpty && table.status === 'billed';
               const zoneLabel = table.zone || 'Floor 1';
 
               // Sizing specific variables
@@ -877,7 +878,7 @@ export const PosBillingView: React.FC = () => {
                           )}
 
                           {/* Quick Bill Direct Print - only if Bill printer active and table not billed */}
-                          {hasActiveBillPrinter && !isBillPrinted && (
+                          {!isBillPrinted && (!table.cart || table.cart.length > 0) && (
                             <button
                               type="button"
                               title="Direct Print Bill"
@@ -1851,7 +1852,7 @@ export const PosBillingView: React.FC = () => {
 
             if ((hasUnprintedKotItems || isSubmittingKot) && activeTableHasActiveKotPrinter) {
               actionButtons.push(submitKotBtn);
-            } else if (hasActiveBillPrinter) {
+            } else {
               actionButtons.push(printBillBtn(false));
             }
 
