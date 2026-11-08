@@ -7,6 +7,7 @@ import { PaymentMethodsConfigView } from './PaymentMethodsConfigView';
 import { SerialConfigView } from './SerialConfigView';
 import { 
   CreditCard,
+  Hash,
   Settings, 
   Plus, 
   Trash2, 
