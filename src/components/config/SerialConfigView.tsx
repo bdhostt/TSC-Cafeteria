@@ -27,7 +27,7 @@ export const SerialConfigView: React.FC = () => {
     posInvoiceIncludeDate: false,
     posInvoiceResetCycle: 'NEVER',
 
-    kotPrefix: 'KOT-',
+    kotPrefix: 'KOT-ORD-',
     kotNextNumber: 1,
     kotPadding: 4,
     kotIncludeDate: false,
@@ -68,7 +68,7 @@ export const SerialConfigView: React.FC = () => {
   );
 
   const sampleKot = formatSample(
-    formData.kotPrefix,
+    (formData.kotPrefix === 'KOT-' ? 'KOT-ORD-' : formData.kotPrefix),
     formData.kotNextNumber,
     formData.kotPadding,
     formData.kotIncludeDate
@@ -84,12 +84,19 @@ export const SerialConfigView: React.FC = () => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateSerialConfig(formData);
+    try {
+      fetch('/api/restaurant/pos-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serialConfig: formData })
+      }).catch(() => {});
+    } catch {}
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
   const handleResetDefaults = () => {
-    if (confirm('Are you sure you want to restore default numbering configurations (POS-0001, KOT-0001, ORD-0001 with Continuous numbering)?')) {
+    if (confirm('Are you sure you want to restore default numbering configurations (POS-0001, KOT-ORD-0001, ORD-0001 with Continuous numbering)?')) {
       const defaults: SerialNumberConfig = {
         posInvoicePrefix: 'POS-',
         posInvoiceNextNumber: 1,
@@ -97,7 +104,7 @@ export const SerialConfigView: React.FC = () => {
         posInvoiceIncludeDate: false,
         posInvoiceResetCycle: 'NEVER',
 
-        kotPrefix: 'KOT-',
+        kotPrefix: 'KOT-ORD-',
         kotNextNumber: 1,
         kotPadding: 4,
         kotIncludeDate: false,
@@ -361,7 +368,7 @@ export const SerialConfigView: React.FC = () => {
                   type="text"
                   value={formData.kotPrefix}
                   onChange={e => setFormData({ ...formData, kotPrefix: e.target.value })}
-                  placeholder="e.g. KOT-, KTN-, KOT-ORD-"
+                  placeholder="e.g. KOT-ORD-, KOT-, KTN-"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 text-xs font-mono font-bold"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Starting letters printed on KOT slips</p>

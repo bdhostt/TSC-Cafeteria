@@ -746,7 +746,7 @@ export const PosBillingView: React.FC = () => {
           >
             {filteredTables.map(table => {
               const tableSubtotal = table.cart.reduce((s, i) => s + (i.price * i.qty), 0);
-              const isReallyEmpty = (!table.cart || table.cart.length === 0) && !table.linkedSaleId;
+              const isReallyEmpty = !table.cart || table.cart.length === 0;
               const isFree = table.status === 'free' || isReallyEmpty;
               const isHold = !isReallyEmpty && table.status === 'hold';
               const isBilled = !isReallyEmpty && table.status === 'billed';

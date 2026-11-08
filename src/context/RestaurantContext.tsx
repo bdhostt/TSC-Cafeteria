@@ -991,7 +991,7 @@ export const DEFAULT_SERIAL_CONFIG: SerialNumberConfig = {
   posInvoiceIncludeDate: false,
   posInvoiceResetCycle: 'NEVER',
 
-  kotPrefix: 'KOT-',
+  kotPrefix: 'KOT-ORD-',
   kotNextNumber: 1,
   kotPadding: 4,
   kotIncludeDate: false,
@@ -2570,7 +2570,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // Instant differential tables applicator (<1ms in React)
-  const applyIncomingTables = (incomingTables: Table[], newSale?: SaleRecord, serverTimestamp?: number) => {
+  const applyIncomingTables = (incomingTables: Table[], newSale?: SaleRecord, serverTimestamp?: number, incomingSerialConfig?: SerialNumberConfig) => {
     if (!Array.isArray(incomingTables)) return;
 
     // Protection against race condition / stale snapshot pulse flicker:
@@ -2697,7 +2697,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return {
         ...prev,
         tables: finalTables,
-        sales: updatedSales
+        sales: updatedSales,
+        serialConfig: incomingSerialConfig ? { ...(prev.serialConfig || DEFAULT_SERIAL_CONFIG), ...incomingSerialConfig } : prev.serialConfig
       };
     });
 
@@ -2707,7 +2708,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // Instant differential POS table pusher (<10ms across all screens & terminals)
-  const syncPosTablesToServer = async (tablesToSend: Table[], newSaleToSend?: SaleRecord, action = 'TABLES_UPDATE') => {
+  const syncPosTablesToServer = async (tablesToSend: Table[], newSaleToSend?: SaleRecord, action = 'TABLES_UPDATE', serialConfigToSend?: SerialNumberConfig) => {
     const now = Date.now();
     lastLocalEditTimeRef.current = now;
 
@@ -2719,6 +2720,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           sender: tabClientIdRef.current,
           tables: tablesToSend,
           newSale: newSaleToSend,
+          serialConfig: serialConfigToSend,
           timestamp: now
         });
       } catch (e) {}
@@ -2735,7 +2737,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         body: JSON.stringify({
           action,
           tables: tablesToSend,
-          newSale: newSaleToSend
+          newSale: newSaleToSend,
+          serialConfig: serialConfigToSend
         })
       });
       if (res.ok) {
@@ -2797,7 +2800,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const parsed = JSON.parse(event.data);
             if (!parsed) return;
             if (parsed.type === 'POS_TABLES_UPDATE' && parsed.tables) {
-              applyIncomingTables(parsed.tables, parsed.newSale, parsed.timestamp);
+              applyIncomingTables(parsed.tables, parsed.newSale, parsed.timestamp, parsed.serialConfig);
             } else if (parsed.type === 'CONNECTED' && parsed.tables) {
               applyIncomingTables(parsed.tables, undefined, parsed.timestamp);
             } else if (parsed.type === 'FULL_STATE_UPDATED' && parsed.data) {
@@ -2828,7 +2831,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const json = await res.json();
           if (json.changed) {
             if (json.tables) {
-              applyIncomingTables(json.tables, undefined, json.timestamp);
+              applyIncomingTables(json.tables, undefined, json.timestamp, json.serialConfig);
             }
             const hasFullUpdate = json.fullUpdateTimestamp && json.fullUpdateTimestamp > (lastFullSyncTimestampRef.current || 0);
             const hasSalesMismatch = json.salesCount !== undefined && json.salesCount !== (dataRef.current.sales?.length || 0);
@@ -2847,7 +2850,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       onBroadcast = (evt: MessageEvent) => {
         if (evt.data?.sender === tabClientIdRef.current) return;
         if (evt.data?.type === 'POS_TABLES_UPDATE' && evt.data?.tables) {
-          applyIncomingTables(evt.data.tables, evt.data.newSale, evt.data.timestamp);
+          applyIncomingTables(evt.data.tables, evt.data.newSale, evt.data.timestamp, evt.data.serialConfig);
         } else if (evt.data?.type === 'POS_TAB_SYNC' && evt.data?.data) {
           isUpdatingFromSync.current = true;
           setData(evt.data.data);
@@ -4095,6 +4098,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         todayDateStr
       );
       let activeSerialConfig = { ...resetCheckedConfig };
+      if (activeSerialConfig.kotPrefix === 'KOT-') activeSerialConfig.kotPrefix = 'KOT-ORD-';
       let serialAllocated = resetChanged;
 
       const updatedTables = prev.tables.map(t => {
@@ -4102,7 +4106,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const assignedWaiter = t.waiter || (currentUser?.role === 'WAITER' ? currentUser.name : '');
         
         let orderRef = t.orderRef;
-        let linkedInvoiceNo = t.linkedInvoiceNo;
         let kotBaseSerial = t.kotBaseSerial;
 
         if (!orderRef) {
@@ -4113,27 +4116,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           serialAllocated = true;
         }
 
-        if (!linkedInvoiceNo) {
-          const num = activeSerialConfig.posInvoiceNextNumber || 1;
-          const padded = String(num).padStart(activeSerialConfig.posInvoicePadding || 4, '0');
-          if (activeSerialConfig.posInvoiceIncludeDate) {
-            const dateStr = todayDateStr.replace(/-/g, '');
-            linkedInvoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${dateStr}-${padded}`;
-          } else {
-            linkedInvoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${padded}`;
-          }
-          activeSerialConfig.posInvoiceNextNumber = num + 1;
-          serialAllocated = true;
-        }
-
-        if (!kotBaseSerial) {
+        if (!kotBaseSerial || kotBaseSerial.startsWith('KOT-0') || kotBaseSerial.startsWith('KOT-1')) {
           const num = activeSerialConfig.kotNextNumber || 1;
           const padded = String(num).padStart(activeSerialConfig.kotPadding || 4, '0');
+          const effKotPrefix = (activeSerialConfig.kotPrefix && activeSerialConfig.kotPrefix !== 'KOT-') ? activeSerialConfig.kotPrefix : 'KOT-ORD-';
           if (activeSerialConfig.kotIncludeDate) {
             const dateStr = todayDateStr.replace(/-/g, '');
-            kotBaseSerial = `${activeSerialConfig.kotPrefix || 'KOT-'}${dateStr}-${padded}`;
+            kotBaseSerial = `${effKotPrefix}${dateStr}-${padded}`;
           } else {
-            kotBaseSerial = `${activeSerialConfig.kotPrefix || 'KOT-'}${padded}`;
+            kotBaseSerial = `${effKotPrefix}${padded}`;
           }
           activeSerialConfig.kotNextNumber = num + 1;
           serialAllocated = true;
@@ -4145,7 +4136,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           cart: existingCart,
           waiter: assignedWaiter,
           orderRef,
-          linkedInvoiceNo,
           kotBaseSerial,
           orderCreatedBy: t.orderCreatedBy || currentUser?.name || 'Cashier',
           orderCreatedRole: t.orderCreatedRole || currentUser?.role || 'CASHIER',
@@ -4547,7 +4537,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const nextKotCount = (table.kotCount || 0) + 1;
     const isAddonKot = nextKotCount > 1;
     const linkedInvoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
-    const baseKotNo = table.kotBaseSerial || `KOT-${orderRef}`;
+    let activeSerialConfig = { ...(data.serialConfig || DEFAULT_SERIAL_CONFIG) };
+    if (activeSerialConfig.kotPrefix === 'KOT-') activeSerialConfig.kotPrefix = 'KOT-ORD-';
+    let baseKotNo = table.kotBaseSerial;
+    let serialConfigChanged = false;
+
+    if (!baseKotNo || baseKotNo.startsWith('KOT-0') || baseKotNo.startsWith('KOT-1')) {
+      const todayDateStr = data.businessDay?.date || new Date().toISOString().split('T')[0];
+      const num = activeSerialConfig.kotNextNumber || 1;
+      const padded = String(num).padStart(activeSerialConfig.kotPadding || 4, '0');
+      const effKotPrefix = (activeSerialConfig.kotPrefix && activeSerialConfig.kotPrefix !== 'KOT-') ? activeSerialConfig.kotPrefix : 'KOT-ORD-';
+      if (activeSerialConfig.kotIncludeDate) {
+        const dateStr = todayDateStr.replace(/-/g, '');
+        baseKotNo = `${effKotPrefix}${dateStr}-${padded}`;
+      } else {
+        baseKotNo = `${effKotPrefix}${padded}`;
+      }
+      activeSerialConfig.kotNextNumber = num + 1;
+      serialConfigChanged = true;
+    }
+
     const invoiceNo = isAddonKot 
       ? `${baseKotNo}-#${nextKotCount}` 
       : baseKotNo;
@@ -5151,7 +5160,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const orderRef = table.orderRef || ('ORD-' + Date.now().toString().slice(-5));
     const nextBillCount = (table.billCount || 0) + 1;
     const isUpdatedBill = nextBillCount > 1;
-    const posInvoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
+
+    let activeSerialConfig = { ...(data.serialConfig || DEFAULT_SERIAL_CONFIG) };
+    let serialConfigChanged = false;
+    let posInvoiceNo = table.linkedInvoiceNo;
+    const isLegacyRandomInvoice = posInvoiceNo && /POS-\d{5,6}$/.test(posInvoiceNo) && !posInvoiceNo.includes('POS-00');
+
+    if (!posInvoiceNo || isLegacyRandomInvoice) {
+      const todayDateStr = data.businessDay?.date || new Date().toISOString().split('T')[0];
+      const num = activeSerialConfig.posInvoiceNextNumber || 1;
+      const padded = String(num).padStart(activeSerialConfig.posInvoicePadding || 4, '0');
+      if (activeSerialConfig.posInvoiceIncludeDate) {
+        const dateStr = todayDateStr.replace(/-/g, '');
+        posInvoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${dateStr}-${padded}`;
+      } else {
+        posInvoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${padded}`;
+      }
+      activeSerialConfig.posInvoiceNextNumber = num + 1;
+      serialConfigChanged = true;
+    }
+
     const billInvoiceNo = isUpdatedBill 
       ? `${posInvoiceNo}-v${nextBillCount}`
       : posInvoiceNo;
@@ -5171,9 +5199,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     lastSyncedTablesStrRef.current = JSON.stringify(updatedBillTables);
     setData(prev => ({
       ...prev,
-      tables: updatedBillTables
+      tables: updatedBillTables,
+      serialConfig: serialConfigChanged ? activeSerialConfig : prev.serialConfig
     }));
-    syncPosTablesToServer(updatedBillTables, undefined, 'BILL_PRINT');
+    syncPosTablesToServer(updatedBillTables, undefined, 'BILL_PRINT', serialConfigChanged ? activeSerialConfig : undefined);
 
     const agents = data.commissionAgents || DEFAULT_COMMISSION_AGENTS;
     const agent = agents.find(a => a.id === table.channelOrAgentId);
@@ -5467,9 +5496,33 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const changeReturn = Math.max(0, totalEntered - netTotal);
     const cashRetained = Math.max(0, computedCash - changeReturn);
-    const invoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
-    const effectiveOrderRef = table.orderRef 
-      || (table.orderCreatedAt ? ('ORD-' + String(table.orderCreatedAt).slice(-5)) : ('ORD-' + Date.now().toString().slice(-5)));
+    let activeSerialConfig = { ...(data.serialConfig || DEFAULT_SERIAL_CONFIG) };
+    let serialConfigChanged = false;
+    let invoiceNo = table.linkedInvoiceNo;
+    const isLegacyRandomInvoice = invoiceNo && /POS-\d{5,6}$/.test(invoiceNo) && !invoiceNo.includes('POS-00');
+
+    if (!invoiceNo || isLegacyRandomInvoice) {
+      const todayDateStr = data.businessDay?.date || new Date().toISOString().split('T')[0];
+      const num = activeSerialConfig.posInvoiceNextNumber || 1;
+      const padded = String(num).padStart(activeSerialConfig.posInvoicePadding || 4, '0');
+      if (activeSerialConfig.posInvoiceIncludeDate) {
+        const dateStr = todayDateStr.replace(/-/g, '');
+        invoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${dateStr}-${padded}`;
+      } else {
+        invoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${padded}`;
+      }
+      activeSerialConfig.posInvoiceNextNumber = num + 1;
+      serialConfigChanged = true;
+    }
+
+    let effectiveOrderRef = table.orderRef;
+    if (!effectiveOrderRef) {
+      const num = activeSerialConfig.orderRefNextNumber || 1;
+      const padded = String(num).padStart(activeSerialConfig.orderRefPadding || 4, '0');
+      effectiveOrderRef = `${activeSerialConfig.orderRefPrefix || 'ORD-'}${padded}`;
+      activeSerialConfig.orderRefNextNumber = num + 1;
+      serialConfigChanged = true;
+    }
     const today = (data.businessDay?.isOpen && data.businessDay.date) ? data.businessDay.date : (data.session?.startDate || new Date().toISOString().split('T')[0]);
     const itemSummary = table.cart.map(i => `${i.name} (${i.qty})`).join(', ');
 
@@ -5530,6 +5583,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       discountType: 'taka' as const,
       discountVal: 0,
       cart: [],
+      linkedSaleId: undefined,
+      linkedInvoiceNo: undefined,
+      kotBaseSerial: undefined,
+      isPaidOrder: false,
+      paidAmount: 0,
       orderCreatedBy: undefined,
       orderCreatedRole: undefined,
       orderCreatedId: undefined,
@@ -5543,7 +5601,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     lastLocalEditTimeRef.current = Date.now();
     lastSyncedTablesStrRef.current = JSON.stringify(freedTables);
-    syncPosTablesToServer(freedTables, newSale, 'TABLE_SETTLE');
+    syncPosTablesToServer(freedTables, newSale, 'TABLE_SETTLE', serialConfigChanged ? activeSerialConfig : undefined);
 
     // Update state
     setData(prev => {
@@ -5582,7 +5640,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         customers: updatedCustomers,
         customerAdvances: updatedCustomerAdvances,
         sales: [...prev.sales, newSale],
-        tables: freedTables
+        tables: freedTables,
+        serialConfig: serialConfigChanged ? activeSerialConfig : prev.serialConfig
       };
     });
 
@@ -8270,6 +8329,21 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   };
 
+  // Master Serial & Sequences Configuration
+  const updateSerialConfig = (configUpdates: Partial<SerialNumberConfig>) => {
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => {
+      const updatedConfig: SerialNumberConfig = {
+        ...(prev.serialConfig || DEFAULT_SERIAL_CONFIG),
+        ...configUpdates
+      };
+      return {
+        ...prev,
+        serialConfig: updatedConfig
+      };
+    });
+  };
+
   const totalCustomerAdvances = (data.customerAdvances || [])
     .filter(a => a.status === 'ACTIVE' || (a.status !== 'REFUNDED' && (a.amount || 0) > (a.adjustedAmount || 0)))
     .reduce((sum, a) => sum + Math.max(0, (a.amount || 0) - (a.adjustedAmount || 0)), 0);
@@ -8459,6 +8533,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       editTableZone,
       deleteTableZone,
       updateRestaurantProfile,
+      updateSerialConfig,
       addAccountHead,
       editAccountHead,
       deleteAccountHead,

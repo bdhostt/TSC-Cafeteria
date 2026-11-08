@@ -1980,7 +1980,7 @@ async function startServer() {
     function sanitizeTables(tables: any[]) {
     if (!Array.isArray(tables)) return tables;
     return tables.map(t => {
-      if ((!t.cart || t.cart.length === 0) && !t.linkedSaleId) {
+      if (!t.cart || t.cart.length === 0) {
         return {
           ...t,
           status: 'free',
@@ -1989,6 +1989,11 @@ async function startServer() {
           cart: [],
           discountVal: 0,
           channelOrAgentId: 'dine_in',
+          linkedSaleId: undefined,
+          linkedInvoiceNo: undefined,
+          kotBaseSerial: undefined,
+          isPaidOrder: false,
+          paidAmount: 0,
           orderCreatedBy: undefined,
           orderCreatedRole: undefined,
           orderCreatedId: undefined,
@@ -2006,8 +2011,15 @@ async function startServer() {
 
   app.post("/api/restaurant/pos-sync", async (req, res) => {
     try {
-      const { tables, newSale, action = 'TABLES_UPDATE' } = req.body;
+      const { tables, newSale, action = 'TABLES_UPDATE', serialConfig } = req.body;
       const now = Date.now();
+
+      if (serialConfig && typeof serialConfig === 'object' && cachedState) {
+        cachedState.serialConfig = {
+          ...(cachedState.serialConfig || {}),
+          ...serialConfig
+        };
+      }
 
       if (Array.isArray(tables) && cachedState) {
         cachedState.tables = sanitizeTables(tables);
@@ -2028,7 +2040,8 @@ async function startServer() {
           action,
           timestamp: now,
           tables: cachedState.tables,
-          newSale: newSale || null
+          newSale: newSale || null,
+          serialConfig: cachedState.serialConfig
         });
 
         // Persist to MongoDB asynchronously in background
@@ -2068,7 +2081,8 @@ async function startServer() {
       timestamp: lastServerUpdate,
       fullUpdateTimestamp: lastFullStateUpdate,
       tables: sanitizeTables(cachedState?.tables || []),
-      salesCount: cachedState?.sales?.length || 0
+      salesCount: cachedState?.sales?.length || 0,
+      serialConfig: cachedState?.serialConfig
     });
   });
 
