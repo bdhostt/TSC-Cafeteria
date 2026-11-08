@@ -24,8 +24,20 @@ if (Test-Path $installerBat) {
 }
 Copy-Item (Join-Path $rootDir "scripts\README-INSTRUCTIONS.txt") $pkgDir -Force
 
-Get-ChildItem (Join-Path $rootDir "scripts") -File | ForEach-Object {
-    Copy-Item $_.FullName (Join-Path $pkgDir "scripts") -Force
+$printerScripts = @(
+    "print-raw.ps1",
+    "raw-print.exe",
+    "raw-print.cs",
+    "setup-autostart.ps1",
+    "stop-agent.ps1",
+    "remove-autostart.ps1"
+)
+
+foreach ($sc in $printerScripts) {
+    $srcPath = Join-Path $rootDir "scripts\$sc"
+    if (Test-Path $srcPath) {
+        Copy-Item $srcPath (Join-Path $pkgDir "scripts\$sc") -Force
+    }
 }
 
 if (-not (Test-Path $downloadsDir)) {

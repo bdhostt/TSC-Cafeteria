@@ -50,7 +50,7 @@ function loadEnvFile() {
 }
 loadEnvFile();
 
-const envTargetUrl = process.env.APP_URL || process.env.CLOUD_SERVER_URL || (process.env.PORT ? `http://localhost:${process.env.PORT}` : 'http://localhost:3000');
+const envTargetUrl = process.env.APP_URL || process.env.CLOUD_SERVER_URL || 'https://posdemo.bdhostt.com';
 const CLOUD_SERVER_URL = (process.argv[2] || envTargetUrl).replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 250;

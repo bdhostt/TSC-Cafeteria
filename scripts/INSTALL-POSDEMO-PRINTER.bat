@@ -29,7 +29,7 @@ if "!APP_URL!"=="" if exist "%INSTALL_DIR%\.env" (
     )
 )
 if "!APP_URL!"=="" if not "%~1"=="" set "APP_URL=%~1"
-if "!APP_URL!"=="" set "APP_URL=http://localhost:3000"
+if "!APP_URL!"=="" set "APP_URL=https://posdemo.bdhostt.com"
 
 :: Strip surrounding quotes if any
 set APP_URL=!APP_URL:"=!

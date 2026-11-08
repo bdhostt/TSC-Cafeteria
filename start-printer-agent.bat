@@ -25,7 +25,7 @@ if "!CLOUD_URL!"=="" if exist "%~dp0..\.env" (
     )
 )
 if "!CLOUD_URL!"=="" if not "%~1"=="" set "CLOUD_URL=%~1"
-if "!CLOUD_URL!"=="" set "CLOUD_URL=http://localhost:3000"
+if "!CLOUD_URL!"=="" set "CLOUD_URL=https://posdemo.bdhostt.com"
 
 :: Strip quotes
 set CLOUD_URL=!CLOUD_URL:"=!
