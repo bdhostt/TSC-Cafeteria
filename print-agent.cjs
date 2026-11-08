@@ -440,7 +440,7 @@ function buildKotEscPosBuffer(req, slip, index, total, targetPrinter) {
   pushBytes([0x1B, 0x45, 0x01]); // Bold ON
   const cleanStation = (!slip.station || slip.station === 'SPLIT_ALL' || slip.station === 'ALL') ? 'MAIN KITCHEN' : slip.station;
   pushStr('STATION: ' + cleanStation.toUpperCase() + '\n');
-  const invoiceVal = (req.invoiceNo || 'KOT-0000') + (total > 1 ? '-' + index : '');
+  const invoiceVal = req.invoiceNo || 'KOT-0000';
   pushStr('KOT NO: ' + invoiceVal + '\n');
   if (slip.category) {
     pushStr('Category: ' + slip.category + '\n');

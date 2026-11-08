@@ -866,7 +866,7 @@ const allPrinters = (data?.printers && data.printers.length > 0) ? data.printers
             </div>
           )}
           <div className="font-semibold text-xs text-slate-700">
-            {isCancelKot ? 'VOID KOT #' : 'KOT #'} {printableReceipt.invoiceNo}{ticketIndex ? `-${ticketIndex}` : ''}
+            {isCancelKot ? 'VOID KOT #' : 'KOT #'} {printableReceipt.invoiceNo}
           </div>
         </div>
 
