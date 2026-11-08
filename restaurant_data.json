@@ -941,7 +941,7 @@
         "type": "ASSET",
         "category": "Current Assets",
         "systemRole": "CASH",
-        "balance": 36090
+        "balance": 0
       },
       {
         "id": "1020",

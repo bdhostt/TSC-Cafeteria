@@ -8220,6 +8220,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           waiterShifts: [],
           activeWaiterShift: null,
           journalEntries: [],
+          chartOfAccounts: (prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS).map(acc => ({
+            ...acc,
+            balance: 0
+          })),
           tables: (prev.tables || []).map(t => ({ 
             ...t, 
             status: 'free' as const, 
@@ -8259,6 +8263,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       waiterShifts: [],
       activeWaiterShift: null,
       journalEntries: [],
+      chartOfAccounts: (prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS).map(acc => ({
+        ...acc,
+        balance: 0
+      })),
       tables: (prev.tables || []).map(t => ({ 
         ...t, 
         status: 'free' as const, 
