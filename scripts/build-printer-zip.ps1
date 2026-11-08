@@ -1,4 +1,4 @@
-# Build CafeBananiPrinter-Setup.zip
+# Build POSDEMO-Printer-Setup.zip
 $ErrorActionPreference = "Stop"
 $rootDir = (Get-Item $PSScriptRoot).Parent.FullName
 $pkgDir = Join-Path $rootDir "pkg-build-tmp"
@@ -12,8 +12,16 @@ Copy-Item (Join-Path $rootDir "print-agent.cjs") $pkgDir -Force
 Copy-Item (Join-Path $rootDir "run-printer-silent.vbs") $pkgDir -Force
 Copy-Item (Join-Path $rootDir "start-printer-agent.bat") $pkgDir -Force
 Copy-Item (Join-Path $rootDir "stop-printer-agent.bat") $pkgDir -Force
-Copy-Item (Join-Path $rootDir "scripts\INSTALL-CAFE-BANANI-PRINTER.bat") (Join-Path $pkgDir "INSTALL-POS-PRINTER.bat") -Force
-Copy-Item (Join-Path $rootDir "scripts\INSTALL-CAFE-BANANI-PRINTER.bat") $pkgDir -Force
+if (Test-Path (Join-Path $rootDir ".env")) {
+    Copy-Item (Join-Path $rootDir ".env") $pkgDir -Force
+}
+
+$installerBat = Join-Path $rootDir "scripts\INSTALL-POSDEMO-PRINTER.bat"
+if (Test-Path $installerBat) {
+    Copy-Item $installerBat (Join-Path $pkgDir "INSTALL-POSDEMO-PRINTER.bat") -Force
+    Copy-Item $installerBat (Join-Path $pkgDir "INSTALL-POS-PRINTER.bat") -Force
+    Copy-Item $installerBat $pkgDir -Force
+}
 Copy-Item (Join-Path $rootDir "scripts\README-INSTRUCTIONS.txt") $pkgDir -Force
 
 Get-ChildItem (Join-Path $rootDir "scripts") -File | ForEach-Object {
@@ -24,10 +32,25 @@ if (-not (Test-Path $downloadsDir)) {
     New-Item -ItemType Directory -Path $downloadsDir -Force | Out-Null
 }
 
-$zipPath = Join-Path $downloadsDir "CafeBananiPrinter-Setup.zip"
+$zipPath = Join-Path $downloadsDir "POSDEMO-Printer-Setup.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
 Compress-Archive -Path "$pkgDir\*" -DestinationPath $zipPath -Force
+
+# Create backwards compatibility copies
+Copy-Item $zipPath (Join-Path $downloadsDir "DEMOPOS Printer-Setup.zip") -Force
+Copy-Item $zipPath (Join-Path $downloadsDir "CafeBananiPrinter-Setup.zip") -Force
+
+# Also sync to dist/downloads if dist exists
+$distDownloads = Join-Path $rootDir "dist\downloads"
+if (Test-Path (Join-Path $rootDir "dist")) {
+    if (-not (Test-Path $distDownloads)) {
+        New-Item -ItemType Directory -Path $distDownloads -Force | Out-Null
+    }
+    Copy-Item $zipPath (Join-Path $distDownloads "POSDEMO-Printer-Setup.zip") -Force
+    Copy-Item $zipPath (Join-Path $distDownloads "CafeBananiPrinter-Setup.zip") -Force
+}
+
 Remove-Item $pkgDir -Recurse -Force
 
 Write-Host "Created Zip at: $zipPath"

@@ -17,7 +17,41 @@ console.log = (...args) => { origLog(...args); writeToLog('INFO', ...args); };
 console.error = (...args) => { origErr(...args); writeToLog('ERROR', ...args); };
 console.warn = (...args) => { origWarn(...args); writeToLog('WARN', ...args); };
 
-const CLOUD_SERVER_URL = (process.argv[2] || process.env.CLOUD_SERVER_URL || 'https://posdemo.bdhostt.com').replace(/\/+$/, '');
+// Auto-load .env so agent strictly follows APP_URL configured in .env
+function loadEnvFile() {
+  const envCandidates = [
+    path.join(__dirname, '.env'),
+    path.join(__dirname, '..', '.env'),
+    path.join(process.cwd(), '.env')
+  ];
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const raw = fs.readFileSync(envPath, 'utf8');
+        raw.split(/\r?\n/).forEach(line => {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) return;
+          const idx = trimmed.indexOf('=');
+          if (idx > 0) {
+            const k = trimmed.slice(0, idx).trim();
+            let v = trimmed.slice(idx + 1).trim();
+            if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+              v = v.slice(1, -1);
+            }
+            if (!process.env[k]) {
+              process.env[k] = v;
+            }
+          }
+        });
+        break;
+      } catch (e) {}
+    }
+  }
+}
+loadEnvFile();
+
+const envTargetUrl = process.env.APP_URL || process.env.CLOUD_SERVER_URL || (process.env.PORT ? `http://localhost:${process.env.PORT}` : 'http://localhost:3000');
+const CLOUD_SERVER_URL = (process.argv[2] || envTargetUrl).replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 250;
 

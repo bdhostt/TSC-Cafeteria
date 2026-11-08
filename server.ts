@@ -1470,8 +1470,11 @@ async function startServer() {
 
   // Download 1-Click Printer Agent Setup ZIP
   app.get("/api/download/printer-agent-zip", (req, res) => {
-    const brandSlug = (cachedState?.restaurantProfile?.name || "POS").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "POS";
+    const brandSlug = "POSDEMO";
     const candidates = [
+      path.join(process.cwd(), "public", "downloads", "POSDEMO-Printer-Setup.zip"),
+      path.join(process.cwd(), "dist", "downloads", "POSDEMO-Printer-Setup.zip"),
+      path.join(process.cwd(), "public", "downloads", "DEMOPOS Printer-Setup.zip"),
       path.join(process.cwd(), "public", "downloads", "CafeBananiPrinter-Setup.zip"),
       path.join(process.cwd(), "dist", "downloads", "CafeBananiPrinter-Setup.zip")
     ];
@@ -1487,12 +1490,25 @@ async function startServer() {
 
   // Download 1-Click Installer BAT directly
   app.get("/api/download/printer-installer-bat", (req, res) => {
-    const brandSlug = (cachedState?.restaurantProfile?.name || "POS").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "POS";
-    const batPath = path.join(process.cwd(), "scripts", "INSTALL-CAFE-BANANI-PRINTER.bat");
-    if (fs.existsSync(batPath)) {
-      res.setHeader('Content-Disposition', `attachment; filename="INSTALL-${brandSlug}-PRINTER.bat"`);
+    const batCandidates = [
+      path.join(process.cwd(), "scripts", "INSTALL-POSDEMO-PRINTER.bat"),
+      path.join(process.cwd(), "scripts", "INSTALL-DEMOPOS-PRINTER.bat"),
+      path.join(process.cwd(), "scripts", "INSTALL-CAFE-BANANI-PRINTER.bat")
+    ];
+    const batPath = batCandidates.find(p => fs.existsSync(p));
+    if (batPath) {
+      // Strictly resolve target URL from .env (APP_URL) or current incoming request
+      const effectiveUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+      let batContent = fs.readFileSync(batPath, 'utf8');
+
+      // Ensure the generated installer strictly connects to effectiveUrl and never hits other servers
+      batContent = batContent.replace(/http:\/\/localhost:3000/g, effectiveUrl);
+      batContent = batContent.replace(/https:\/\/posdemo\.bdhostt\.com/g, effectiveUrl);
+      batContent = batContent.replace(/https:\/\/tsc-cafeteria\.onrender\.com/g, effectiveUrl);
+
+      res.setHeader('Content-Disposition', `attachment; filename="INSTALL-POSDEMO-PRINTER.bat"`);
       res.setHeader('Content-Type', 'application/x-bat');
-      return res.sendFile(batPath);
+      return res.send(batContent);
     }
     return res.status(404).json({ success: false, error: "Installer script not found" });
   });
