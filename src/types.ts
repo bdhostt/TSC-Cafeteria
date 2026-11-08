@@ -159,6 +159,7 @@ export interface Table {
   orderRef?: string;
   kotCount?: number;
   billCount?: number;
+  kotBaseSerial?: string;
 }
 
 export interface Session {
@@ -704,6 +705,30 @@ export interface RestaurantProfile {
   enableVat?: boolean; // toggle auto-VAT on/off
 }
 
+export type SerialResetCycle = 'NEVER' | 'DAILY' | 'YEARLY';
+
+export interface SerialNumberConfig {
+  posInvoicePrefix: string;
+  posInvoiceNextNumber: number;
+  posInvoicePadding: number;
+  posInvoiceIncludeDate: boolean;
+  posInvoiceResetCycle: SerialResetCycle;
+
+  kotPrefix: string;
+  kotNextNumber: number;
+  kotPadding: number;
+  kotIncludeDate: boolean;
+  kotResetCycle: SerialResetCycle;
+
+  orderRefPrefix: string;
+  orderRefNextNumber: number;
+  orderRefPadding: number;
+  orderRefResetCycle: SerialResetCycle;
+
+  lastResetDate?: string;
+  lastResetYear?: number;
+}
+
 export interface AppData {
   session: Session;
   businessDay?: BusinessDay;
@@ -750,6 +775,7 @@ export interface AppData {
   employmentTypes?: EmploymentType[];
   leaveTypes?: LeaveType[];
   journalEntries?: JournalEntry[];
+  serialConfig?: SerialNumberConfig;
 }
 
 export interface PrintableReceipt {

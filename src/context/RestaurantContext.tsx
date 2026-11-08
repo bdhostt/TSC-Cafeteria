@@ -984,7 +984,68 @@ export const DEFAULT_JOURNAL_ENTRIES: JournalEntry[] = [
   }
 ];
 
+export const DEFAULT_SERIAL_CONFIG: SerialNumberConfig = {
+  posInvoicePrefix: 'POS-',
+  posInvoiceNextNumber: 1,
+  posInvoicePadding: 4,
+  posInvoiceIncludeDate: false,
+  posInvoiceResetCycle: 'NEVER',
+
+  kotPrefix: 'KOT-',
+  kotNextNumber: 1,
+  kotPadding: 4,
+  kotIncludeDate: false,
+  kotResetCycle: 'NEVER',
+
+  orderRefPrefix: 'ORD-',
+  orderRefNextNumber: 1,
+  orderRefPadding: 4,
+  orderRefResetCycle: 'NEVER',
+
+  lastResetDate: new Date().toISOString().split('T')[0],
+  lastResetYear: new Date().getFullYear()
+};
+
+export function checkAndResetSerialConfig(config: SerialNumberConfig, currentDayDateStr: string): { updated: SerialNumberConfig; changed: boolean } {
+  const currentYear = new Date(currentDayDateStr || Date.now()).getFullYear();
+  let updated = { ...config };
+  let changed = false;
+
+  if (config.lastResetDate && config.lastResetDate !== currentDayDateStr) {
+    if (config.posInvoiceResetCycle === 'DAILY') {
+      updated.posInvoiceNextNumber = 1;
+      changed = true;
+    }
+    if (config.kotResetCycle === 'DAILY') {
+      updated.kotNextNumber = 1;
+      changed = true;
+    }
+    if (config.orderRefResetCycle === 'DAILY') {
+      updated.orderRefNextNumber = 1;
+      changed = true;
+    }
+    updated.lastResetDate = currentDayDateStr;
+    changed = true;
+  }
+
+  if (config.lastResetYear && config.lastResetYear !== currentYear) {
+    if (config.posInvoiceResetCycle === 'YEARLY') {
+      updated.posInvoiceNextNumber = 1;
+      changed = true;
+    }
+    if (config.kotResetCycle === 'YEARLY') {
+      updated.kotNextNumber = 1;
+      changed = true;
+    }
+    updated.lastResetYear = currentYear;
+    changed = true;
+  }
+
+  return { updated, changed };
+}
+
 const DEFAULT_DATA: AppData = {
+  serialConfig: DEFAULT_SERIAL_CONFIG,
   session: { 
     isActive: false, 
     openingCash: 0, 
@@ -1539,6 +1600,7 @@ interface RestaurantContextType {
 
   // Restaurant Profile & Branding
   updateRestaurantProfile: (profile: Partial<RestaurantProfile>) => void;
+  updateSerialConfig: (config: Partial<SerialNumberConfig>) => void;
 
   // HR & Staff Management
   addEmployee: (emp: Omit<Employee, 'id'>) => void;
@@ -4027,11 +4089,56 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
 
+      const todayDateStr = prev.businessDay?.date || new Date().toISOString().split('T')[0];
+      const { updated: resetCheckedConfig, changed: resetChanged } = checkAndResetSerialConfig(
+        prev.serialConfig || DEFAULT_SERIAL_CONFIG,
+        todayDateStr
+      );
+      let activeSerialConfig = { ...resetCheckedConfig };
+      let serialAllocated = resetChanged;
+
       const updatedTables = prev.tables.map(t => {
         if (t.id !== tableId) return t;
         const assignedWaiter = t.waiter || (currentUser?.role === 'WAITER' ? currentUser.name : '');
-        const orderRef = t.orderRef || ('ORD-' + Date.now().toString().slice(-5));
-        const linkedInvoiceNo = t.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
+        
+        let orderRef = t.orderRef;
+        let linkedInvoiceNo = t.linkedInvoiceNo;
+        let kotBaseSerial = t.kotBaseSerial;
+
+        if (!orderRef) {
+          const num = activeSerialConfig.orderRefNextNumber || 1;
+          const padded = String(num).padStart(activeSerialConfig.orderRefPadding || 4, '0');
+          orderRef = `${activeSerialConfig.orderRefPrefix || 'ORD-'}${padded}`;
+          activeSerialConfig.orderRefNextNumber = num + 1;
+          serialAllocated = true;
+        }
+
+        if (!linkedInvoiceNo) {
+          const num = activeSerialConfig.posInvoiceNextNumber || 1;
+          const padded = String(num).padStart(activeSerialConfig.posInvoicePadding || 4, '0');
+          if (activeSerialConfig.posInvoiceIncludeDate) {
+            const dateStr = todayDateStr.replace(/-/g, '');
+            linkedInvoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${dateStr}-${padded}`;
+          } else {
+            linkedInvoiceNo = `${activeSerialConfig.posInvoicePrefix || 'POS-'}${padded}`;
+          }
+          activeSerialConfig.posInvoiceNextNumber = num + 1;
+          serialAllocated = true;
+        }
+
+        if (!kotBaseSerial) {
+          const num = activeSerialConfig.kotNextNumber || 1;
+          const padded = String(num).padStart(activeSerialConfig.kotPadding || 4, '0');
+          if (activeSerialConfig.kotIncludeDate) {
+            const dateStr = todayDateStr.replace(/-/g, '');
+            kotBaseSerial = `${activeSerialConfig.kotPrefix || 'KOT-'}${dateStr}-${padded}`;
+          } else {
+            kotBaseSerial = `${activeSerialConfig.kotPrefix || 'KOT-'}${padded}`;
+          }
+          activeSerialConfig.kotNextNumber = num + 1;
+          serialAllocated = true;
+        }
+
         return {
           ...t,
           status: t.status === 'free' ? 'hold' : t.status,
@@ -4039,6 +4146,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           waiter: assignedWaiter,
           orderRef,
           linkedInvoiceNo,
+          kotBaseSerial,
           orderCreatedBy: t.orderCreatedBy || currentUser?.name || 'Cashier',
           orderCreatedRole: t.orderCreatedRole || currentUser?.role || 'CASHIER',
           orderCreatedId: t.orderCreatedId || currentUser?.id,
@@ -4046,7 +4154,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
       });
 
-      return { ...prev, tables: updatedTables };
+      return { 
+        ...prev, 
+        tables: updatedTables,
+        serialConfig: serialAllocated ? activeSerialConfig : prev.serialConfig
+      };
     });
   };
 
@@ -4435,9 +4547,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const nextKotCount = (table.kotCount || 0) + 1;
     const isAddonKot = nextKotCount > 1;
     const linkedInvoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
+    const baseKotNo = table.kotBaseSerial || `KOT-${orderRef}`;
     const invoiceNo = isAddonKot 
-      ? `KOT-${orderRef}-#${nextKotCount}` 
-      : `KOT-${orderRef}`;
+      ? `${baseKotNo}-#${nextKotCount}` 
+      : baseKotNo;
     const dateTime = new Date().toLocaleString('en-US');
 
     // Mark all current items in cart as KOT printed up to their current full quantity

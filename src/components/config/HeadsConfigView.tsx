@@ -4,6 +4,7 @@ import { AccountHead, AccountType, AccountSystemRole, RestaurantProfile, Commiss
 import { PrintersConfigView } from './PrintersConfigView';
 import { PrintTemplatesConfigView } from './PrintTemplatesConfigView';
 import { PaymentMethodsConfigView } from './PaymentMethodsConfigView';
+import { SerialConfigView } from './SerialConfigView';
 import { 
   CreditCard,
   Settings, 
@@ -107,7 +108,7 @@ export const HeadsConfigView: React.FC = () => {
     }
   }, [activeSubNav]);
 
-  const switchTab = (tab: 'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments' | 'vat') => {
+  const switchTab = (tab: 'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments' | 'vat' | 'serials') => {
     setActiveTab(tab);
     setActiveSubNav(tab);
   };
@@ -843,6 +844,19 @@ export const HeadsConfigView: React.FC = () => {
             >
               <Percent className="w-3.5 h-3.5" />
               <span>VAT & Tax Configuration</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab('serials')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'serials'
+                  ? 'bg-blue-600 text-white shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="KOT & POS Invoice Numbering Sequences"
+            >
+              <Hash className="w-3.5 h-3.5" />
+              <span>Serial & Sequences</span>
             </button>
           </div>
         </div>
@@ -1936,6 +1950,13 @@ export const HeadsConfigView: React.FC = () => {
       {activeTab === 'payments' && (
         <div className="animate-in fade-in">
           <PaymentMethodsConfigView />
+        </div>
+      )}
+
+      {/* Serial & Sequence Setup Tab */}
+      {activeTab === 'serials' && (
+        <div className="animate-in fade-in">
+          <SerialConfigView />
         </div>
       )}
 
