@@ -991,7 +991,7 @@ export const DEFAULT_SERIAL_CONFIG: SerialNumberConfig = {
   posInvoiceIncludeDate: false,
   posInvoiceResetCycle: 'NEVER',
 
-  kotPrefix: 'KOT-ORD-',
+  kotPrefix: 'KOT-',
   kotNextNumber: 1,
   kotPadding: 4,
   kotIncludeDate: false,
@@ -4098,7 +4098,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         todayDateStr
       );
       let activeSerialConfig = { ...resetCheckedConfig };
-      if (activeSerialConfig.kotPrefix === 'KOT-') activeSerialConfig.kotPrefix = 'KOT-ORD-';
+      if (activeSerialConfig.kotPrefix === 'KOT-ORD-') activeSerialConfig.kotPrefix = 'KOT-';
       let serialAllocated = resetChanged;
 
       const updatedTables = prev.tables.map(t => {
@@ -4116,10 +4116,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           serialAllocated = true;
         }
 
-        if (!kotBaseSerial || kotBaseSerial.startsWith('KOT-0') || kotBaseSerial.startsWith('KOT-1')) {
+        if (!kotBaseSerial || kotBaseSerial.startsWith('KOT-ORD-')) {
           const num = activeSerialConfig.kotNextNumber || 1;
           const padded = String(num).padStart(activeSerialConfig.kotPadding || 4, '0');
-          const effKotPrefix = (activeSerialConfig.kotPrefix && activeSerialConfig.kotPrefix !== 'KOT-') ? activeSerialConfig.kotPrefix : 'KOT-ORD-';
+          const effKotPrefix = (activeSerialConfig.kotPrefix && activeSerialConfig.kotPrefix !== 'KOT-ORD-') ? activeSerialConfig.kotPrefix : 'KOT-';
           if (activeSerialConfig.kotIncludeDate) {
             const dateStr = todayDateStr.replace(/-/g, '');
             kotBaseSerial = `${effKotPrefix}${dateStr}-${padded}`;
@@ -4538,15 +4538,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const isAddonKot = nextKotCount > 1;
     const linkedInvoiceNo = table.linkedInvoiceNo || ('POS-' + Date.now().toString().slice(-6));
     let activeSerialConfig = { ...(data.serialConfig || DEFAULT_SERIAL_CONFIG) };
-    if (activeSerialConfig.kotPrefix === 'KOT-') activeSerialConfig.kotPrefix = 'KOT-ORD-';
+    if (activeSerialConfig.kotPrefix === 'KOT-ORD-') activeSerialConfig.kotPrefix = 'KOT-';
     let baseKotNo = table.kotBaseSerial;
     let serialConfigChanged = false;
 
-    if (!baseKotNo || baseKotNo.startsWith('KOT-0') || baseKotNo.startsWith('KOT-1')) {
+    if (!baseKotNo || baseKotNo.startsWith('KOT-ORD-')) {
       const todayDateStr = data.businessDay?.date || new Date().toISOString().split('T')[0];
       const num = activeSerialConfig.kotNextNumber || 1;
       const padded = String(num).padStart(activeSerialConfig.kotPadding || 4, '0');
-      const effKotPrefix = (activeSerialConfig.kotPrefix && activeSerialConfig.kotPrefix !== 'KOT-') ? activeSerialConfig.kotPrefix : 'KOT-ORD-';
+      const effKotPrefix = (activeSerialConfig.kotPrefix && activeSerialConfig.kotPrefix !== 'KOT-ORD-') ? activeSerialConfig.kotPrefix : 'KOT-';
       if (activeSerialConfig.kotIncludeDate) {
         const dateStr = todayDateStr.replace(/-/g, '');
         baseKotNo = `${effKotPrefix}${dateStr}-${padded}`;
