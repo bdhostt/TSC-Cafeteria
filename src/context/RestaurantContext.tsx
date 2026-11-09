@@ -2354,6 +2354,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const lastSyncedTablesStrRef = useRef<string>("");
   const debounceSyncTimerRef = useRef<any>(null);
   const debounceStorageTimerRef = useRef<any>(null);
+  const debounceTablesSyncTimerRef = useRef<any>(null);
 
   useEffect(() => {
     dataRef.current = data;
@@ -2366,6 +2367,47 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     activeTableIdRef.current = activeTableId;
   }, [activeTableId]);
+
+    // Bulletproof cart merger: Guarantees zero local draft items are lost during rapid clicks or server sync
+  const mergeTableCarts = (serverCart: TableCartItem[] = [], localCart: TableCartItem[] = []): TableCartItem[] => {
+    if (!Array.isArray(localCart) || localCart.length === 0) return serverCart || [];
+    if (!Array.isArray(serverCart) || serverCart.length === 0) return localCart;
+
+    const result: TableCartItem[] = [];
+    const handledKeys = new Set<string>();
+
+    for (const sItem of serverCart) {
+      const key = sItem.cartItemId || String(sItem.id);
+      handledKeys.add(key);
+
+      const lItem = localCart.find(li => (li.cartItemId || String(li.id)) === key);
+      if (!lItem) {
+        result.push(sItem);
+      } else {
+        const sPrinted = sItem.kotPrintedQty || (sItem.kotPrinted ? sItem.qty : 0);
+        const lPrinted = lItem.kotPrintedQty || (lItem.kotPrinted ? lItem.qty : 0);
+        const maxPrinted = Math.max(sPrinted, lPrinted);
+        const maxQty = Math.max(sItem.qty, lItem.qty);
+
+        result.push({
+          ...sItem,
+          ...lItem,
+          qty: maxQty,
+          kotPrinted: maxPrinted > 0 && maxPrinted >= maxQty,
+          kotPrintedQty: maxPrinted
+        });
+      }
+    }
+
+    for (const lItem of localCart) {
+      const key = lItem.cartItemId || String(lItem.id);
+      if (!handledKeys.has(key)) {
+        result.push(lItem);
+      }
+    }
+
+    return result;
+  };
 
   // Unified, smart state processor for both SSE real-time stream and HTTP polling
   const processIncomingServerState = (incomingData: AppData, serverTimestamp?: number, isInitial = false) => {
@@ -2403,91 +2445,32 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const localTables = dataRef.current?.tables || [];
       const now = Date.now();
       result.data.tables = result.data.tables.map((t: Table) => {
-        if ((!t.cart || t.cart.length === 0) && !t.linkedSaleId) {
-          return {
-            ...t,
-            status: 'free',
-            waiter: '',
-            customer: 'Walk-in Customer',
-            cart: [],
-            discountVal: 0,
-            channelOrAgentId: 'dine_in',
-            orderCreatedBy: undefined,
-            orderCreatedRole: undefined,
-            orderCreatedId: undefined,
-            orderCreatedAt: undefined,
-            billedAt: undefined,
-            billedAtTime: undefined,
-            orderRef: undefined,
-            kotCount: 0,
-            billCount: 0
-          };
-        }
         const lt = localTables.find(l => l.id === t.id);
         if (!lt) return t;
 
-        // If local table was freed locally within the last 4 seconds, keep it free
-        if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - lastLocalEditTimeRef.current < 4000)) {
+        // If table was settled locally (< 4000ms), prevent stale server cart revive
+        if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - (lastLocalEditTimeRef.current || 0) < 4000)) {
           return lt;
         }
 
-        // Never downgrade already-printed KOT items
-        if (Array.isArray(t.cart) && Array.isArray(lt.cart) && lt.cart.length > 0) {
-          const mergedCart = t.cart.map(inItem => {
-            const lItem = lt.cart.find(li => 
-              (li.cartItemId && inItem.cartItemId && li.cartItemId === inItem.cartItemId) ||
-              (li.id != null && inItem.id != null && String(li.id) === String(inItem.id) && li.name === inItem.name)
-            );
-            if (lItem) {
-              const isLocalPrinted = lItem.kotPrinted || (lItem.kotPrintedQty || 0) > 0;
-              const maxKotQty = Math.max(lItem.kotPrintedQty || 0, inItem.kotPrintedQty || 0);
-              if (isLocalPrinted) {
-                return {
-                  ...inItem,
-                  kotPrinted: true,
-                  kotPrintedQty: maxKotQty > 0 ? maxKotQty : inItem.qty,
-                  kotPrintedAt: inItem.kotPrintedAt || lItem.kotPrintedAt,
-                  kotPrintedTimestamp: inItem.kotPrintedTimestamp || lItem.kotPrintedTimestamp
-                };
-              }
-            }
-            return inItem;
-          });
-          return {
-            ...t,
-            cart: mergedCart
-          };
-        }
+        const mergedCart = mergeTableCarts(t.cart || [], lt.cart || []);
+        const isCartEmpty = mergedCart.length === 0;
 
-        return t;
+        return {
+          ...t,
+          status: isCartEmpty ? 'free' as const : (t.status === 'free' ? 'hold' as const : t.status),
+          waiter: lt.waiter || t.waiter,
+          customer: (lt.customer && lt.customer !== 'Walk-in Customer') ? lt.customer : (t.customer || lt.customer),
+          channelOrAgentId: lt.channelOrAgentId || t.channelOrAgentId,
+          discountVal: lt.discountVal ?? t.discountVal,
+          discountType: lt.discountType ?? t.discountType,
+          orderRef: lt.orderRef || t.orderRef,
+          kotBaseSerial: lt.kotBaseSerial || t.kotBaseSerial,
+          kotCount: Math.max(lt.kotCount || 0, t.kotCount || 0),
+          billCount: Math.max(lt.billCount || 0, t.billCount || 0),
+          cart: mergedCart
+        };
       });
-
-      // Smart Table Protection: only protect draft cart if user is actively in 'order' screen
-      const isActivelyOnOrderScreen = posView === 'order';
-      if (isActivelyOnOrderScreen && activeTableId && !isInitial) {
-        const localActive = dataRef.current.tables?.find(t => t.id === activeTableId);
-        const hasUnprintedDraft = localActive && Array.isArray(localActive.cart) && localActive.cart.some(item => !item.kotPrinted);
-
-        if (hasUnprintedDraft && localActive) {
-          result.data.tables = result.data.tables.map((st: Table) => {
-            if (st.id === activeTableId) {
-              return {
-                ...st,
-                cart: localActive.cart,
-                status: localActive.status,
-                waiter: localActive.waiter || st.waiter,
-                customer: (localActive.customer && localActive.customer !== 'Walk-in Customer') ? localActive.customer : (st.customer || localActive.customer),
-                channelOrAgentId: localActive.channelOrAgentId || st.channelOrAgentId,
-                discountVal: localActive.discountVal ?? st.discountVal,
-                discountType: localActive.discountType ?? st.discountType,
-                orderCreatedBy: localActive.orderCreatedBy || st.orderCreatedBy,
-                orderCreatedRole: localActive.orderCreatedRole || st.orderCreatedRole
-              };
-            }
-            return st;
-          });
-        }
-      }
     }
 
     if (result.data) {
@@ -2595,97 +2578,38 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     lastSyncedTablesStrRef.current = inTablesStr;
 
     const now = Date.now();
-    const sanitizedIncoming = incomingTables.map(t => {
-      if ((!t.cart || t.cart.length === 0) && !t.linkedSaleId) {
-        return {
-          ...t,
-          status: 'free' as const,
-          waiter: '',
-          customer: 'Walk-in Customer',
-          cart: [],
-          discountVal: 0,
-          channelOrAgentId: 'dine_in',
-          orderCreatedBy: undefined,
-          orderCreatedRole: undefined,
-          orderCreatedId: undefined,
-          orderCreatedAt: undefined,
-          billedAt: undefined,
-          billedAtTime: undefined,
-          orderRef: undefined,
-          kotCount: 0,
-          billCount: 0
-        };
-      }
-      return t;
-    });
-
     const currentLocalTables = dataRef.current.tables || [];
-    const mergedTables = sanitizedIncoming.map(st => {
+    const mergedTables = incomingTables.map(st => {
       const lt = currentLocalTables.find(l => l.id === st.id);
       if (!lt) return st;
 
       // If local table was settled recently (< 4000ms), do not let stale server cart revive it
-      if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - lastLocalEditTimeRef.current < 4000)) {
+      if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - (lastLocalEditTimeRef.current || 0) < 4000)) {
         return lt;
       }
 
-      // Never downgrade already-printed KOT items
-      if (Array.isArray(st.cart) && Array.isArray(lt.cart) && lt.cart.length > 0) {
-        const mergedCart = st.cart.map(inItem => {
-          const lItem = lt.cart.find(li => 
-            (li.cartItemId && inItem.cartItemId && li.cartItemId === inItem.cartItemId) ||
-            (li.id != null && inItem.id != null && String(li.id) === String(inItem.id) && li.name === inItem.name)
-          );
-          if (lItem) {
-            const isLocalPrinted = lItem.kotPrinted || (lItem.kotPrintedQty || 0) > 0;
-            const maxKotQty = Math.max(lItem.kotPrintedQty || 0, inItem.kotPrintedQty || 0);
-            if (isLocalPrinted) {
-              return {
-                ...inItem,
-                kotPrinted: true,
-                kotPrintedQty: maxKotQty > 0 ? maxKotQty : inItem.qty,
-                kotPrintedAt: inItem.kotPrintedAt || lItem.kotPrintedAt,
-                kotPrintedTimestamp: inItem.kotPrintedTimestamp || lItem.kotPrintedTimestamp
-              };
-            }
-          }
-          return inItem;
-        });
-        return {
-          ...st,
-          cart: mergedCart
-        };
-      }
-      return st;
+      // Merge carts ensuring zero local draft items are lost
+      const finalCart = mergeTableCarts(st.cart || [], lt.cart || []);
+      const isCartEmpty = finalCart.length === 0;
+
+      return {
+        ...st,
+        status: isCartEmpty ? 'free' as const : (st.status === 'free' ? 'hold' as const : st.status),
+        waiter: lt.waiter || st.waiter,
+        customer: (lt.customer && lt.customer !== 'Walk-in Customer') ? lt.customer : (st.customer || lt.customer),
+        channelOrAgentId: lt.channelOrAgentId || st.channelOrAgentId,
+        discountVal: lt.discountVal ?? st.discountVal,
+        discountType: lt.discountType ?? st.discountType,
+        orderRef: lt.orderRef || st.orderRef,
+        kotBaseSerial: lt.kotBaseSerial || st.kotBaseSerial,
+        kotCount: Math.max(lt.kotCount || 0, st.kotCount || 0),
+        billCount: Math.max(lt.billCount || 0, st.billCount || 0),
+        cart: finalCart
+      };
     });
 
     setData(prev => {
-      const isActivelyOnOrderScreen = posViewRef.current === 'order';
-      const curActiveId = activeTableIdRef.current;
       let finalTables = mergedTables;
-
-      if (isActivelyOnOrderScreen && curActiveId) {
-        const localActive = prev.tables?.find(t => t.id === curActiveId);
-        const hasUnprintedDraft = localActive && Array.isArray(localActive.cart) && localActive.cart.some(item => !item.kotPrinted);
-
-        if (hasUnprintedDraft && localActive) {
-          finalTables = mergedTables.map(st => {
-            if (st.id === curActiveId) {
-              return {
-                ...st,
-                cart: localActive.cart,
-                status: localActive.status,
-                waiter: localActive.waiter || st.waiter,
-                customer: (localActive.customer && localActive.customer !== 'Walk-in Customer') ? localActive.customer : (st.customer || localActive.customer),
-                channelOrAgentId: localActive.channelOrAgentId || st.channelOrAgentId,
-                discountVal: localActive.discountVal ?? st.discountVal,
-                discountType: localActive.discountType ?? st.discountType
-              };
-            }
-            return st;
-          });
-        }
-      }
 
       let updatedSales = prev.sales || [];
       if (newSale && newSale.invoiceNo) {
@@ -2737,6 +2661,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         },
         body: JSON.stringify({
           action,
+          sender: tabClientIdRef.current,
           tables: tablesToSend,
           newSale: newSaleToSend,
           serialConfig: serialConfigToSend
@@ -2764,7 +2689,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const res = await fetch("/api/restaurant/state", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
-        body: JSON.stringify({ data: stateToSend, clientTimestamp: timestamp }),
+        body: JSON.stringify({ data: stateToSend, sender: tabClientIdRef.current, clientTimestamp: timestamp }),
       });
       if (res.ok) {
         const result = await res.json();
@@ -2800,6 +2725,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           try {
             const parsed = JSON.parse(event.data);
             if (!parsed) return;
+            // Strictly ignore echo from this tab
+            if (parsed.sender && parsed.sender === tabClientIdRef.current) return;
             if (parsed.type === 'POS_TABLES_UPDATE' && parsed.tables) {
               applyIncomingTables(parsed.tables, parsed.newSale, parsed.timestamp, parsed.serialConfig);
             } else if (parsed.type === 'CONNECTED' && parsed.tables) {
@@ -2890,13 +2817,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           } catch (e) {}
         }, 200);
 
-        // Instant zero-lag differential tables push (<10ms across all terminals)
+        // Debounced differential tables push (350ms batching) to eliminate network race conditions on rapid multi-item selection
         const curTablesStr = JSON.stringify(data.tables);
         if (curTablesStr !== lastSyncedTablesStrRef.current) {
           lastSyncedTablesStrRef.current = curTablesStr;
           const recentSale = (data.sales && data.sales.length > 0) ? data.sales[data.sales.length - 1] : undefined;
           const isRecentSettle = recentSale && (now - (recentSale.createdAt || recentSale.id || 0) < 5000);
-          syncPosTablesToServer(data.tables, isRecentSettle ? recentSale : undefined);
+          if (debounceTablesSyncTimerRef.current) clearTimeout(debounceTablesSyncTimerRef.current);
+          debounceTablesSyncTimerRef.current = setTimeout(() => {
+            syncPosTablesToServer(dataRef.current.tables, isRecentSettle ? recentSale : undefined);
+          }, 350);
         }
 
         // Instant zero-lag broadcast to all other open tabs in this browser

@@ -1344,7 +1344,7 @@ export const PosBillingView: React.FC = () => {
           })()}
 
           {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-slate-100 my-2 pr-1 custom-scrollbar">
+          <div ref={cartListRef} className="flex-1 overflow-y-auto min-h-0 divide-y divide-slate-100 my-2 pr-1 custom-scrollbar">
             {activeTable?.cart?.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400 font-medium flex flex-col items-center justify-center gap-3">
                 <p>Cart is empty. Click items from the menu to add dishes.</p>

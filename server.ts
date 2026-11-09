@@ -2027,7 +2027,7 @@ async function startServer() {
 
   app.post("/api/restaurant/pos-sync", async (req, res) => {
     try {
-      const { tables, newSale, action = 'TABLES_UPDATE', serialConfig } = req.body;
+      const { tables, newSale, action = 'TABLES_UPDATE', serialConfig, sender } = req.body;
       const now = Date.now();
 
       if (serialConfig && typeof serialConfig === 'object' && cachedState) {
@@ -2054,6 +2054,7 @@ async function startServer() {
         broadcastRealtimeState({
           type: 'POS_TABLES_UPDATE',
           action,
+          sender: sender || null,
           timestamp: now,
           tables: cachedState.tables,
           newSale: newSale || null,
@@ -2148,7 +2149,7 @@ async function startServer() {
 
   app.post("/api/restaurant/state", async (req, res) => {
     try {
-      const { data: clientData } = req.body;
+      const { data: clientData, sender } = req.body;
 
       if (!isDbConnected()) {
         await connectToDatabase();
@@ -2183,6 +2184,7 @@ async function startServer() {
         // Broadcast to all other terminals instantly via SSE stream
         broadcastRealtimeState({
           type: 'FULL_STATE_UPDATED',
+          sender: sender || null,
           timestamp: lastServerUpdate,
           data: cachedState
         });
