@@ -2073,71 +2073,17 @@ export function computeCogsBomAllocation(
 }
 
 export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [data, setData] = useState<AppData>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const mergedTables = (parsed.tables || DEFAULT_DATA.tables).map((t: Table, idx: number) => {
-          const isCleanFree = (!t.cart || t.cart.length === 0) && !t.linkedSaleId;
-          return {
-            ...t,
-            status: isCleanFree ? 'free' : t.status,
-            zone: t.zone || (t.id.startsWith('VIP') ? 'VIP Lounge' : t.id.startsWith('RT') ? 'Rooftop Garden' : idx >= 3 ? 'Floor 2' : 'Floor 1'),
-            waiter: isCleanFree ? '' : (t.waiter || ''),
-            cart: isCleanFree ? [] : (t.cart || []),
-            discountVal: isCleanFree ? 0 : (t.discountVal || 0),
-            channelOrAgentId: isCleanFree ? 'dine_in' : (t.channelOrAgentId || 'dine_in'),
-            customer: isCleanFree ? 'Walk-in Customer' : (t.customer || 'Walk-in Customer'),
-            orderCreatedAt: isCleanFree ? undefined : t.orderCreatedAt,
-            orderCreatedBy: isCleanFree ? undefined : t.orderCreatedBy,
-            orderCreatedRole: isCleanFree ? undefined : t.orderCreatedRole,
-            orderCreatedId: isCleanFree ? undefined : t.orderCreatedId,
-            billedAt: isCleanFree ? undefined : t.billedAt,
-            billedAtTime: isCleanFree ? undefined : t.billedAtTime
-          };
-        });
-        const mergedZones = (parsed.tableZones && parsed.tableZones.length > 0)
-          ? parsed.tableZones
-          : DEFAULT_TABLE_ZONES;
-        const mergedDimensions = (!parsed.tableDimensions || (parsed.tableDimensions.width === 210 && parsed.tableDimensions.height === 140))
-          ? { width: 147, height: 98 }
-          : parsed.tableDimensions;
-        const businessDay = parsed.businessDay || {
-          date: new Date().toISOString().split('T')[0],
-          isOpen: parsed.session?.isActive ?? false,
-          openedAt: "11:00 AM",
-          openedBy: "Admin / Cashier",
-          dayNumber: 1
-        };
-        let sanitizedInventory = parsed.inventory || [];
-        if (Array.isArray(sanitizedInventory) && parsed.purchases?.some((p: any) => p.billNo === 'BILL-8540' || p.billNo?.includes('8540'))) {
-          sanitizedInventory = sanitizedInventory.map((inv: any) => {
-            if (inv.id === 1 && inv.open === 1) {
-              return { ...inv, open: 0 };
-            }
-            return inv;
-          });
-        }
-        const mergedCoa = parsed.chartOfAccounts 
-          ? ensureAccountSystemRoles(parsed.chartOfAccounts)
-          : DEFAULT_CHART_OF_ACCOUNTS;
-        return { 
-          ...DEFAULT_DATA, 
-          ...parsed,
-          chartOfAccounts: mergedCoa,
-          inventory: sanitizedInventory,
-          businessDay,
-          tables: mergedTables,
-          tableZones: mergedZones,
-          tableDimensions: mergedDimensions
-        };
-      }
-    } catch (e) {
-      console.error("Error loading app data:", e);
+  // Purge any historical localStorage database dumps so client browsers are completely clean
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TIMESTAMP_STORAGE_KEY);
+      localStorage.removeItem('barcode_cafe_restaurant_data_v2');
+      localStorage.removeItem('barcode_cafe_restaurant_data');
     }
-    return DEFAULT_DATA;
-  });
+  } catch {}
+
+  const [data, setData] = useState<AppData>(DEFAULT_DATA);
 
   const [activeTab, setActiveTabState] = useState<ActiveTab>(() => {
     try {
@@ -2353,7 +2299,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const activeTableIdRef = useRef(activeTableId);
   const lastSyncedTablesStrRef = useRef<string>("");
   const debounceSyncTimerRef = useRef<any>(null);
-  const debounceStorageTimerRef = useRef<any>(null);
   const debounceTablesSyncTimerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -2368,48 +2313,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     activeTableIdRef.current = activeTableId;
   }, [activeTableId]);
 
-    // Bulletproof cart merger: Guarantees zero local draft items are lost during rapid clicks or server sync
-  const mergeTableCarts = (serverCart: TableCartItem[] = [], localCart: TableCartItem[] = []): TableCartItem[] => {
-    if (!Array.isArray(localCart) || localCart.length === 0) return serverCart || [];
-    if (!Array.isArray(serverCart) || serverCart.length === 0) return localCart;
-
-    const result: TableCartItem[] = [];
-    const handledKeys = new Set<string>();
-
-    for (const sItem of serverCart) {
-      const key = sItem.cartItemId || String(sItem.id);
-      handledKeys.add(key);
-
-      const lItem = localCart.find(li => (li.cartItemId || String(li.id)) === key);
-      if (!lItem) {
-        result.push(sItem);
-      } else {
-        const sPrinted = sItem.kotPrintedQty || (sItem.kotPrinted ? sItem.qty : 0);
-        const lPrinted = lItem.kotPrintedQty || (lItem.kotPrinted ? lItem.qty : 0);
-        const maxPrinted = Math.max(sPrinted, lPrinted);
-        const maxQty = Math.max(sItem.qty, lItem.qty);
-
-        result.push({
-          ...sItem,
-          ...lItem,
-          qty: maxQty,
-          kotPrinted: maxPrinted > 0 && maxPrinted >= maxQty,
-          kotPrintedQty: maxPrinted
-        });
-      }
-    }
-
-    for (const lItem of localCart) {
-      const key = lItem.cartItemId || String(lItem.id);
-      if (!handledKeys.has(key)) {
-        result.push(lItem);
-      }
-    }
-
-    return result;
-  };
-
-  // Unified, smart state processor for both SSE real-time stream and HTTP polling
+    // Unified, real-time state processor directly bound to database state
   const processIncomingServerState = (incomingData: AppData, serverTimestamp?: number, isInitial = false) => {
     if (!isInitial && printableReceiptRef.current) {
       return;
@@ -2442,35 +2346,22 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     if (result.data.tables) {
-      const localTables = dataRef.current?.tables || [];
-      const now = Date.now();
-      result.data.tables = result.data.tables.map((t: Table) => {
-        const lt = localTables.find(l => l.id === t.id);
-        if (!lt) return t;
+      if (!isInitial) {
+        const localTables = dataRef.current?.tables || [];
+        const now = Date.now();
+        result.data.tables = result.data.tables.map((t: Table) => {
+          const lt = localTables.find(l => l.id === t.id);
+          if (!lt) return t;
 
-        // If table was settled locally (< 4000ms), prevent stale server cart revive
-        if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - (lastLocalEditTimeRef.current || 0) < 4000)) {
-          return lt;
-        }
+          // If active table edited recently in this tab (< 2500ms), preserve local in-flight draft
+          const isActiveAndRecentlyEdited = (t.id === activeTableIdRef.current) && ((now - (lastLocalEditTimeRef.current || 0)) < 2500);
+          if (isActiveAndRecentlyEdited) {
+            return lt;
+          }
 
-        const mergedCart = mergeTableCarts(t.cart || [], lt.cart || []);
-        const isCartEmpty = mergedCart.length === 0;
-
-        return {
-          ...t,
-          status: isCartEmpty ? 'free' as const : (t.status === 'free' ? 'hold' as const : t.status),
-          waiter: lt.waiter || t.waiter,
-          customer: (lt.customer && lt.customer !== 'Walk-in Customer') ? lt.customer : (t.customer || lt.customer),
-          channelOrAgentId: lt.channelOrAgentId || t.channelOrAgentId,
-          discountVal: lt.discountVal ?? t.discountVal,
-          discountType: lt.discountType ?? t.discountType,
-          orderRef: lt.orderRef || t.orderRef,
-          kotBaseSerial: lt.kotBaseSerial || t.kotBaseSerial,
-          kotCount: Math.max(lt.kotCount || 0, t.kotCount || 0),
-          billCount: Math.max(lt.billCount || 0, t.billCount || 0),
-          cart: mergedCart
-        };
-      });
+          return t;
+        });
+      }
     }
 
     if (result.data) {
@@ -2490,17 +2381,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (isInitial || (serverStateStr !== currentLocalStr && serverStateStr !== lastSyncedStringRef.current)) {
       isUpdatingFromSync.current = true;
       setData(result.data);
+      dataRef.current = result.data;
       lastSyncedStringRef.current = serverStateStr;
       if (serverTimestamp) {
         lastSyncedTimestampRef.current = serverTimestamp;
         lastFullSyncTimestampRef.current = serverTimestamp;
-        try {
-          localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(serverTimestamp));
-        } catch {}
       }
-      try {
-        localStorage.setItem(STORAGE_KEY, serverStateStr);
-      } catch {}
       setTimeout(() => {
         isUpdatingFromSync.current = false;
       }, 150);
@@ -2510,7 +2396,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Synchronize state from server
+  // Synchronize state directly from server database
   const syncFromServer = async (isInitial = false) => {
     if (!isInitial && printableReceiptRef.current) {
       return;
@@ -2525,23 +2411,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const result = await res.json();
       if (result.success && result.data) {
         const serverTimestamp = Number(result.timestamp) || 0;
-        const localSavedTimestamp = Number(localStorage.getItem(TIMESTAMP_STORAGE_KEY)) || 0;
-        const isServerFromMongo = Boolean(result.isLoadedFromMongo);
-
-        const localSalesCount = dataRef.current.sales?.length || 0;
-        const localPurchasesCount = dataRef.current.purchases?.length || 0;
-        const localSessionActive = Boolean(dataRef.current.session?.isActive || (dataRef.current.posSessions && dataRef.current.posSessions.length > 0));
-
-        const isLocalNewer = localSavedTimestamp > serverTimestamp;
-        const isServerUninitialized = !isServerFromMongo && serverTimestamp <= 0;
-
-        if (isInitial && (isLocalNewer || (isServerUninitialized && (localSalesCount > 0 || localPurchasesCount > 0 || localSessionActive)))) {
-          console.log("🛡️ Preserving local restaurant state and syncing up to server (preventing overwrite by default server fallback)");
-          isInitialSyncDoneRef.current = true;
-          syncToServer(dataRef.current);
-          return;
-        }
-
         processIncomingServerState(result.data, serverTimestamp, isInitial);
       }
     } catch (err) {
@@ -2553,12 +2422,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Instant differential tables applicator (<1ms in React)
+  // Instant differential tables applicator (<1ms in React, direct from MongoDB / SSE)
   const applyIncomingTables = (incomingTables: Table[], newSale?: SaleRecord, serverTimestamp?: number, incomingSerialConfig?: SerialNumberConfig) => {
     if (!Array.isArray(incomingTables)) return;
 
     // Protection against race condition / stale snapshot pulse flicker:
-    // If local user made an edit in the last 4 seconds, do not overwrite local tables from an incoming pulse
+    // If local user made an edit in the last 2.5 seconds, do not overwrite local tables from an incoming pulse
     const isRecentlyEditedLocally = (Date.now() - (lastLocalEditTimeRef.current || 0)) < 2500;
     const isServerAhead = Boolean(serverTimestamp && serverTimestamp >= (lastLocalEditTimeRef.current || 0));
     if (isRecentlyEditedLocally && !isServerAhead) {
@@ -2583,29 +2452,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const lt = currentLocalTables.find(l => l.id === st.id);
       if (!lt) return st;
 
-      // If local table was settled recently (< 4000ms), do not let stale server cart revive it
-      if ((!lt.cart || lt.cart.length === 0) && !lt.linkedSaleId && (now - (lastLocalEditTimeRef.current || 0) < 4000)) {
+      // If active table edited recently in this tab (< 2500ms), preserve local in-flight draft
+      const isActiveAndRecentlyEdited = (st.id === activeTableIdRef.current) && ((now - (lastLocalEditTimeRef.current || 0)) < 2500);
+      if (isActiveAndRecentlyEdited) {
         return lt;
       }
 
-      // Merge carts ensuring zero local draft items are lost
-      const finalCart = mergeTableCarts(st.cart || [], lt.cart || []);
-      const isCartEmpty = finalCart.length === 0;
-
-      return {
-        ...st,
-        status: isCartEmpty ? 'free' as const : (st.status === 'free' ? 'hold' as const : st.status),
-        waiter: lt.waiter || st.waiter,
-        customer: (lt.customer && lt.customer !== 'Walk-in Customer') ? lt.customer : (st.customer || lt.customer),
-        channelOrAgentId: lt.channelOrAgentId || st.channelOrAgentId,
-        discountVal: lt.discountVal ?? st.discountVal,
-        discountType: lt.discountType ?? st.discountType,
-        orderRef: lt.orderRef || st.orderRef,
-        kotBaseSerial: lt.kotBaseSerial || st.kotBaseSerial,
-        kotCount: Math.max(lt.kotCount || 0, st.kotCount || 0),
-        billCount: Math.max(lt.billCount || 0, st.billCount || 0),
-        cart: finalCart
-      };
+      // Otherwise, the incoming server table is 100% authoritative
+      return st;
     });
 
     setData(prev => {
@@ -2619,12 +2473,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       }
 
-      return {
+      const next = {
         ...prev,
         tables: finalTables,
         sales: updatedSales,
-        serialConfig: incomingSerialConfig ? { ...(prev.serialConfig || DEFAULT_SERIAL_CONFIG), ...incomingSerialConfig } : prev.serialConfig
+        serialConfig: incomingSerialConfig || prev.serialConfig
       };
+      dataRef.current = next;
+      return next;
     });
 
     if (serverTimestamp) {
@@ -2697,9 +2553,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           lastSyncedStringRef.current = serialized;
           if (result.timestamp) {
             lastSyncedTimestampRef.current = result.timestamp;
-            try {
-              localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(result.timestamp));
-            } catch {}
           }
         }
       }
@@ -2801,23 +2654,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
-  // Save changes to localStorage, broadcast instantly to sibling tabs, and push to Server when modified
+  // Real-time synchronization directly to Server database when state modified
   useEffect(() => {
     try {
       const now = Date.now();
       if (isInitialSyncDoneRef.current && !isUpdatingFromSync.current) {
         lastLocalEditTimeRef.current = now;
 
-        // Debounce heavy full localStorage serialization (200ms batching) to keep main thread completely unblocked during rapid clicks
-        if (debounceStorageTimerRef.current) clearTimeout(debounceStorageTimerRef.current);
-        debounceStorageTimerRef.current = setTimeout(() => {
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(now));
-          } catch (e) {}
-        }, 200);
-
-        // Debounced differential tables push (350ms batching) to eliminate network race conditions on rapid multi-item selection
+        // Debounced differential tables push (300ms batching) to eliminate network race conditions on rapid multi-item selection
         const curTablesStr = JSON.stringify(data.tables);
         if (curTablesStr !== lastSyncedTablesStrRef.current) {
           lastSyncedTablesStrRef.current = curTablesStr;
@@ -2826,7 +2670,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (debounceTablesSyncTimerRef.current) clearTimeout(debounceTablesSyncTimerRef.current);
           debounceTablesSyncTimerRef.current = setTimeout(() => {
             syncPosTablesToServer(dataRef.current.tables, isRecentSettle ? recentSale : undefined);
-          }, 350);
+          }, 300);
         }
 
         // Instant zero-lag broadcast to all other open tabs in this browser
@@ -2840,14 +2684,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           } catch (e) {}
         }
 
-        // Instant zero-delay full state push to MongoDB/Disk (100ms micro-batch)
+        // Debounced full state push to MongoDB
         if (debounceSyncTimerRef.current) clearTimeout(debounceSyncTimerRef.current);
         debounceSyncTimerRef.current = setTimeout(() => {
           syncToServer(data);
-        }, 100);
+        }, 300);
       }
     } catch (e) {
-      console.error("Error saving app data:", e);
+      console.error("Error syncing app data:", e);
     }
   }, [data]);
 
@@ -4278,25 +4122,27 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const clearCart = (tableId: string) => {
     lastLocalEditTimeRef.current = Date.now();
     setData(prev => {
+      const updatedTables = prev.tables.map(t => t.id === tableId ? { 
+        ...t, 
+        cart: [], 
+        status: 'free' as const, 
+        waiter: '', 
+        discountVal: 0,
+        channelOrAgentId: 'dine_in',
+        customer: 'Walk-in Customer',
+        orderCreatedBy: undefined,
+        orderCreatedRole: undefined,
+        orderCreatedId: undefined,
+        orderCreatedAt: undefined,
+        billedAt: undefined,
+        billedAtTime: undefined
+      } : t);
       const nextState = {
         ...prev,
-        tables: prev.tables.map(t => t.id === tableId ? { 
-          ...t, 
-          cart: [], 
-          status: 'free' as const, 
-          waiter: '', 
-          discountVal: 0,
-          channelOrAgentId: 'dine_in',
-          customer: 'Walk-in Customer',
-          orderCreatedBy: undefined,
-          orderCreatedRole: undefined,
-          orderCreatedId: undefined,
-          orderCreatedAt: undefined,
-          billedAt: undefined,
-          billedAtTime: undefined
-        } : t)
+        tables: updatedTables
       };
       dataRef.current = nextState;
+      syncPosTablesToServer(updatedTables, undefined, 'CART_CLEAR');
       return nextState;
     });
   };
@@ -4956,12 +4802,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
 
-      return {
-        ...prev,
-        sales: updatedSales,
-        tables: prev.tables.map(t => t.id === tableId ? {
+      const freedTables = prev.tables.map(t => t.id === tableId ? {
           ...t,
-          status: 'free',
+          status: 'free' as const,
           cart: [],
           waiter: '',
           customer: 'Walk-in Customer',
@@ -4980,8 +4823,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           orderRef: undefined,
           kotCount: 0,
           billCount: 0
-        } : t)
+        } : t);
+
+      const nextState = {
+        ...prev,
+        sales: updatedSales,
+        tables: freedTables
       };
+      dataRef.current = nextState;
+      syncPosTablesToServer(freedTables, undefined, 'TABLE_RELEASE');
+      return nextState;
     });
   };
 
@@ -5001,26 +4852,31 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // revert any unsent extra items and keep submitted items intact on table.
     if (confirmedKotItems.length > 0) {
       lastLocalEditTimeRef.current = Date.now();
-      setData(prev => ({
-        ...prev,
-        tables: prev.tables.map(t => {
-          if (t.id !== tableId) return t;
+      setData(prev => {
+        const nextState = {
+          ...prev,
+          tables: prev.tables.map(t => {
+            if (t.id !== tableId) return t;
 
-          // Revert cart to only KOT-printed items with their confirmed printed quantities
-          const revertedCart = t.cart
-            .filter(item => (item.kotPrintedQty || 0) > 0)
-            .map(item => ({
-              ...item,
-              qty: item.kotPrintedQty || item.qty
-            }));
+            // Revert cart to only KOT-printed items with their confirmed printed quantities
+            const revertedCart = t.cart
+              .filter(item => (item.kotPrintedQty || 0) > 0)
+              .map(item => ({
+                ...item,
+                qty: item.kotPrintedQty || item.qty
+              }));
 
-          return {
-            ...t,
-            cart: revertedCart,
-            status: t.status === 'billed' ? 'billed' : 'hold'
-          };
-        })
-      }));
+            return {
+              ...t,
+              cart: revertedCart,
+              status: t.status === 'billed' ? ('billed' as const) : ('hold' as const)
+            };
+          })
+        };
+        dataRef.current = nextState;
+        syncPosTablesToServer(nextState.tables, undefined, 'ORDER_CANCEL_DRAFT');
+        return nextState;
+      });
     } else {
       // If table has NO confirmed KOT items (e.g. 0 items selected, or unsubmitted draft items),
       // completely release the table back to free (green)
