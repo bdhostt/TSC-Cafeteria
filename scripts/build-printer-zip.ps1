@@ -49,10 +49,6 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
 Compress-Archive -Path "$pkgDir\*" -DestinationPath $zipPath -Force
 
-# Create backwards compatibility copies
-Copy-Item $zipPath (Join-Path $downloadsDir "DEMOPOS Printer-Setup.zip") -Force
-Copy-Item $zipPath (Join-Path $downloadsDir "CafeBananiPrinter-Setup.zip") -Force
-
 # Also sync to dist/downloads if dist exists
 $distDownloads = Join-Path $rootDir "dist\downloads"
 if (Test-Path (Join-Path $rootDir "dist")) {
@@ -60,7 +56,6 @@ if (Test-Path (Join-Path $rootDir "dist")) {
         New-Item -ItemType Directory -Path $distDownloads -Force | Out-Null
     }
     Copy-Item $zipPath (Join-Path $distDownloads "POSDEMO-Printer-Setup.zip") -Force
-    Copy-Item $zipPath (Join-Path $distDownloads "CafeBananiPrinter-Setup.zip") -Force
 }
 
 Remove-Item $pkgDir -Recurse -Force

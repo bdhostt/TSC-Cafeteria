@@ -1473,10 +1473,7 @@ async function startServer() {
     const brandSlug = "POSDEMO";
     const candidates = [
       path.join(process.cwd(), "public", "downloads", "POSDEMO-Printer-Setup.zip"),
-      path.join(process.cwd(), "dist", "downloads", "POSDEMO-Printer-Setup.zip"),
-      path.join(process.cwd(), "public", "downloads", "DEMOPOS Printer-Setup.zip"),
-      path.join(process.cwd(), "public", "downloads", "CafeBananiPrinter-Setup.zip"),
-      path.join(process.cwd(), "dist", "downloads", "CafeBananiPrinter-Setup.zip")
+      path.join(process.cwd(), "dist", "downloads", "POSDEMO-Printer-Setup.zip")
     ];
     for (const zipPath of candidates) {
       if (fs.existsSync(zipPath)) {
@@ -1491,9 +1488,7 @@ async function startServer() {
   // Download 1-Click Installer BAT directly
   app.get("/api/download/printer-installer-bat", (req, res) => {
     const batCandidates = [
-      path.join(process.cwd(), "scripts", "INSTALL-POSDEMO-PRINTER.bat"),
-      path.join(process.cwd(), "scripts", "INSTALL-DEMOPOS-PRINTER.bat"),
-      path.join(process.cwd(), "scripts", "INSTALL-CAFE-BANANI-PRINTER.bat")
+      path.join(process.cwd(), "scripts", "INSTALL-POSDEMO-PRINTER.bat")
     ];
     const batPath = batCandidates.find(p => fs.existsSync(p));
     if (batPath) {
