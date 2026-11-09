@@ -229,7 +229,18 @@ export const PosBillingView: React.FC = () => {
   const [billPrintedSuccess, setBillPrintedSuccess] = useState(false);
 
   // Live Clock Tick for Order Elapsed Minutes Tracking
-  const [nowTime, setNowTime] = useState<number>(() => Date.now());
+  
+  // Cart container auto-scroll on new item addition
+  const cartListRef = useRef<HTMLDivElement>(null);
+  const prevCartLengthRef = useRef<number>(0);
+  useEffect(() => {
+    const curLen = activeTable?.cart?.length || 0;
+    if (curLen > prevCartLengthRef.current && cartListRef.current) {
+      cartListRef.current.scrollTop = cartListRef.current.scrollHeight;
+    }
+    prevCartLengthRef.current = curLen;
+  }, [activeTable?.cart?.length]);
+const [nowTime, setNowTime] = useState<number>(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNowTime(Date.now()), 15000);
     return () => clearInterval(timer);
