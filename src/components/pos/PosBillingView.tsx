@@ -1249,28 +1249,6 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
             </div>
           )}
 
-          {/* Billed Table Lock Alert Banner */}
-          {activeTable.status === 'billed' && !activeTable.linkedSaleId && (
-            <div className="mx-2 mt-1.5 p-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex items-center justify-between text-xs shadow-2xs shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-amber-600 text-white shrink-0">
-                  <Lock className="w-3.5 h-3.5" />
-                </span>
-                <div>
-                  <div className="flex items-center gap-1.5 font-black text-xs text-amber-900">
-                    <span>বিল প্রস্তুত ও টেবিল লকড</span>
-                    {activeTable.linkedInvoiceNo && (
-                      <span className="font-mono text-blue-900 bg-white px-1.5 py-0.2 rounded border border-amber-300 font-extrabold">{activeTable.linkedInvoiceNo}</span>
-                    )}
-                  </div>
-                  <div className="text-[10.5px] text-amber-800 font-medium">
-                    বিল প্রিন্ট সম্পন্ন ও টেবিল লক করা আছে। পেমেন্ট সেটেল করুন।
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Order Timing Row: Start Time • End Time • Total Duration (Matching mark 1 text size and style) */}
           {(() => {
             const orderStartTimestamp = activeTable.orderCreatedAt || (
