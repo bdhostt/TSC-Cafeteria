@@ -490,6 +490,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
   // POS Order View Filters
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [isMobileCategoryDrawerOpen, setIsMobileCategoryDrawerOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const allZones = data.tableZones && data.tableZones.length > 0 
@@ -1041,109 +1042,252 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
 
       {/* Left Column: Food Menu catalog, categories, search (takes all remaining space) */}
       <div className={`${mobilePosTab === 'menu' ? 'flex' : 'hidden'} lg:flex flex-1 min-w-0 min-h-0 flex-col h-full overflow-hidden space-y-1.5`}>
-        {/* Category Tabs & Search Bar (Clean full width for menu navigation) */}
-        <div className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-slate-200/90 shadow-none flex items-center gap-2 shrink-0">
-          <div className="w-36 sm:w-44 relative shrink-0">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              id="search-pos-menu"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search dish..."
-              className="w-full pl-7 pr-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-[#004b9b] focus:outline-none"
-            />
-          </div>
+        {/* DESKTOP VIEW (Visible on Desktop >= lg): Horizontal Category Tabs + 4-5 Column Grid */}
+        <div className="hidden lg:flex flex-col flex-1 min-h-0 space-y-1.5 overflow-hidden">
+          {/* Desktop Category Tabs & Search Bar */}
+          <div className="p-1.5 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-slate-200/90 shadow-none flex items-center gap-2 shrink-0">
+            <div className="w-44 relative shrink-0">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                id="search-pos-menu"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search dish..."
+                className="w-full pl-7 pr-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-[#004b9b] focus:outline-none"
+              />
+            </div>
 
-          <div className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-0.5">
-            <button
-              onClick={() => setSelectedCategory('ALL')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition cursor-pointer ${
-                selectedCategory === 'ALL'
-                  ? 'bg-[#004b9b] text-white font-black shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              All Categories
-            </button>
-            {data.menuCategories.map(cat => (
+            <div className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-0.5">
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => setSelectedCategory('ALL')}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition cursor-pointer ${
-                  selectedCategory === cat
+                  selectedCategory === 'ALL'
                     ? 'bg-[#004b9b] text-white font-black shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {cat}
+                All Categories
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Menu Items Grid - Independently scrollable (Maintains optimal card size ~200px-230px on all screen sizes) */}
-        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar min-h-0">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 auto-rows-max">
-            {filteredMenuItems.map(dish => {
-              const inCart = activeTable?.cart?.find(c => c.id === dish.id);
-              const hasOptions = (dish.variations && dish.variations.length > 0) || (dish.addons && dish.addons.length > 0);
-
-              return (
+              {data.menuCategories.map(cat => (
                 <button
-                  key={dish.id}
-                  id={`menu-item-btn-${dish.id}`}
-                  onClick={() => {
-                    if (activeTable?.status === 'billed') {
-                      alert('This table is already billed and locked. Adding items is disabled. Please settle payment.');
-                      return;
-                    }
-                    if (hasOptions) {
-                      setSelectedDishForCustomization(dish);
-                    } else {
-                      addToCart(activeTable.id, dish.id);
-                    }
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-colors duration-75 active:scale-[0.98] flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md select-none ${
-                    inCart 
-                      ? 'bg-blue-50/80 border-[#004b9b] ring-2 ring-blue-400/20' 
-                      : 'bg-white border-slate-200 hover:border-blue-300'
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-[#004b9b] text-white font-black shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-                        {dish.category}
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Menu Items Grid */}
+          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar min-h-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 auto-rows-max">
+              {filteredMenuItems.map(dish => {
+                const inCart = activeTable?.cart?.find(c => c.id === dish.id);
+                const hasOptions = (dish.variations && dish.variations.length > 0) || (dish.addons && dish.addons.length > 0);
+
+                return (
+                  <button
+                    key={dish.id}
+                    id={`menu-item-btn-${dish.id}`}
+                    onClick={() => {
+                      if (activeTable?.status === 'billed') {
+                        alert('This table is already billed and locked. Adding items is disabled. Please settle payment.');
+                        return;
+                      }
+                      if (hasOptions) {
+                        setSelectedDishForCustomization(dish);
+                      } else {
+                        addToCart(activeTable.id, dish.id);
+                      }
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-colors duration-75 active:scale-[0.98] flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md select-none ${
+                      inCart 
+                        ? 'bg-blue-50/80 border-[#004b9b] ring-2 ring-blue-400/20' 
+                        : 'bg-white border-slate-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+                          {dish.category}
+                        </span>
+                        {hasOptions && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 shrink-0">
+                            Options
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-extrabold text-xs text-slate-900 line-clamp-2 leading-snug">
+                        {dish.name}
+                      </h4>
+                    </div>
+
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="font-extrabold text-sm text-slate-900">
+                        ৳ {dish.price}
                       </span>
-                      {hasOptions && (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 shrink-0">
-                          Options
+
+                      {inCart ? (
+                        <span className="w-6 h-6 rounded-full bg-[#004b9b] text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
+                          {inCart.qty}
+                        </span>
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-slate-100 hover:bg-[#004b9b] hover:text-white text-slate-600 text-xs flex items-center justify-center transition">
+                          <Plus className="w-3.5 h-3.5" />
                         </span>
                       )}
                     </div>
-                    <h4 className="font-extrabold text-xs text-slate-900 line-clamp-2 leading-snug">
-                      {dish.name}
-                    </h4>
-                  </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
-                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="font-extrabold text-sm text-slate-900">
-                      ৳ {dish.price}
+        {/* MOBILE VIEW (Visible on Mobile < lg): Vertical Category Strip on Left + 3-Column Menu on Right */}
+        <div className="lg:hidden flex-1 flex min-h-0 overflow-hidden bg-white border border-slate-200 rounded-xl shadow-2xs">
+          {/* Left Vertical Category Strip (Matching reference screenshot) */}
+          <div className="w-[74px] sm:w-[82px] shrink-0 bg-slate-50/80 border-r border-slate-200/90 flex flex-col h-full overflow-hidden select-none">
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-200/60 custom-scrollbar">
+              {/* All Option */}
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('ALL')}
+                className={`w-full py-2.5 px-1 text-center transition cursor-pointer relative flex flex-col items-center justify-center gap-0.5 ${
+                  selectedCategory === 'ALL'
+                    ? 'bg-emerald-50 text-emerald-900 font-black border-l-4 border-emerald-600'
+                    : 'text-slate-600 hover:bg-slate-100 font-bold'
+                }`}
+              >
+                <span className="text-[11px] leading-tight block">All</span>
+                <span className={`text-[9px] px-1 rounded-full font-mono ${
+                  selectedCategory === 'ALL' ? 'bg-emerald-200 text-emerald-900 font-black' : 'text-slate-400'
+                }`}>
+                  {data.menuItems.length}
+                </span>
+              </button>
+
+              {/* Each Category */}
+              {data.menuCategories.map(cat => {
+                const isSelected = selectedCategory === cat;
+                const catItemCount = data.menuItems.filter(m => m.category === cat).length;
+                const displayName = cat.replace(/ Items$/i, '');
+
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`w-full py-2.5 px-1 text-center transition cursor-pointer relative flex flex-col items-center justify-center gap-0.5 ${
+                      isSelected
+                        ? 'bg-emerald-50 text-emerald-900 font-black border-l-4 border-emerald-600'
+                        : 'text-slate-600 hover:bg-slate-100 font-bold'
+                    }`}
+                  >
+                    <span className="text-[11px] leading-tight block break-words max-w-[68px]">
+                      {displayName}
                     </span>
+                    <span className={`text-[9px] px-1 rounded-full font-mono ${
+                      isSelected ? 'bg-emerald-200 text-emerald-900 font-black' : 'text-slate-400'
+                    }`}>
+                      {catItemCount}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-                    {inCart ? (
-                      <span className="w-6 h-6 rounded-full bg-[#004b9b] text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
-                        {inCart.qty}
-                      </span>
-                    ) : (
-                      <span className="w-6 h-6 rounded-full bg-slate-100 hover:bg-[#004b9b] hover:text-white text-slate-600 text-xs flex items-center justify-center transition">
-                        <Plus className="w-3.5 h-3.5" />
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+          {/* Right Area: Search Bar + 3-Column Dish Grid */}
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 p-1 sm:p-1.5 overflow-hidden">
+            {/* Search Input */}
+            <div className="pb-1 shrink-0">
+              <div className="relative">
+                <Search className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search dish..."
+                  className="w-full pl-6 pr-6 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-[#004b9b] focus:outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 3-Column Menu Grid */}
+            <div className="flex-1 overflow-y-auto pr-0.5 custom-scrollbar min-h-0">
+              <div className="grid grid-cols-3 gap-1.5 auto-rows-max pb-1">
+                {filteredMenuItems.map(dish => {
+                  const inCart = activeTable?.cart?.find(c => c.id === dish.id);
+                  const hasOptions = (dish.variations && dish.variations.length > 0) || (dish.addons && dish.addons.length > 0);
+
+                  return (
+                    <button
+                      key={dish.id}
+                      onClick={() => {
+                        if (activeTable?.status === 'billed') {
+                          alert('This table is already billed and locked. Adding items is disabled. Please settle payment.');
+                          return;
+                        }
+                        if (hasOptions) {
+                          setSelectedDishForCustomization(dish);
+                        } else {
+                          addToCart(activeTable.id, dish.id);
+                        }
+                      }}
+                      className={`p-1.5 rounded-xl border text-left transition-colors duration-75 active:scale-[0.96] flex flex-col justify-between min-h-[76px] sm:min-h-[82px] relative cursor-pointer select-none ${
+                        inCart
+                          ? 'bg-blue-50 border-[#004b9b] ring-1 ring-blue-500/40 shadow-xs'
+                          : 'bg-white border-slate-200/90 hover:border-blue-300 shadow-2xs'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        {hasOptions && (
+                          <span className="text-[7.5px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-200 inline-block mb-0.5">
+                            Opt
+                          </span>
+                        )}
+                        <h4 className="font-extrabold text-[10.5px] text-slate-900 line-clamp-2 leading-tight">
+                          {dish.name}
+                        </h4>
+                      </div>
+
+                      <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between">
+                        <span className="font-black text-[11px] text-[#004b9b]">
+                          ৳{dish.price}
+                        </span>
+
+                        {inCart ? (
+                          <span className="w-4.5 h-4.5 rounded-full bg-[#004b9b] text-white font-black text-[9.5px] flex items-center justify-center shadow-xs">
+                            {inCart.qty}
+                          </span>
+                        ) : (
+                          <span className="w-4 h-4 rounded-full bg-slate-100 hover:bg-[#004b9b] hover:text-white text-slate-500 text-[10px] flex items-center justify-center transition">
+                            <Plus className="w-2.5 h-2.5" />
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1504,7 +1648,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                           <Plus className="w-3 h-3" />
                         </button>
 
-                        {/* Void / Delete Button */}
+                        {/* Screen 1 (Desktop / Laptop): Void / Delete Button right after Plus button */}
                         <button
                           type="button"
                           onClick={() => {
@@ -1514,7 +1658,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                               removeCartItem(activeTable.id, item.cartItemId || idx);
                             }
                           }}
-                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer ml-0.5 ${
+                          className={`hidden lg:flex w-6 h-6 rounded-lg items-center justify-center transition cursor-pointer ml-0.5 ${
                             isItemKotPrinted || activeTable.linkedSaleId
                               ? 'bg-rose-100 hover:bg-rose-200 text-rose-700'
                               : 'hover:bg-slate-100 text-slate-400 hover:text-rose-600'
@@ -1536,8 +1680,43 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                       </div>
                     )}
 
-                    <div className="w-14 text-right font-extrabold text-xs text-slate-900 shrink-0">
-                      ৳{item.price * item.qty}
+                    {/* Right side: Price (Desktop: right-aligned) & Mobile Delete Button (Screen 2: far right after price) */}
+                    <div className="flex items-center justify-end gap-1.5 shrink-0">
+                      <div className="w-14 text-right font-extrabold text-xs text-slate-900 shrink-0">
+                        ৳{item.price * item.qty}
+                      </div>
+
+                      {/* Screen 2 (Mobile): Void / Delete Button placed on the far right after price */}
+                      {!isItemLocked && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isItemKotPrinted || activeTable.linkedSaleId) {
+                              setVoidingItem({ item, index: idx });
+                            } else {
+                              removeCartItem(activeTable.id, item.cartItemId || idx);
+                            }
+                          }}
+                          className={`flex lg:hidden w-6 h-6 rounded-lg items-center justify-center transition cursor-pointer ${
+                            isItemKotPrinted || activeTable.linkedSaleId
+                              ? 'bg-rose-100 hover:bg-rose-200 text-rose-700'
+                              : 'hover:bg-rose-50 text-slate-400 hover:text-rose-600'
+                          }`}
+                          title={
+                            activeTable.linkedSaleId
+                              ? 'Void Item & Refund amount'
+                              : (isItemKotPrinted
+                                  ? 'Void KOT Item (Admin/Manager Permission Required)'
+                                  : 'Remove from cart')
+                          }
+                        >
+                          {isItemKotPrinted || activeTable.linkedSaleId ? (
+                            <Ban className="w-3.5 h-3.5 text-rose-700" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1684,10 +1863,10 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                       setPosView('floor');
                     }
                   }}
-                  className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] sm:text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
+                  className={`py-2.5 sm:py-3 min-h-[44px] sm:min-h-[46px] px-1.5 sm:px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-[13px] tracking-tight transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs border border-slate-300/80 ${fullWidth ? 'w-full' : ''}`}
                   title={isTableOccupied ? "Back to Table Floor Plan" : "Cancel, clear items, and release table"}
                 >
-                  <X className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <X className="w-4 h-4 text-slate-500 shrink-0" />
                   <span className="truncate">Cancel</span>
                 </button>
               );
@@ -1706,10 +1885,10 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                     setIsSubmittingKot(false);
                   }
                 }}
-                className="py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] sm:text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer w-full"
+                className="py-2.5 sm:py-3 min-h-[44px] sm:min-h-[46px] px-1.5 sm:px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-[13px] tracking-tight transition flex items-center justify-center gap-1.5 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer w-full"
                 title="Submit Order: Sends KOT to Kitchen & Holds Order on Table"
               >
-                <ChefHat className="w-3.5 h-3.5 shrink-0" />
+                <ChefHat className="w-4 h-4 shrink-0" />
                 <span className="truncate">{isSubmittingKot ? 'Submitting...' : 'Submit (KOT)'}</span>
               </button>
             );
@@ -1726,7 +1905,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                   setBillPrintedSuccess(true);
                   setTimeout(() => setBillPrintedSuccess(false), 2000);
                 }}
-                className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl text-[11px] sm:text-xs font-extrabold transition flex items-center justify-center gap-1 shadow-sm disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''} ${
+                className={`py-2.5 sm:py-3 min-h-[44px] sm:min-h-[46px] px-1.5 sm:px-2 rounded-xl text-xs sm:text-[13px] font-black tracking-tight transition flex items-center justify-center gap-1.5 shadow-sm disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''} ${
                   billPrintedSuccess
                     ? 'bg-emerald-700 text-white'
                     : 'bg-black hover:bg-slate-900 text-white'
@@ -1735,17 +1914,17 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
               >
                 {isPrintingBill ? (
                   <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
                     <span className="truncate">Printing...</span>
                   </>
                 ) : billPrintedSuccess ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                    <Check className="w-4 h-4 text-emerald-300 shrink-0" />
                     <span className="truncate">Printed!</span>
                   </>
                 ) : (
                   <>
-                    <Printer className="w-3.5 h-3.5 shrink-0" />
+                    <Printer className="w-4 h-4 shrink-0" />
                     <span className="truncate">Print Bill</span>
                   </>
                 )}
@@ -1758,10 +1937,10 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                 type="button"
                 disabled={activeTable.cart.length === 0}
                 onClick={() => openSettleModal(activeTable.id)}
-                className={`py-2 sm:py-2.5 px-1 sm:px-1.5 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-[11px] sm:text-xs transition flex items-center justify-center gap-1 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''}`}
+                className={`py-2.5 sm:py-3 min-h-[44px] sm:min-h-[46px] px-1.5 sm:px-2 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-xs sm:text-[13px] tracking-tight transition flex items-center justify-center gap-1.5 shadow-md disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer ${fullWidth ? 'w-full' : ''}`}
                 title="Settle Payment & Pay"
               >
-                <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                <CreditCard className="w-4 h-4 shrink-0" />
                 <span className="truncate">Settle & Pay</span>
               </button>
             );
@@ -1772,35 +1951,35 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
             if (activeTable.linkedSaleId) {
               const remainingDue = Math.max(0, netTotal - (activeTable.paidAmount || 0));
               return (
-                <div className="pt-1.5 sm:pt-2 shrink-0">
+                <div className="pt-2 sm:pt-2.5 shrink-0">
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => finishLinkedOrderInPos(activeTable.id)}
-                      className="py-2 sm:py-2.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1 shadow-2xs border border-slate-300 cursor-pointer"
+                      className="py-2.5 sm:py-3 min-h-[44px] sm:min-h-[46px] px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-[13px] transition flex items-center justify-center gap-1.5 shadow-2xs border border-slate-300 cursor-pointer"
                       title="Save and return to Sales Ledger"
                     >
-                      <RotateCcw className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <RotateCcw className="w-4 h-4 text-slate-500 shrink-0" />
                       <span>Back to Sales</span>
                     </button>
                     {remainingDue > 0 ? (
                       <button
                         type="button"
                         onClick={() => openSettleModal(activeTable.id)}
-                        className="py-2 sm:py-2.5 px-2 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-xs transition flex items-center justify-center gap-1 shadow-md cursor-pointer"
+                        className="py-2.5 sm:py-3 min-h-[44px] sm:min-h-[46px] px-2 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-black text-xs sm:text-[13px] transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
                         title="Settle additional items added to this order"
                       >
-                        <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                        <CreditCard className="w-4 h-4 shrink-0" />
                         <span>Settle Due (৳{remainingDue})</span>
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => finishLinkedOrderInPos(activeTable.id)}
-                        className="py-2 sm:py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition flex items-center justify-center gap-1 shadow-md cursor-pointer"
+                        className="py-2.5 sm:py-3 min-h-[44px] sm:min-h-[46px] px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-[13px] transition flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
                         title="Done modifying order - save and release table"
                       >
-                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        <Check className="w-4 h-4 shrink-0" />
                         <span>Done / Release</span>
                       </button>
                     )}
@@ -1812,7 +1991,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
             // State 1: Cart is empty -> Only Cancel button view hobe
             if (isCartEmpty) {
               return (
-                <div className="pt-1.5 sm:pt-2 shrink-0">
+                <div className="pt-2 sm:pt-2.5 shrink-0">
                   {cancelBtn(true)}
                 </div>
               );
@@ -1827,7 +2006,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
               }
               const billedGridCols = billedButtons.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
               return (
-                <div className="pt-1.5 sm:pt-2 shrink-0">
+                <div className="pt-2 sm:pt-2.5 shrink-0">
                   <div className={`grid ${billedGridCols} gap-1.5 sm:gap-2`}>
                     {billedButtons.map((btn, bIdx) => (
                       <React.Fragment key={bIdx}>{btn}</React.Fragment>
@@ -1861,7 +2040,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                   : 'grid-cols-4';
 
             return (
-              <div className="pt-1.5 sm:pt-2 shrink-0">
+              <div className="pt-2 sm:pt-2.5 shrink-0">
                 <div className={`grid ${gridClass} gap-1.5 sm:gap-2`}>
                   {actionButtons.map((btn, bIdx) => (
                     <React.Fragment key={bIdx}>{btn}</React.Fragment>
@@ -2042,6 +2221,137 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
             setAssigningTable(null);
           }}
         />
+      )}
+
+      {/* Mobile Slide-Over Category Sidebar Drawer (Option 1) */}
+      {isMobileCategoryDrawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop with smooth blur */}
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200"
+            onClick={() => setIsMobileCategoryDrawerOpen(false)}
+          />
+
+          {/* Slide-in Drawer from Left */}
+          <div className="fixed inset-y-0 left-0 w-[285px] sm:w-[320px] max-w-[85vw] bg-white shadow-2xl flex flex-col h-full z-10 animate-in slide-in-from-left duration-200 border-r border-slate-200">
+            {/* Drawer Header */}
+            <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#004b9b] text-white flex items-center justify-center shadow-xs">
+                  <Utensils className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900 leading-tight">Food Categories</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    {data.menuCategories.length} Categories • {data.menuItems.length} Dishes
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileCategoryDrawerOpen(false)}
+                className="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition cursor-pointer"
+                title="Close Categories Drawer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Category Items List */}
+            <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 custom-scrollbar">
+              {/* All Categories Option */}
+              {(() => {
+                const isSelected = selectedCategory === 'ALL';
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory('ALL');
+                      setIsMobileCategoryDrawerOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-xl text-left font-bold text-xs transition flex items-center justify-between cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-[#004b9b] to-[#002652] text-white shadow-sm ring-1 ring-blue-500'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <LayoutGrid className={`w-4 h-4 ${isSelected ? 'text-blue-200' : 'text-[#004b9b]'}`} />
+                      <span>All Categories</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                      isSelected ? 'bg-white/20 text-white font-bold' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {data.menuItems.length}
+                    </span>
+                  </button>
+                );
+              })()}
+
+              <div className="py-1">
+                <div className="h-px bg-slate-100" />
+              </div>
+
+              {/* Individual Categories */}
+              {data.menuCategories.map(cat => {
+                const isSelected = selectedCategory === cat;
+                const catItemCount = data.menuItems.filter(m => m.category === cat).length;
+
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(cat);
+                      setIsMobileCategoryDrawerOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-xl text-left font-bold text-xs transition flex items-center justify-between cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-[#004b9b] to-[#002652] text-white shadow-sm ring-1 ring-blue-500'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-slate-300'}`} />
+                      <span className="truncate max-w-[170px]">{cat}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                      isSelected ? 'bg-white/20 text-white font-bold' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {catItemCount}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="p-3 border-t border-slate-100 bg-slate-50 shrink-0">
+              {selectedCategory !== 'ALL' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory('ALL');
+                    setIsMobileCategoryDrawerOpen(false);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset to All Categories</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCategoryDrawerOpen(false)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#004b9b] hover:bg-[#005bb8] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Done</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
