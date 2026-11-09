@@ -2353,6 +2353,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const activeTableIdRef = useRef(activeTableId);
   const lastSyncedTablesStrRef = useRef<string>("");
   const debounceSyncTimerRef = useRef<any>(null);
+  const debounceStorageTimerRef = useRef<any>(null);
 
   useEffect(() => {
     dataRef.current = data;
@@ -2877,10 +2878,17 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     try {
       const now = Date.now();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       if (isInitialSyncDoneRef.current && !isUpdatingFromSync.current) {
-        localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(now));
         lastLocalEditTimeRef.current = now;
+
+        // Debounce heavy full localStorage serialization (200ms batching) to keep main thread completely unblocked during rapid clicks
+        if (debounceStorageTimerRef.current) clearTimeout(debounceStorageTimerRef.current);
+        debounceStorageTimerRef.current = setTimeout(() => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            localStorage.setItem(TIMESTAMP_STORAGE_KEY, String(now));
+          } catch (e) {}
+        }, 200);
 
         // Instant zero-lag differential tables push (<10ms across all terminals)
         const curTablesStr = JSON.stringify(data.tables);
@@ -3677,6 +3685,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsStartSessionModalOpen(true);
       return;
     }
+    // Synchronously bind active table and view refs to prevent race conditions during rapid entry
+    activeTableIdRef.current = tableId;
+    posViewRef.current = 'order';
     const targetTable = data.tables?.find(t => t.id === tableId);
     if (targetTable && (!targetTable.cart || targetTable.cart.length === 0) && !targetTable.linkedSaleId && targetTable.status !== 'free') {
       const sanitized = data.tables.map(t => t.id === tableId ? {
@@ -4144,11 +4155,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
       });
 
-      return { 
+      const nextState = { 
         ...prev, 
         tables: updatedTables,
         serialConfig: serialAllocated ? activeSerialConfig : prev.serialConfig
       };
+      dataRef.current = nextState;
+      return nextState;
     });
   };
 
@@ -4231,7 +4244,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           cart: existingCart
         };
       });
-      return { ...prev, tables: updatedTables };
+      const nextState = { ...prev, tables: updatedTables };
+      dataRef.current = nextState;
+      return nextState;
     });
   };
 
@@ -4266,7 +4281,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           cart: existingCart
         };
       });
-      return { ...prev, tables: updatedTables };
+      const nextState = { ...prev, tables: updatedTables };
+      dataRef.current = nextState;
+      return nextState;
     });
   };
 
@@ -4322,30 +4339,36 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           cart: existingCart
         };
       });
-      return { ...prev, tables: updatedTables };
+      const nextState = { ...prev, tables: updatedTables };
+      dataRef.current = nextState;
+      return nextState;
     });
   };
 
   const clearCart = (tableId: string) => {
     lastLocalEditTimeRef.current = Date.now();
-    setData(prev => ({
-      ...prev,
-      tables: prev.tables.map(t => t.id === tableId ? { 
-        ...t, 
-        cart: [], 
-        status: 'free', 
-        waiter: '', 
-        discountVal: 0,
-        channelOrAgentId: 'dine_in',
-        customer: 'Walk-in Customer',
-        orderCreatedBy: undefined,
-        orderCreatedRole: undefined,
-        orderCreatedId: undefined,
-        orderCreatedAt: undefined,
-        billedAt: undefined,
-        billedAtTime: undefined
-      } : t)
-    }));
+    setData(prev => {
+      const nextState = {
+        ...prev,
+        tables: prev.tables.map(t => t.id === tableId ? { 
+          ...t, 
+          cart: [], 
+          status: 'free' as const, 
+          waiter: '', 
+          discountVal: 0,
+          channelOrAgentId: 'dine_in',
+          customer: 'Walk-in Customer',
+          orderCreatedBy: undefined,
+          orderCreatedRole: undefined,
+          orderCreatedId: undefined,
+          orderCreatedAt: undefined,
+          billedAt: undefined,
+          billedAtTime: undefined
+        } : t)
+      };
+      dataRef.current = nextState;
+      return nextState;
+    });
   };
 
   const setTableDiscount = (tableId: string, type: DiscountType, val: number) => {

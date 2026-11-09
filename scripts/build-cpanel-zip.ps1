@@ -30,7 +30,6 @@ $filesToCopy = @(
     "app.js",
     "package.json",
     "package-lock.json",
-    "restaurant_data.json",
     "print-agent.cjs",
     ".node-version",
     ".env.example",

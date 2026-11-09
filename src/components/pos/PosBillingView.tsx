@@ -487,18 +487,20 @@ export const PosBillingView: React.FC = () => {
 
 
 
-  // Filtered menu items
-  const filteredMenuItems = data.menuItems.filter(item => {
-    if (selectedDept !== 'ALL' && item.department !== selectedDept) return false;
-    if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const matchName = item.name.toLowerCase().includes(q);
-      const matchCat = item.category.toLowerCase().includes(q);
-      if (!matchName && !matchCat) return false;
-    }
-    return true;
-  });
+  // Filtered menu items (Memoized to eliminate main-thread lag during rapid typing/clicks)
+  const filteredMenuItems = useMemo(() => {
+    return data.menuItems.filter(item => {
+      if (selectedDept !== 'ALL' && item.department !== selectedDept) return false;
+      if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = item.name.toLowerCase().includes(q);
+        const matchCat = item.category.toLowerCase().includes(q);
+        if (!matchName && !matchCat) return false;
+      }
+      return true;
+    });
+  }, [data.menuItems, selectedDept, selectedCategory, searchQuery]);
 
   // Mobile Terminal Tab: 'menu' (Food Menu catalog) or 'cart' (Order, Cart & Bill)
   const [mobilePosTab, setMobilePosTab] = useState<'menu' | 'cart'>('menu');
@@ -1091,7 +1093,7 @@ export const PosBillingView: React.FC = () => {
                       addToCart(activeTable.id, dish.id);
                     }
                   }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md hover:scale-[1.02] ${
+                  className={`p-3.5 rounded-2xl border text-left transition-colors duration-75 active:scale-[0.98] flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md select-none ${
                     inCart 
                       ? 'bg-blue-50/80 border-[#004b9b] ring-2 ring-blue-400/20' 
                       : 'bg-white border-slate-200 hover:border-blue-300'
