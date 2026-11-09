@@ -5383,7 +5383,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       createdAt: Date.now()
     };
 
-    const freedTables = data.tables.map(t => t.id === tableId ? {
+    const currentTables = dataRef.current?.tables || data.tables;
+    const freedTables = currentTables.map(t => t.id === tableId ? {
       ...t,
       status: 'free' as const,
       waiter: '',
@@ -5444,7 +5445,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ? currentCusts
         : [...currentCusts, targetCustomer];
 
-      return {
+      const next = {
         ...prev,
         customers: updatedCustomers,
         customerAdvances: updatedCustomerAdvances,
@@ -5452,6 +5453,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         tables: freedTables,
         serialConfig: serialConfigChanged ? activeSerialConfig : prev.serialConfig
       };
+      dataRef.current = next;
+      return next;
     });
 
     // Trigger celebration confetti
