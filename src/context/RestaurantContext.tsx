@@ -6750,17 +6750,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const savePurchaseOrder = (order: Partial<PurchaseOrder> & { id?: number }, updateMasterRates: boolean = false) => {
     setData(prev => {
-      const pos = prev.purchaseOrders || DEFAULT_PURCHASE_ORDERS;
+      const pos = prev.purchaseOrders || [];
+      const index = order.id ? pos.findIndex(p => p.id === order.id) : -1;
       let updatedPOs: PurchaseOrder[];
-      if (order.id) {
-        const index = pos.findIndex(p => p.id === order.id);
-        if (index >= 0) {
-          updatedPOs = [...pos];
-          updatedPOs[index] = { ...pos[index], ...order } as PurchaseOrder;
-        } else {
-          updatedPOs = pos;
-        }
+
+      if (index >= 0) {
+        // Edit existing PO
+        updatedPOs = [...pos];
+        updatedPOs[index] = { ...pos[index], ...order } as PurchaseOrder;
       } else {
+        // Create new PO
         const newPo: PurchaseOrder = {
           id: order.id || Date.now(),
           poNo: order.poNo || `PO-${new Date().getFullYear()}-${(pos.length + 1).toString().padStart(3, '0')}`,
@@ -6801,7 +6800,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const deletePurchaseOrder = (id: number) => {
     setData(prev => ({
       ...prev,
-      purchaseOrders: (prev.purchaseOrders || DEFAULT_PURCHASE_ORDERS).filter(po => po.id !== id)
+      purchaseOrders: (prev.purchaseOrders || []).filter(po => po.id !== id)
     }));
   };
 
