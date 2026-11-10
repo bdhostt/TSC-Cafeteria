@@ -1107,21 +1107,22 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                         addToCart(activeTable.id, dish.id);
                       }
                     }}
-                    className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-colors duration-75 active:scale-[0.98] flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md select-none ${
+                    className={`overflow-hidden rounded-2xl border text-left transition-all duration-150 active:scale-[0.98] flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md select-none ${
                       inCart 
                         ? 'bg-blue-50/80 border-[#004b9b] ring-2 ring-blue-400/20' 
                         : 'bg-white border-slate-200 hover:border-blue-300'
                     }`}
                   >
-                    <div className="w-full">
-                      {/* Dish Photo Banner on Desktop if available */}
-                      {dish.imageUrl && (
-                        <div className="w-full h-24 rounded-xl overflow-hidden mb-2 bg-slate-100 border border-slate-200/60 relative shrink-0">
-                          <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
-                        </div>
-                      )}
+                    {/* Dish Photo Banner on Desktop if available - Edge-to-edge flush with zero gap */}
+                    {dish.imageUrl && (
+                      <div className="w-full h-28 bg-slate-100 relative shrink-0 overflow-hidden border-b border-slate-100">
+                        <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" />
+                      </div>
+                    )}
 
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                    <div className="p-3 flex flex-col justify-between flex-1 w-full">
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-0.5">
                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
                           {dish.category}
                         </span>
@@ -1150,6 +1151,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                           <Plus className="w-3.5 h-3.5" />
                         </span>
                       )}
+                    </div>
                     </div>
                   </button>
                 );
@@ -1258,21 +1260,22 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                           addToCart(activeTable.id, dish.id);
                         }
                       }}
-                      className={`p-1.5 rounded-xl border text-left transition-colors duration-75 active:scale-[0.96] flex flex-col justify-between min-h-[76px] sm:min-h-[82px] relative cursor-pointer select-none ${
+                      className={`overflow-hidden rounded-xl border text-left transition-all duration-150 active:scale-[0.96] flex flex-col justify-between min-h-[76px] sm:min-h-[82px] relative cursor-pointer select-none ${
                         inCart
                           ? 'bg-blue-50 border-[#004b9b] ring-1 ring-blue-500/40 shadow-xs'
                           : 'bg-white border-slate-200/90 hover:border-blue-300 shadow-2xs'
                       }`}
                     >
-                      <div className="min-w-0 w-full">
-                        {/* Mobile Food Photo if available */}
-                        {dish.imageUrl && (
-                          <div className="w-full h-14 rounded-lg overflow-hidden mb-1 bg-slate-100 border border-slate-200/60 relative shrink-0">
-                            <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
-                          </div>
-                        )}
+                      {/* Mobile Food Photo if available - Edge-to-edge flush with zero gap */}
+                      {dish.imageUrl && (
+                        <div className="w-full h-16 sm:h-18 bg-slate-100 relative shrink-0 overflow-hidden border-b border-slate-100">
+                          <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
+                        </div>
+                      )}
 
-                        {hasOptions && (
+                      <div className="p-1.5 flex flex-col justify-between flex-1 w-full min-w-0">
+                        <div className="min-w-0 w-full">
+                          {hasOptions && (
                           <span className="text-[7.5px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-200 inline-block mb-0.5">
                             Opt
                           </span>
@@ -1296,6 +1299,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                             <Plus className="w-2.5 h-2.5" />
                           </span>
                         )}
+                      </div>
                       </div>
                     </button>
                   );
