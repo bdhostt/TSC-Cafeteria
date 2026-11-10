@@ -6533,7 +6533,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           channelPrices: item.channelPrices || {},
           variations: item.variations || [],
           addons: item.addons || [],
-          promo: item.promo
+          promo: item.promo,
+          imageUrl: item.imageUrl || undefined
         };
         updated = [...prev.menuItems, newItem];
       }

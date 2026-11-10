@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { compressDishImage } from '../../utils/imageUtils';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { MenuItem, RecipeIngredient, MenuItemVariation, MenuItemAddon, MenuItemPromo } from '../../types';
 import { 
@@ -27,7 +28,10 @@ import {
   ChevronUp,
   Download,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Camera,
+  Utensils,
+  Image as ImageIcon
 } from 'lucide-react';
 import { AIChefAssistantModal } from '../ai/AIChefAssistantModal';
 import { ExcelImportModal } from '../common/ExcelImportModal';
@@ -55,6 +59,9 @@ export const MenuItemsView: React.FC = () => {
   const [department, setDepartment] = useState(data.departments[0] || 'Main Kitchen');
   const [category, setCategory] = useState(data.menuCategories[0] || 'Steak & BBQ');
   const [price, setPrice] = useState<number>(0);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [recipe, setRecipe] = useState<RecipeIngredient[]>([]);
 
   // Multi-price list for Commission Agents / Channels
@@ -85,6 +92,7 @@ export const MenuItemsView: React.FC = () => {
     setCategory(data.menuCategories[0] || 'Steak & BBQ');
     setPrice(0);
     setRecipe([]);
+    setImageUrl('');
     
     // Initialize default channel prices based on commission agents
     const initialChannels: Record<string, number> = {};
@@ -115,6 +123,7 @@ export const MenuItemsView: React.FC = () => {
     setDepartment(item.department);
     setCategory(item.category);
     setPrice(item.price);
+    setImageUrl(item.imageUrl || '');
     setRecipe(item.recipe || []);
     setChannelPrices(item.channelPrices || {});
     setVariations(item.variations || []);
@@ -243,7 +252,8 @@ export const MenuItemsView: React.FC = () => {
       channelPrices,
       variations: variations.filter(v => v.name.trim() !== ''),
       addons: addons.filter(a => a.name.trim() !== ''),
-      promo: promo.isActive ? promo : undefined
+      promo: promo.isActive ? promo : undefined,
+      imageUrl: imageUrl || undefined
     });
 
     setIsModalOpen(false);
@@ -466,8 +476,21 @@ export const MenuItemsView: React.FC = () => {
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-3.5 px-4">
-                        <div className="font-extrabold text-slate-900 text-sm">{item.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">ID: #{item.id}</div>
+                        <div className="flex items-center gap-2.5">
+                          {item.imageUrl ? (
+                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-2xs">
+                              <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 shrink-0 flex items-center justify-center text-slate-400">
+                              <Utensils className="w-4 h-4 text-slate-400" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-extrabold text-slate-900 text-sm truncate">{item.name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">ID: #{item.id}</div>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-slate-800">{item.department}</div>
@@ -695,6 +718,88 @@ export const MenuItemsView: React.FC = () => {
               {modalTab === 'basic' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Dish Photo File Upload Section */}
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span>Dish Photo (Select directly from device)</span>
+                        <span className="text-[10.5px] font-normal text-slate-500">Auto-compressed for POS</span>
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            setIsUploadingImage(true);
+                            const compressed = await compressDishImage(file, 400, 0.75);
+                            setImageUrl(compressed);
+                          } catch (err: any) {
+                            alert(err.message || 'Failed to process image');
+                          } finally {
+                            setIsUploadingImage(false);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }
+                        }}
+                        className="hidden"
+                      />
+
+                      {imageUrl ? (
+                        <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-300 shrink-0 shadow-xs">
+                            <img src={imageUrl} alt="Dish Preview" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-extrabold text-slate-900 truncate">Food photo attached</p>
+                            <p className="text-[10px] text-slate-500 mb-2">Ready to show on POS table and mobile menu</p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploadingImage}
+                                className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-slate-700 transition cursor-pointer shadow-2xs flex items-center gap-1"
+                              >
+                                <Camera className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Change Photo</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setImageUrl('')}
+                                className="px-2.5 py-1 text-xs font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg text-rose-700 transition cursor-pointer flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="border-2 border-dashed border-slate-300 hover:border-amber-500 bg-slate-50 hover:bg-amber-50/40 rounded-2xl p-4 text-center cursor-pointer transition group"
+                        >
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <div className="w-10 h-10 rounded-full bg-white shadow-xs border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-amber-600 group-hover:border-amber-300 transition">
+                              {isUploadingImage ? (
+                                <span className="animate-spin text-xs">⌛</span>
+                              ) : (
+                                <Camera className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs font-extrabold text-slate-800 group-hover:text-amber-700">
+                                {isUploadingImage ? 'Optimizing photo...' : 'Click to select photo from Computer or Mobile'}
+                              </p>
+                              <p className="text-[10.5px] text-slate-400">
+                                Select from Gallery or Camera (JPG, PNG, WebP)
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-slate-700 mb-1">Dish Name *</label>
                       <input

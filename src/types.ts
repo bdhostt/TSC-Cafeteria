@@ -354,6 +354,7 @@ export interface MenuItem {
   variations?: MenuItemVariation[]; // Size, Weight, Portion options
   addons?: MenuItemAddon[]; // Extra cheese, sauces, sides
   promo?: MenuItemPromo; // Promo code, direct discount & countdown timer
+  imageUrl?: string; // Food photo (compressed Data URL or URL)
 }
 
 export interface PurchaseItem {

@@ -1107,13 +1107,20 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                         addToCart(activeTable.id, dish.id);
                       }
                     }}
-                    className={`p-3.5 rounded-2xl border text-left transition-colors duration-75 active:scale-[0.98] flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md select-none ${
+                    className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-colors duration-75 active:scale-[0.98] flex flex-col justify-between min-h-[110px] relative cursor-pointer hover:shadow-md select-none ${
                       inCart 
                         ? 'bg-blue-50/80 border-[#004b9b] ring-2 ring-blue-400/20' 
                         : 'bg-white border-slate-200 hover:border-blue-300'
                     }`}
                   >
-                    <div>
+                    <div className="w-full">
+                      {/* Dish Photo Banner on Desktop if available */}
+                      {dish.imageUrl && (
+                        <div className="w-full h-24 rounded-xl overflow-hidden mb-2 bg-slate-100 border border-slate-200/60 relative shrink-0">
+                          <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between gap-1 mb-0.5">
                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
                           {dish.category}
@@ -1129,7 +1136,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                       </h4>
                     </div>
 
-                    <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between w-full">
                       <span className="font-extrabold text-sm text-slate-900">
                         ৳ {dish.price}
                       </span>
@@ -1257,7 +1264,14 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                           : 'bg-white border-slate-200/90 hover:border-blue-300 shadow-2xs'
                       }`}
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 w-full">
+                        {/* Mobile Food Photo if available */}
+                        {dish.imageUrl && (
+                          <div className="w-full h-14 rounded-lg overflow-hidden mb-1 bg-slate-100 border border-slate-200/60 relative shrink-0">
+                            <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
+                          </div>
+                        )}
+
                         {hasOptions && (
                           <span className="text-[7.5px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-200 inline-block mb-0.5">
                             Opt
@@ -1268,7 +1282,7 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                         </h4>
                       </div>
 
-                      <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between">
+                      <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between w-full">
                         <span className="font-black text-[11px] text-[#004b9b]">
                           ৳{dish.price}
                         </span>
