@@ -3368,7 +3368,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const baseBkash = getOpeningBalance('MOBILE_BANKING', ['bkash', 'nagad', 'mobile banking', 'mfs']) || getOpeningBalance('1040');
   const baseNagad = 0;
 
-  const cashDrawerBalance = Math.max(0, baseCashDrawer + payCash + totalCashDueCollected + advCash - cashExpenses - totalCashPurchases - vendorPayCash);
+  // Active POS Shift / Business Day Opening Cash Drawer Float
+  const activeShiftFloat = (data.session?.isActive && typeof data.session.openingCash === 'number' && data.session.openingCash > 0)
+    ? data.session.openingCash
+    : (data.businessDay?.isOpen && typeof data.businessDay.pendingHandoverFloat === 'number' && data.businessDay.pendingHandoverFloat > 0
+        ? data.businessDay.pendingHandoverFloat
+        : 0);
+
+  const effectiveCashOpening = Math.max(baseCashDrawer, activeShiftFloat);
+
+  const cashDrawerBalance = Math.max(0, effectiveCashOpening + payCash + totalCashDueCollected + advCash - cashExpenses - totalCashPurchases - vendorPayCash);
   const pettyCashBalance = Math.max(0, basePettyCash - pettyCashExpenses);
   const bankTransferBalance = Math.max(0, baseBank + payCard + advBank - vendorPayBank - bankExpenses);
   const chequeBalance = Math.max(0, baseCheque - vendorPayCheque);
@@ -5605,8 +5614,20 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         dayNumber: (prev.dayEndRecords?.length || 0) + 1
       };
 
+      // Synchronize Chart of Accounts 1010 (Cash in Hand) opening balance if it is currently 0
+      const currentCoa = prev.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+      let coaUpdated = false;
+      const updatedCoa = currentCoa.map(acc => {
+        if ((acc.code === '1010' || acc.systemRole === 'CASH') && (!acc.balance || acc.balance === 0) && openingCash > 0) {
+          coaUpdated = true;
+          return { ...acc, balance: openingCash };
+        }
+        return acc;
+      });
+
       return {
         ...prev,
+        chartOfAccounts: coaUpdated ? updatedCoa : prev.chartOfAccounts,
         businessDay: updatedBusinessDay,
         session: {
           id: sessionId,
@@ -7716,7 +7737,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return opening + estimatedProfit + journalEffect;
 
       case 'OWNER_EQUITY':
-        return opening + journalEffect;
+        return opening + (baseCashDrawer === 0 ? activeShiftFloat : 0) + journalEffect;
 
       case 'OWNER_DRAWINGS':
         return opening + journalEffect;

@@ -745,7 +745,8 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       const acc = coaListReport.find(a => a.code === code || a.id === code);
       return Number(acc?.balance) || 0;
     };
-    let cashBalance = getReportCoaBalance('1010');
+    const activeShiftFloat = (data.session?.isActive && Number(data.session.openingCash) > 0) ? Number(data.session.openingCash) : 0;
+    let cashBalance = Math.max(getReportCoaBalance('1010'), activeShiftFloat);
     let bankBalance = getReportCoaBalance('1030') + getReportCoaBalance('1040');
     data.sales.forEach(s => {
       if (!isSaleActive(s)) return;

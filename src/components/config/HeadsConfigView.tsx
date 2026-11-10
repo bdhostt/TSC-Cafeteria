@@ -1539,6 +1539,12 @@ export const HeadsConfigView: React.FC = () => {
                   ) : (
                     filteredAccounts.map(acc => {
                       const liveBalance = getLiveAccountBalance(acc);
+                      const isCashHead = acc.code === '1010' || (acc.systemRole || getAccountSystemRole(acc)) === 'CASH';
+                      const isEquityHead = acc.code === '3010' || (acc.systemRole || getAccountSystemRole(acc)) === 'OWNER_EQUITY';
+                      const activeShiftFloat = (data.session?.isActive && Number(data.session.openingCash) > 0) ? Number(data.session.openingCash) : 0;
+                      const effectiveDisplayOpening = (acc.balance && acc.balance > 0)
+                        ? acc.balance
+                        : ((isCashHead || isEquityHead) ? activeShiftFloat : (acc.balance || 0));
                       return (
                         <tr key={acc.id} className="hover:bg-slate-50/80 transition">
                           <td className="py-3 px-4 font-mono font-bold text-slate-900">
@@ -1557,7 +1563,7 @@ export const HeadsConfigView: React.FC = () => {
                             {acc.category}
                           </td>
                           <td className="py-3 px-4 text-right font-mono text-slate-500 whitespace-nowrap">
-                            ৳ {(acc.balance || 0).toLocaleString()}
+                            ৳ {effectiveDisplayOpening.toLocaleString()}
                           </td>
                           <td className={`py-3 px-4 text-right font-bold font-mono text-sm whitespace-nowrap ${
                             acc.type === 'EXPENSE' ? 'text-rose-700' :
