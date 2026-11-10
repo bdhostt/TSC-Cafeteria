@@ -1115,12 +1115,14 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                   >
                     {/* Dish Photo Banner on Desktop if available - Edge-to-edge flush with zero gap */}
                     {dish.imageUrl && (
-                      <div className="w-full h-28 bg-slate-100 relative shrink-0 overflow-hidden border-b border-slate-100">
+                      <div className="w-full h-26 sm:h-28 bg-slate-100 relative shrink-0 overflow-hidden">
                         <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" />
                       </div>
                     )}
 
-                    <div className="p-3 flex flex-col justify-between flex-1 w-full">
+                    <div className={`flex flex-col justify-between flex-1 w-full ${
+                      dish.imageUrl ? 'px-2.5 sm:px-3 pt-1 pb-2.5 sm:pb-3' : 'p-2.5 sm:p-3'
+                    }`}>
                       <div>
                         <div className="flex items-center justify-between gap-1 mb-0.5">
                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
@@ -1268,12 +1270,14 @@ const [nowTime, setNowTime] = useState<number>(() => Date.now());
                     >
                       {/* Mobile Food Photo if available - Edge-to-edge flush with zero gap */}
                       {dish.imageUrl && (
-                        <div className="w-full h-16 sm:h-18 bg-slate-100 relative shrink-0 overflow-hidden border-b border-slate-100">
+                        <div className="w-full h-16 sm:h-18 bg-slate-100 relative shrink-0 overflow-hidden">
                           <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
                         </div>
                       )}
 
-                      <div className="p-1.5 flex flex-col justify-between flex-1 w-full min-w-0">
+                      <div className={`flex flex-col justify-between flex-1 w-full min-w-0 ${
+                        dish.imageUrl ? 'px-1.5 pt-0.5 pb-1.5' : 'p-1.5'
+                      }`}>
                         <div className="min-w-0 w-full">
                           {hasOptions && (
                           <span className="text-[7.5px] px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-200 inline-block mb-0.5">
