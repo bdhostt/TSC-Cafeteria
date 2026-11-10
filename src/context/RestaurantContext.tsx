@@ -3044,12 +3044,19 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     });
 
-    const avgPurchaseBid = totalReceivedQty > 0 ? (totalReceivedVal / totalReceivedQty) : (Number(item.defaultRate) || 0);
     const invRecord = data.inventory.find(x => x.id === item.id);
     const openQty = invRecord ? (Number(invRecord.open) || 0) : 0;
     const manualUsedQty = invRecord ? (invRecord.manualUsed !== undefined ? Number(invRecord.manualUsed) : (Number(invRecord.used) || 0)) : 0;
     const wastageQty = invRecord ? (Number(invRecord.wastage) || 0) : 0;
-    const valuationRate = (invRecord && invRecord.rate) ? Number(invRecord.rate) : avgPurchaseBid;
+
+    // Weighted Average Valuation Rate based on available Opening Stock + Inward Purchases
+    const totalAvailableQty = openQty + totalReceivedQty;
+    const totalAvailableVal = (openQty * (Number(item.defaultRate) || 0)) + totalReceivedVal;
+    const weightedAvgRate = totalAvailableQty > 0 
+      ? (totalAvailableVal / totalAvailableQty) 
+      : (Number(item.defaultRate) || (invRecord && invRecord.rate ? Number(invRecord.rate) : 0));
+
+    const valuationRate = weightedAvgRate;
     rawItemRatesMap[item.id] = valuationRate;
 
     const posBomUsedQty = autoBomUsageMap[item.id] || 0;

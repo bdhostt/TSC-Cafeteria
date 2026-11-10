@@ -313,12 +313,14 @@ export const InventoryReports: React.FC<SubReportProps> = ({ reportType }) => {
         }
       });
 
-      // Valuation Rate calculation (Weighted average purchase rate or item default rate)
-      const avgPurchaseRate = lifetimeReceivedQty > 0 
-        ? (lifetimeReceivedVal / lifetimeReceivedQty) 
-        : (Number(item.defaultRate) || 0);
+      // Valuation Rate calculation (Weighted average rate of Opening Stock + Inward Purchases)
+      const totalAvailableQty = initialOpenQty + lifetimeReceivedQty;
+      const totalAvailableVal = (initialOpenQty * (Number(item.defaultRate) || 0)) + lifetimeReceivedVal;
+      const weightedAvgRate = totalAvailableQty > 0 
+        ? (totalAvailableVal / totalAvailableQty) 
+        : (Number(item.defaultRate) || (invRecord && invRecord.rate ? Number(invRecord.rate) : 0));
 
-      const valuationRate = (invRecord && invRecord.rate) ? Number(invRecord.rate) : avgPurchaseRate;
+      const valuationRate = weightedAvgRate;
 
       const periodAvgInwardRate = inPeriodReceivedQty > 0 
         ? (inPeriodReceivedVal / inPeriodReceivedQty) 

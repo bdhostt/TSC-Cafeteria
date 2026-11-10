@@ -347,12 +347,14 @@ export const StockValuationView: React.FC = () => {
         }
       });
 
-      // Valuation Rate Calculation (Weighted Average Purchase Rate)
-      const avgPurchaseRate = lifetimeReceivedQty > 0 
-        ? (lifetimeReceivedVal / lifetimeReceivedQty) 
-        : (Number(item.defaultRate) || 0);
+      // Valuation Rate Calculation (Weighted Average Rate of Opening Stock + Inward Purchases)
+      const totalAvailableQty = initialOpenQty + lifetimeReceivedQty;
+      const totalAvailableVal = (initialOpenQty * (Number(item.defaultRate) || 0)) + lifetimeReceivedVal;
+      const weightedAvgRate = totalAvailableQty > 0 
+        ? (totalAvailableVal / totalAvailableQty) 
+        : (Number(item.defaultRate) || (invRecord && invRecord.rate ? Number(invRecord.rate) : 0));
 
-      const valuationRate = (invRecord && invRecord.rate) ? Number(invRecord.rate) : avgPurchaseRate;
+      const valuationRate = weightedAvgRate;
 
       // Inward Rate for the period
       const periodAvgInwardRate = inPeriodReceivedQty > 0 
@@ -1576,7 +1578,7 @@ export const StockValuationView: React.FC = () => {
               </div>
 
               <div className="text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-                UOM: <span className="text-indigo-700">{selectedLedgerItem.uom}</span> | Valuation Rate: <span className="text-indigo-700">৳{selectedLedgerItem.defaultRate}</span>
+                UOM: <span className="text-indigo-700">{selectedLedgerItem.uom}</span> | Weighted Avg Rate: <span className="text-indigo-700">৳{(stockRows.find(r => r.item.id === selectedLedgerItem.id)?.valuationRate ?? Number(selectedLedgerItem.defaultRate) ?? 0).toFixed(2)}</span>
               </div>
             </div>
 
