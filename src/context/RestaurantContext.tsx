@@ -1558,16 +1558,17 @@ interface RestaurantContextType {
   importMasterItems: (items: RawMasterItem[], overwrite?: boolean, extraData?: { newCategories?: string[]; newVendors?: string[] }) => { added: number; updated: number };
   
   // Purchases, POs & Returns
-  savePurchaseVoucher: (voucher: PurchaseVoucher) => void;
+  savePurchaseVoucher: (voucher: PurchaseVoucher, updateMasterRates?: boolean) => void;
   deletePurchaseVoucher: (id: number) => void;
-  savePurchaseOrder: (order: Partial<PurchaseOrder> & { id?: number }) => void;
+  savePurchaseOrder: (order: Partial<PurchaseOrder> & { id?: number }, updateMasterRates?: boolean) => void;
   deletePurchaseOrder: (id: number) => void;
   receivePurchaseOrderItems: (
     poId: number,
     receivedItems: PurchaseItem[],
     billNo: string,
     paymentType: PurchasePaymentType,
-    receiveDate?: string
+    receiveDate?: string,
+    updateMasterRates?: boolean
   ) => void;
   savePurchaseReturn: (returnRecord: Partial<PurchaseReturn> & { id?: number }) => void;
   deletePurchaseReturn: (id: number) => void;
@@ -6685,7 +6686,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return { added: addedCount, updated: updatedCount };
   };
 
-  const savePurchaseVoucher = (voucher: PurchaseVoucher) => {
+  const savePurchaseVoucher = (voucher: PurchaseVoucher, updateMasterRates: boolean = true) => {
     setData(prev => {
       const index = prev.purchases.findIndex(p => p.id === voucher.id);
       let updatedPurchases: PurchaseVoucher[];
@@ -6720,10 +6721,25 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updatedInventory = Array.from(invMap.values());
       }
 
+      // Optionally update Raw Materials Master Catalog Standard Rates
+      let updatedMasterItems = prev.masterItems;
+      if (updateMasterRates && voucher.items && voucher.items.length > 0) {
+        updatedMasterItems = prev.masterItems.map(m => {
+          const matched = voucher.items.find(
+            itm => (itm.itemId && itm.itemId === m.id) || (itm.item && itm.item.trim().toLowerCase() === m.name.trim().toLowerCase())
+          );
+          if (matched && typeof matched.rate === 'number' && matched.rate > 0) {
+            return { ...m, defaultRate: matched.rate };
+          }
+          return m;
+        });
+      }
+
       return {
         ...prev,
         purchases: updatedPurchases,
-        inventory: updatedInventory
+        inventory: updatedInventory,
+        masterItems: updatedMasterItems
       };
     });
   };
@@ -6732,33 +6748,52 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setData(prev => ({ ...prev, purchases: prev.purchases.filter(p => p.id !== id) }));
   };
 
-  const savePurchaseOrder = (order: Partial<PurchaseOrder> & { id?: number }) => {
+  const savePurchaseOrder = (order: Partial<PurchaseOrder> & { id?: number }, updateMasterRates: boolean = false) => {
     setData(prev => {
       const pos = prev.purchaseOrders || DEFAULT_PURCHASE_ORDERS;
+      let updatedPOs: PurchaseOrder[];
       if (order.id) {
         const index = pos.findIndex(p => p.id === order.id);
         if (index >= 0) {
-          const updatedPOs = [...pos];
+          updatedPOs = [...pos];
           updatedPOs[index] = { ...pos[index], ...order } as PurchaseOrder;
-          return { ...prev, purchaseOrders: updatedPOs };
+        } else {
+          updatedPOs = pos;
         }
+      } else {
+        const newPo: PurchaseOrder = {
+          id: order.id || Date.now(),
+          poNo: order.poNo || `PO-${new Date().getFullYear()}-${(pos.length + 1).toString().padStart(3, '0')}`,
+          date: order.date || new Date().toISOString().split('T')[0],
+          vendor: order.vendor || prev.vendors[0] || 'Supplier',
+          expectedDate: order.expectedDate || new Date().toISOString().split('T')[0],
+          items: order.items || [],
+          total: order.total || 0,
+          status: order.status || 'PENDING',
+          grnNo: order.grnNo,
+          notes: order.notes,
+          receivedHistory: order.receivedHistory || []
+        };
+        updatedPOs = [newPo, ...pos];
       }
-      const newPo: PurchaseOrder = {
-        id: order.id || Date.now(),
-        poNo: order.poNo || `PO-${new Date().getFullYear()}-${(pos.length + 1).toString().padStart(3, '0')}`,
-        date: order.date || new Date().toISOString().split('T')[0],
-        vendor: order.vendor || prev.vendors[0] || 'Supplier',
-        expectedDate: order.expectedDate || new Date().toISOString().split('T')[0],
-        items: order.items || [],
-        total: order.total || 0,
-        status: order.status || 'PENDING',
-        grnNo: order.grnNo,
-        notes: order.notes,
-        receivedHistory: order.receivedHistory || []
-      };
+
+      let updatedMasterItems = prev.masterItems;
+      if (updateMasterRates && order.items && order.items.length > 0) {
+        updatedMasterItems = prev.masterItems.map(m => {
+          const matched = order.items!.find(
+            itm => (itm.itemId && itm.itemId === m.id) || (itm.item && itm.item.trim().toLowerCase() === m.name.trim().toLowerCase())
+          );
+          if (matched && typeof matched.rate === 'number' && matched.rate > 0) {
+            return { ...m, defaultRate: matched.rate };
+          }
+          return m;
+        });
+      }
+
       return {
         ...prev,
-        purchaseOrders: [newPo, ...pos]
+        purchaseOrders: updatedPOs,
+        masterItems: updatedMasterItems
       };
     });
   };
@@ -6775,7 +6810,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     receivedItems: PurchaseItem[],
     billNo: string,
     paymentType: PurchasePaymentType,
-    receiveDate?: string
+    receiveDate?: string,
+    updateMasterRates: boolean = true
   ) => {
     if (!receivedItems || receivedItems.length === 0) return;
 
@@ -6856,11 +6892,26 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       const updatedPOs = pos.map(p => p.id === poId ? updatedPO : p);
 
+      // 4. Optionally update Raw Materials Master Catalog Standard Rates
+      let updatedMasterItems = prev.masterItems;
+      if (updateMasterRates && receivedItems && receivedItems.length > 0) {
+        updatedMasterItems = prev.masterItems.map(m => {
+          const matched = receivedItems.find(
+            itm => (itm.itemId && itm.itemId === m.id) || (itm.item && itm.item.trim().toLowerCase() === m.name.trim().toLowerCase())
+          );
+          if (matched && typeof matched.rate === 'number' && matched.rate > 0) {
+            return { ...m, defaultRate: matched.rate };
+          }
+          return m;
+        });
+      }
+
       return {
         ...prev,
         purchases: [newVoucher, ...prev.purchases],
         inventory: Array.from(invMap.values()),
-        purchaseOrders: updatedPOs
+        purchaseOrders: updatedPOs,
+        masterItems: updatedMasterItems
       };
     });
   };

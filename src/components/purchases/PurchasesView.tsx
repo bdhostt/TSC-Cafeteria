@@ -85,6 +85,10 @@ export const PurchasesView: React.FC = () => {
   const [poNotes, setPoNotes] = useState('');
   const [poItems, setPoItems] = useState<PurchaseItem[]>([]);
 
+  const [voucherUpdateMasterRates, setVoucherUpdateMasterRates] = useState(true);
+  const [poUpdateMasterRates, setPoUpdateMasterRates] = useState(false);
+  const [receiveUpdateMasterRates, setReceiveUpdateMasterRates] = useState(true);
+
   // --- Receive Items Modal State ---
   const [receivingPo, setReceivingPo] = useState<PurchaseOrder | null>(null);
   const [receiveBillNo, setReceiveBillNo] = useState('');
@@ -190,6 +194,7 @@ export const PurchasesView: React.FC = () => {
 
   // --- Voucher Handlers ---
   const handleOpenNewVoucher = () => {
+    setVoucherUpdateMasterRates(true);
     setVoucherDate(new Date().toISOString().split('T')[0]);
     setVoucherVendor(data.vendors[0] || 'Kader Meat Supply');
     setVoucherBillNo('BILL-' + Date.now().toString().slice(-4));
@@ -287,12 +292,13 @@ export const PurchasesView: React.FC = () => {
       items: JSON.parse(JSON.stringify(voucherItems))
     };
 
-    savePurchaseVoucher(newVoucher);
+    savePurchaseVoucher(newVoucher, voucherUpdateMasterRates);
     setIsVoucherModalOpen(false);
   };
 
   // --- Purchase Order (PO) Handlers ---
   const handleOpenNewPo = () => {
+    setPoUpdateMasterRates(false);
     setPoNo('DCC-PO-2026-' + Math.floor(1000 + Math.random() * 9000));
     setPoDate(new Date().toISOString().split('T')[0]);
     setPoExpectedDate(new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
@@ -390,12 +396,13 @@ export const PurchasesView: React.FC = () => {
       notes: poNotes
     };
 
-    savePurchaseOrder(newPo);
+    savePurchaseOrder(newPo, poUpdateMasterRates);
     setIsPoModalOpen(false);
   };
 
   // --- Receive Items against PO Handlers ---
   const handleOpenReceiveModal = (po: PurchaseOrder) => {
+    setReceiveUpdateMasterRates(true);
     setReceivingPo(po);
     setReceiveBillNo('INV-' + Math.floor(1000 + Math.random() * 9000));
     setReceivePaymentType('CREDIT');
@@ -442,6 +449,19 @@ export const PurchasesView: React.FC = () => {
     });
   };
 
+  const handleReceiveRateChange = (index: number, newRate: number) => {
+    setReceiveItemsList(prev => {
+      const arr = [...prev];
+      const validRate = Math.max(0, newRate);
+      arr[index] = {
+        ...arr[index],
+        rate: validRate,
+        total: Math.round(arr[index].receiveQty * validRate)
+      };
+      return arr;
+    });
+  };
+
   const totalReceiveBillAmount = receiveItemsList.reduce((sum, i) => sum + i.total, 0);
 
   const handleSubmitReceive = (e: React.FormEvent) => {
@@ -470,7 +490,8 @@ export const PurchasesView: React.FC = () => {
       itemsToReceive,
       receiveBillNo,
       receivePaymentType,
-      receiveDate
+      receiveDate,
+      receiveUpdateMasterRates
     );
 
     setReceivingPo(null);
@@ -2072,6 +2093,20 @@ export const PurchasesView: React.FC = () => {
                   </table>
                 </div>
 
+                <div className="mt-3 flex items-center gap-2 p-2.5 bg-indigo-50/80 border border-indigo-200 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="voucherUpdateMasterRates"
+                    checked={voucherUpdateMasterRates}
+                    onChange={e => setVoucherUpdateMasterRates(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 cursor-pointer"
+                  />
+                  <label htmlFor="voucherUpdateMasterRates" className="text-xs font-bold text-indigo-950 cursor-pointer select-none flex items-center gap-1.5">
+                    <span>Update Raw Materials Master Catalog standard rate with these purchase prices</span>
+                    <span className="text-[10px] text-indigo-600 font-semibold">(Recommended)</span>
+                  </label>
+                </div>
+
                 <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
                   <div className="text-xs font-bold text-slate-400">Total Purchase Bill Amount:</div>
                   <div className="text-xl font-extrabold text-amber-400">৳ {totalVoucherAmount.toLocaleString()}</div>
@@ -2248,6 +2283,19 @@ export const PurchasesView: React.FC = () => {
                   </table>
                 </div>
 
+                <div className="mt-3 flex items-center gap-2 p-2.5 bg-indigo-50/80 border border-indigo-200 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="poUpdateMasterRates"
+                    checked={poUpdateMasterRates}
+                    onChange={e => setPoUpdateMasterRates(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 cursor-pointer"
+                  />
+                  <label htmlFor="poUpdateMasterRates" className="text-xs font-bold text-indigo-950 cursor-pointer select-none flex items-center gap-1.5">
+                    <span>Update Raw Materials Master Catalog standard rate with PO estimated rates</span>
+                  </label>
+                </div>
+
                 <div className="mt-3 p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
                   <div className="text-xs font-bold text-slate-400">Total Purchase Order Estimate:</div>
                   <div className="text-xl font-extrabold text-amber-400">৳ {totalPoAmount.toLocaleString()}</div>
@@ -2381,7 +2429,16 @@ export const PurchasesView: React.FC = () => {
                               className="w-full px-2 py-1 bg-white border border-emerald-400 rounded text-center text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500"
                             />
                           </td>
-                          <td className="py-2 px-2 text-right font-bold text-slate-700">৳{row.rate}</td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={row.rate}
+                              onChange={e => handleReceiveRateChange(idx, parseFloat(e.target.value) || 0)}
+                              className="w-20 px-1.5 py-1 bg-white border border-slate-300 rounded text-right text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </td>
                           <td className="py-2 px-3 text-right font-extrabold text-slate-900">
                             ৳ {row.total.toLocaleString()}
                           </td>
@@ -2389,6 +2446,20 @@ export const PurchasesView: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 p-2.5 bg-indigo-50/80 border border-indigo-200 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="receiveUpdateMasterRates"
+                    checked={receiveUpdateMasterRates}
+                    onChange={e => setReceiveUpdateMasterRates(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 cursor-pointer"
+                  />
+                  <label htmlFor="receiveUpdateMasterRates" className="text-xs font-bold text-indigo-950 cursor-pointer select-none flex items-center gap-1.5">
+                    <span>Update Raw Materials Master Catalog standard rate with these purchase prices</span>
+                    <span className="text-[10px] text-indigo-600 font-semibold">(Recommended)</span>
+                  </label>
                 </div>
 
                 <div className="mt-3 p-3.5 bg-slate-900 text-white rounded-xl flex items-center justify-between">
