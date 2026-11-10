@@ -3125,6 +3125,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return sum;
   }, 0);
 
+  const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+
   // Dynamic COGS & Operating Expense adjustments from General Ledger Journal Entries
   let journalCogsDebit = 0;
   let journalOpExDebit = 0;
@@ -3152,7 +3154,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const estimatedProfit = netSalesRevenue - (totalProductionCost + totalExpenses);
 
   const methodList = (data.paymentMethods && data.paymentMethods.length > 0) ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
-  const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
 
   // Helper to find configured payment method
   const getMethodConfig = (m?: string): PaymentMethodConfig | undefined => {
