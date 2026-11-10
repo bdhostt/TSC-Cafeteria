@@ -2952,7 +2952,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
 
-  const totalExpenses = data.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const rawVoucherExpenses = data.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
   // Customer Receivables (Due)
   const custMap: Record<string, { due: number; coll: number }> = {};
@@ -3125,8 +3125,30 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return sum;
   }, 0);
 
+  // Dynamic COGS & Operating Expense adjustments from General Ledger Journal Entries
+  let journalCogsDebit = 0;
+  let journalOpExDebit = 0;
+
+  (data.journalEntries || []).forEach(j => {
+    const debitAcc = coaList.find(a => a.id === j.debitAccountId || a.code === j.debitAccountId);
+    const creditAcc = coaList.find(a => a.id === j.creditAccountId || a.code === j.creditAccountId);
+
+    if (debitAcc && debitAcc.type === 'EXPENSE') {
+      const isCogs = (debitAcc.systemRole || getAccountSystemRole(debitAcc)) === 'COGS' || debitAcc.category === 'Cost of Goods Sold (BOM)';
+      if (isCogs) journalCogsDebit += (j.amount || 0);
+      else journalOpExDebit += (j.amount || 0);
+    }
+
+    if (creditAcc && creditAcc.type === 'EXPENSE') {
+      const isCogs = (creditAcc.systemRole || getAccountSystemRole(creditAcc)) === 'COGS' || creditAcc.category === 'Cost of Goods Sold (BOM)';
+      if (isCogs) journalCogsDebit -= (j.amount || 0);
+      else journalOpExDebit -= (j.amount || 0);
+    }
+  });
+
+  const totalExpenses = rawVoucherExpenses + Math.max(0, journalOpExDebit);
+  const totalProductionCost = totalBomCostVal + totalManualUsedCostVal + totalWastageCostVal + Math.max(0, journalCogsDebit);
   const netSalesRevenue = Math.max(0, totalSales - totalSalesVAT);
-  const totalProductionCost = totalBomCostVal + totalManualUsedCostVal + totalWastageCostVal;
   const estimatedProfit = netSalesRevenue - (totalProductionCost + totalExpenses);
 
   const methodList = (data.paymentMethods && data.paymentMethods.length > 0) ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;

@@ -1456,9 +1456,12 @@ export const HeadsConfigView: React.FC = () => {
             </div>
 
             {(() => {
-              const liveCogs = metrics.totalBomCostVal + (metrics.totalManualUsedVal || 0) + (metrics.totalWastageCostVal || 0);
-              const liveOpEx = metrics.totalExpenses;
-              const liveTotalExpenses = liveCogs + liveOpEx;
+              const expenseAccounts = chartList.filter(a => a.type === 'EXPENSE');
+              const liveTotalExpenses = expenseAccounts.reduce((sum, a) => sum + getLiveAccountBalance(a), 0);
+              const liveCogs = expenseAccounts
+                .filter(a => (a.systemRole || getAccountSystemRole(a)) === 'COGS' || a.category === 'Cost of Goods Sold (BOM)')
+                .reduce((sum, a) => sum + getLiveAccountBalance(a), 0);
+              const liveOpEx = Math.max(0, liveTotalExpenses - liveCogs);
               return (
                 <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl shadow-xs">
                   <div className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Live Total Expenses</div>
