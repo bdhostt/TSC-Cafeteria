@@ -718,12 +718,12 @@ export const MenuItemsView: React.FC = () => {
               {modalTab === 'basic' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Dish Photo File Upload Section */}
+                    {/* Dish Photo File Upload Section (Ultra Compact) */}
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                        <span>Dish Photo (Select directly from device)</span>
-                        <span className="text-[10.5px] font-normal text-slate-500">Auto-compressed for POS</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-slate-700">Dish Photo</label>
+                        <span className="text-[10.5px] text-slate-400 font-medium">Device upload • Auto-compressed for POS</span>
+                      </div>
                       <input
                         type="file"
                         accept="image/*"
@@ -746,56 +746,61 @@ export const MenuItemsView: React.FC = () => {
                       />
 
                       {imageUrl ? (
-                        <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-                          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-300 shrink-0 shadow-xs">
-                            <img src={imageUrl} alt="Dish Preview" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-extrabold text-slate-900 truncate">Food photo attached</p>
-                            <p className="text-[10px] text-slate-500 mb-2">Ready to show on POS table and mobile menu</p>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isUploadingImage}
-                                className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-slate-700 transition cursor-pointer shadow-2xs flex items-center gap-1"
-                              >
-                                <Camera className="w-3.5 h-3.5 text-slate-500" />
-                                <span>Change Photo</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setImageUrl('')}
-                                className="px-2.5 py-1 text-xs font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg text-rose-700 transition cursor-pointer flex items-center gap-1"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                                <span>Remove</span>
-                              </button>
+                        <div className="flex items-center justify-between gap-3 p-1.5 sm:p-2 bg-slate-50/90 border border-slate-200 rounded-xl shadow-2xs">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-slate-100 border border-slate-300 shrink-0 shadow-2xs">
+                              <img src={imageUrl} alt="Dish Preview" className="w-full h-full object-cover" />
                             </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">Photo attached</p>
+                              <p className="text-[10px] text-emerald-600 font-semibold">✓ Active on POS cards</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploadingImage}
+                              className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-slate-700 transition cursor-pointer shadow-2xs flex items-center gap-1"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Change</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setImageUrl('')}
+                              className="px-2.5 py-1 text-xs font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg text-rose-700 transition cursor-pointer flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Remove</span>
+                            </button>
                           </div>
                         </div>
                       ) : (
                         <div 
                           onClick={() => fileInputRef.current?.click()}
-                          className="border-2 border-dashed border-slate-300 hover:border-amber-500 bg-slate-50 hover:bg-amber-50/40 rounded-2xl p-4 text-center cursor-pointer transition group"
+                          className="border border-dashed border-slate-300 hover:border-amber-500 bg-slate-50/70 hover:bg-amber-50/30 rounded-xl px-3 py-1.5 sm:py-2 flex items-center justify-between cursor-pointer transition group"
                         >
-                          <div className="flex flex-col items-center justify-center gap-1.5">
-                            <div className="w-10 h-10 rounded-full bg-white shadow-xs border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-amber-600 group-hover:border-amber-300 transition">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-white shadow-2xs border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-amber-600 group-hover:border-amber-300 transition shrink-0">
                               {isUploadingImage ? (
                                 <span className="animate-spin text-xs">⌛</span>
                               ) : (
-                                <Camera className="w-5 h-5" />
+                                <Camera className="w-4 h-4" />
                               )}
                             </div>
                             <div>
-                              <p className="text-xs font-extrabold text-slate-800 group-hover:text-amber-700">
-                                {isUploadingImage ? 'Optimizing photo...' : 'Click to select photo from Computer or Mobile'}
+                              <p className="text-xs font-bold text-slate-700 group-hover:text-amber-700 leading-tight">
+                                {isUploadingImage ? 'Optimizing photo...' : 'Upload Photo (Computer / Mobile)'}
                               </p>
-                              <p className="text-[10.5px] text-slate-400">
-                                Select from Gallery or Camera (JPG, PNG, WebP)
+                              <p className="text-[10px] text-slate-400 leading-tight">
+                                Select from Gallery or Camera
                               </p>
                             </div>
                           </div>
+                          <span className="text-[10.5px] font-bold text-[#004b9b] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 group-hover:bg-[#004b9b] group-hover:text-white transition shrink-0">
+                            Choose File
+                          </span>
                         </div>
                       )}
                     </div>

@@ -7,12 +7,12 @@
       "posInvoiceIncludeDate": false,
       "posInvoiceResetCycle": "NEVER",
       "kotPrefix": "KOT-",
-      "kotNextNumber": 11,
+      "kotNextNumber": 13,
       "kotPadding": 4,
       "kotIncludeDate": false,
       "kotResetCycle": "NEVER",
       "orderRefPrefix": "ORD-",
-      "orderRefNextNumber": 11,
+      "orderRefNextNumber": 13,
       "orderRefPadding": 4,
       "orderRefResetCycle": "NEVER",
       "lastResetDate": "2026-11-09",
@@ -6424,9 +6424,9 @@
     "inventory": [
       {
         "id": 1,
-        "open": 0,
-        "used": 0,
-        "manualUsed": 0,
+        "open": 10,
+        "used": 10,
+        "manualUsed": 10,
         "wastage": 0,
         "rate": 60
       }
@@ -6465,5 +6465,5 @@
       "CHEF": false
     }
   },
-  "timestamp": 1794288445059
+  "timestamp": 1794291490496
 }
