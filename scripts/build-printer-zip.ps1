@@ -46,7 +46,6 @@ $zipPath = Join-Path $downloadsDir "TSC-Printer-Setup.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
 Compress-Archive -Path "$pkgDir\*" -DestinationPath $zipPath -Force
-Copy-Item $zipPath (Join-Path $downloadsDir "TSCPrinter-Setup.zip") -Force
 
 # Also sync to dist/downloads if dist exists
 $distDownloads = Join-Path $rootDir "dist\downloads"
@@ -55,14 +54,20 @@ if (Test-Path (Join-Path $rootDir "dist")) {
         New-Item -ItemType Directory -Path $distDownloads -Force | Out-Null
     }
     Copy-Item $zipPath (Join-Path $distDownloads "TSC-Printer-Setup.zip") -Force
-    Copy-Item $zipPath (Join-Path $distDownloads "TSCPrinter-Setup.zip") -Force
 }
 
 Remove-Item $pkgDir -Recurse -Force
 
-# Clean any old posdemo zips from public/downloads
-$oldPosdemoZip = Join-Path $downloadsDir "POSDEMO-Printer-Setup.zip"
-if (Test-Path $oldPosdemoZip) { Remove-Item $oldPosdemoZip -Force }
+# Clean any redundant/duplicate legacy zips from downloads
+$legacyZipNames = @("TSCPrinter-Setup.zip", "POSDEMO-Printer-Setup.zip", "CafeBananiPrinter-Setup.zip")
+foreach ($name in $legacyZipNames) {
+    $p = Join-Path $downloadsDir $name
+    if (Test-Path $p) { Remove-Item $p -Force }
+    if (Test-Path $distDownloads) {
+        $dp = Join-Path $distDownloads $name
+        if (Test-Path $dp) { Remove-Item $dp -Force }
+    }
+}
 
 Write-Host "Created Zip at: $zipPath"
 Get-Item $zipPath | Select-Object Name, Length

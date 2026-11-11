@@ -1473,9 +1473,7 @@ async function startServer() {
     const brandSlug = "TSC";
     const candidates = [
       path.join(process.cwd(), "public", "downloads", "TSC-Printer-Setup.zip"),
-      path.join(process.cwd(), "public", "downloads", "TSCPrinter-Setup.zip"),
-      path.join(process.cwd(), "dist", "downloads", "TSC-Printer-Setup.zip"),
-      path.join(process.cwd(), "dist", "downloads", "TSCPrinter-Setup.zip")
+      path.join(process.cwd(), "dist", "downloads", "TSC-Printer-Setup.zip")
     ];
     for (const zipPath of candidates) {
       if (fs.existsSync(zipPath)) {
