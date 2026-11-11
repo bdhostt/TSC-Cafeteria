@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRestaurant, DEFAULT_PAYMENT_METHODS } from '../../context/RestaurantContext';
+import { SearchableRawSelect, RawSelectOption } from '../common/SearchableRawSelect';
 import { 
   PurchaseVoucher, 
   PurchaseOrder, 
@@ -548,6 +549,39 @@ export const PurchasesView: React.FC = () => {
 
     setReturnItemId(selectedKey);
   };
+
+  const returnSelectOptions = useMemo<RawSelectOption[]>(() => {
+    const opts: RawSelectOption[] = [];
+    const matchedBill = data.purchases.find(
+      p => p.vendor === returnVendor && p.billNo.toLowerCase() === returnBillNo.toLowerCase().trim()
+    );
+    const billItems = matchedBill ? matchedBill.items : [];
+    if (billItems.length > 0) {
+      billItems.forEach((bi, idx) => {
+        opts.push({
+          id: String(bi.itemId || bi.item),
+          name: bi.item,
+          category: bi.category || 'Bill Item',
+          uom: bi.uom || 'Unit',
+          rate: bi.rate || 0,
+          subtitle: `Purchased: ${bi.qty} ${bi.uom || ''}`,
+          group: `Items from Bill ${returnBillNo}`,
+          badge: 'Bill Item',
+        });
+      });
+    }
+    data.masterItems.forEach(m => {
+      opts.push({
+        id: m.id,
+        name: m.name,
+        category: m.category,
+        uom: m.uom,
+        rate: m.defaultRate,
+        group: 'All Master Raw Materials',
+      });
+    });
+    return opts;
+  }, [data.purchases, data.masterItems, returnVendor, returnBillNo]);
 
   const handleSubmitReturn = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2040,16 +2074,14 @@ export const PurchasesView: React.FC = () => {
                     <tbody className="divide-y divide-slate-100">
                       {voucherItems.map((row, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-2 px-2">
-                            <select
+                          <td className="py-2 px-2 min-w-[220px]">
+                            <SearchableRawSelect
                               value={row.itemId}
-                              onChange={e => handleVoucherItemChange(idx, parseInt(e.target.value))}
-                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
-                            >
-                              {data.masterItems.map(m => (
-                                <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                              ))}
-                            </select>
+                              rawItems={data.masterItems}
+                              onChange={newId => handleVoucherItemChange(idx, Number(newId))}
+                              buttonClassName="py-1 px-2 text-xs font-bold"
+                              placeholder="Search raw material..."
+                            />
                           </td>
                           <td className="py-2 px-2 text-center font-bold text-slate-600">
                             {row.uom}
@@ -2230,16 +2262,14 @@ export const PurchasesView: React.FC = () => {
                     <tbody className="divide-y divide-slate-100">
                       {poItems.map((row, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-2 px-2">
-                            <select
+                          <td className="py-2 px-2 min-w-[220px]">
+                            <SearchableRawSelect
                               value={row.itemId}
-                              onChange={e => handlePoItemChange(idx, parseInt(e.target.value))}
-                              className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
-                            >
-                              {data.masterItems.map(m => (
-                                <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                              ))}
-                            </select>
+                              rawItems={data.masterItems}
+                              onChange={newId => handlePoItemChange(idx, Number(newId))}
+                              buttonClassName="py-1 px-2 text-xs font-bold"
+                              placeholder="Search raw material..."
+                            />
                           </td>
                           <td className="py-2 px-2 text-center font-bold text-slate-600">
                             {row.uom}
@@ -2589,38 +2619,14 @@ export const PurchasesView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Returned Raw Material *</label>
-                <select
+                <SearchableRawSelect
                   value={String(returnItemId)}
-                  onChange={e => handleReturnItemSelect(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900"
-                >
-                  {(() => {
-                    const matchedBill = data.purchases.find(
-                      p => p.vendor === returnVendor && p.billNo.toLowerCase() === returnBillNo.toLowerCase().trim()
-                    );
-                    const billItems = matchedBill ? matchedBill.items : [];
-                    return (
-                      <>
-                        {billItems.length > 0 && (
-                          <optgroup label={`Items from Bill ${returnBillNo}`}>
-                            {billItems.map((bi, idx) => (
-                              <option key={`bill-${idx}-${bi.itemId || bi.item}`} value={String(bi.itemId || bi.item)}>
-                                ★ {bi.item} ({bi.category || 'Bill Item'}) - ৳{bi.rate}/{bi.uom} (Purchased: {bi.qty})
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        <optgroup label="All Master Raw Materials">
-                          {data.masterItems.map(m => (
-                            <option key={m.id} value={String(m.id)}>
-                              {m.name} ({m.category}) - ৳{m.defaultRate}/{m.uom}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </>
-                    );
-                  })()}
-                </select>
+                  options={returnSelectOptions}
+                  onChange={newKey => handleReturnItemSelect(newKey)}
+                  displayFormat="full"
+                  buttonClassName="px-2.5 py-1.5"
+                  placeholder="Search returned raw material..."
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

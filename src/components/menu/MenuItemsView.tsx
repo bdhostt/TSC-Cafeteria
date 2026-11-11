@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { AIChefAssistantModal } from '../ai/AIChefAssistantModal';
 import { ExcelImportModal } from '../common/ExcelImportModal';
+import { SearchableRawSelect } from '../common/SearchableRawSelect';
 import { 
   exportMenuItemsToExcel, 
   generateMenuItemTemplateExcel, 
@@ -1252,17 +1253,13 @@ export const MenuItemsView: React.FC = () => {
                         return (
                           <div key={idx} className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
                             <div className="flex-1">
-                              <select
+                              <SearchableRawSelect
                                 value={ing.rawItemId}
-                                onChange={e => handleUpdateIngredient(idx, parseInt(e.target.value), ing.qty)}
-                                className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900"
-                              >
-                                {data.masterItems.map(m => (
-                                  <option key={m.id} value={m.id}>
-                                    {m.name} ({m.uom}) — ৳{m.defaultRate}/{m.uom}
-                                  </option>
-                                ))}
-                              </select>
+                                rawItems={data.masterItems}
+                                onChange={newId => handleUpdateIngredient(idx, Number(newId), ing.qty)}
+                                placeholder="Search raw material for recipe..."
+                                displayFormat="full"
+                              />
                             </div>
 
                             <div className="w-24">
