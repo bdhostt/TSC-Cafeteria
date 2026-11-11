@@ -6,7 +6,7 @@ $rootDir = (Get-Item $scriptDir).Parent.FullName
 $vbsPath = Join-Path $rootDir "run-printer-silent.vbs"
 
 Write-Host "====================================================================" -ForegroundColor Cyan
-Write-Host "      BD HOSTT POS DEMO  - THERMAL PRINTER AUTO-START INSTALLER" -ForegroundColor Cyan
+Write-Host "      BD HOSTT TSC CAFETERIA - THERMAL PRINTER AUTO-START INSTALLER" -ForegroundColor Cyan
 Write-Host "====================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -28,32 +28,45 @@ Start-Sleep -Milliseconds 600
 Write-Host "[1/3] Setting up Windows Auto-Start on PC Boot..." -ForegroundColor Yellow
 $wsh = New-Object -ComObject WScript.Shell
 $startupFolder = [System.IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs\Startup')
-$startupShortcut = Join-Path $startupFolder "POSDEMOPrinterAgent.lnk"
-$legacyStartup = Join-Path $startupFolder "POSPrinterAgent.lnk"
-if (Test-Path $legacyStartup) { Remove-Item -Force $legacyStartup }
+$startupShortcut = Join-Path $startupFolder "TSCPrinterAgent.lnk"
+$legacyShortcuts = @(
+    Join-Path $startupFolder "POSDEMOPrinterAgent.lnk",
+    Join-Path $startupFolder "POSPrinterAgent.lnk"
+)
+foreach ($leg in $legacyShortcuts) {
+    if (Test-Path $leg) { Remove-Item -Force $leg }
+}
 
 $s1 = $wsh.CreateShortcut($startupShortcut)
 $s1.TargetPath = "wscript.exe"
 $s1.Arguments = "`"$vbsPath`""
 $s1.WorkingDirectory = $rootDir
 $s1.IconLocation = "$env:SystemRoot\System32\imageres.dll,46"
-$s1.Description = "BD HOSTT POS DEMO Background Thermal Printer Agent"
+$s1.Description = "BD HOSTT TSC Cafeteria Background Thermal Printer Agent"
 $s1.Save()
 Write-Host "      [OK] Added to Windows Startup folder." -ForegroundColor Green
 
 # 2. Add to Desktop Shortcut
 Write-Host "`n[2/3] Creating Desktop Shortcut for Easy Manual Start..." -ForegroundColor Yellow
 $desktopFolder = [Environment]::GetFolderPath('Desktop')
-$desktopShortcut = Join-Path $desktopFolder "POS DEMO Printer Agent.lnk"
+$desktopShortcut = Join-Path $desktopFolder "TSC Printer Agent.lnk"
+$legacyDeskShortcuts = @(
+    Join-Path $desktopFolder "POS DEMO Printer Agent.lnk",
+    Join-Path $desktopFolder "POSDEMO Printer Agent.lnk",
+    Join-Path $desktopFolder "POS Printer Agent.lnk"
+)
+foreach ($leg in $legacyDeskShortcuts) {
+    if (Test-Path $leg) { Remove-Item -Force $leg }
+}
 
 $s2 = $wsh.CreateShortcut($desktopShortcut)
 $s2.TargetPath = "wscript.exe"
 $s2.Arguments = "`"$vbsPath`""
 $s2.WorkingDirectory = $rootDir
 $s2.IconLocation = "$env:SystemRoot\System32\imageres.dll,46"
-$s2.Description = "Start BD HOSTT POS DEMO Printer Service"
+$s2.Description = "Start BD HOSTT TSC Printer Service"
 $s2.Save()
-Write-Host "      [OK] Desktop shortcut created: 'POS DEMO Printer Agent'" -ForegroundColor Green
+Write-Host "      [OK] Desktop shortcut created: 'TSC Printer Agent'" -ForegroundColor Green
 
 # 3. Launch the agent right away (detached via WMI Win32_Process so it survives shell exit)
 Write-Host "`n[3/3] Starting Printer Agent in Background now..." -ForegroundColor Yellow

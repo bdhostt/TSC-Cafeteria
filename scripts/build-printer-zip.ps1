@@ -1,4 +1,4 @@
-# Build POSDEMO-Printer-Setup.zip
+# Build TSC-Printer-Setup.zip
 $ErrorActionPreference = "Stop"
 $rootDir = (Get-Item $PSScriptRoot).Parent.FullName
 $pkgDir = Join-Path $rootDir "pkg-build-tmp"
@@ -16,11 +16,9 @@ if (Test-Path (Join-Path $rootDir ".env")) {
     Copy-Item (Join-Path $rootDir ".env") $pkgDir -Force
 }
 
-$installerBat = Join-Path $rootDir "scripts\INSTALL-POSDEMO-PRINTER.bat"
+$installerBat = Join-Path $rootDir "scripts\INSTALL-TSC-PRINTER.bat"
 if (Test-Path $installerBat) {
-    Copy-Item $installerBat (Join-Path $pkgDir "INSTALL-POSDEMO-PRINTER.bat") -Force
-    Copy-Item $installerBat (Join-Path $pkgDir "INSTALL-POS-PRINTER.bat") -Force
-    Copy-Item $installerBat $pkgDir -Force
+    Copy-Item $installerBat (Join-Path $pkgDir "INSTALL-TSC-PRINTER.bat") -Force
 }
 Copy-Item (Join-Path $rootDir "scripts\README-INSTRUCTIONS.txt") $pkgDir -Force
 
@@ -44,10 +42,11 @@ if (-not (Test-Path $downloadsDir)) {
     New-Item -ItemType Directory -Path $downloadsDir -Force | Out-Null
 }
 
-$zipPath = Join-Path $downloadsDir "POSDEMO-Printer-Setup.zip"
+$zipPath = Join-Path $downloadsDir "TSC-Printer-Setup.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
 Compress-Archive -Path "$pkgDir\*" -DestinationPath $zipPath -Force
+Copy-Item $zipPath (Join-Path $downloadsDir "TSCPrinter-Setup.zip") -Force
 
 # Also sync to dist/downloads if dist exists
 $distDownloads = Join-Path $rootDir "dist\downloads"
@@ -55,10 +54,15 @@ if (Test-Path (Join-Path $rootDir "dist")) {
     if (-not (Test-Path $distDownloads)) {
         New-Item -ItemType Directory -Path $distDownloads -Force | Out-Null
     }
-    Copy-Item $zipPath (Join-Path $distDownloads "POSDEMO-Printer-Setup.zip") -Force
+    Copy-Item $zipPath (Join-Path $distDownloads "TSC-Printer-Setup.zip") -Force
+    Copy-Item $zipPath (Join-Path $distDownloads "TSCPrinter-Setup.zip") -Force
 }
 
 Remove-Item $pkgDir -Recurse -Force
+
+# Clean any old posdemo zips from public/downloads
+$oldPosdemoZip = Join-Path $downloadsDir "POSDEMO-Printer-Setup.zip"
+if (Test-Path $oldPosdemoZip) { Remove-Item $oldPosdemoZip -Force }
 
 Write-Host "Created Zip at: $zipPath"
 Get-Item $zipPath | Select-Object Name, Length

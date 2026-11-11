@@ -2291,7 +2291,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   if (!posBroadcastChannelRef.current && typeof window !== 'undefined' && 'BroadcastChannel' in window) {
     try {
-      posBroadcastChannelRef.current = new BroadcastChannel('posdemo_multi_tab_sync');
+      posBroadcastChannelRef.current = new BroadcastChannel('tsc_cafeteria_multi_tab_sync');
     } catch (e) {}
   }
 

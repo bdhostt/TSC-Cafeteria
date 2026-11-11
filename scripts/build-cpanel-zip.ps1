@@ -1,8 +1,8 @@
-# Build optimized cpanel_deploy.zip for cPanel Phusion Passenger
+# Build optimized deploy-cpanel.zip for cPanel Phusion Passenger
 $ErrorActionPreference = "Stop"
 $rootDir = (Get-Item $PSScriptRoot).Parent.FullName
 $stagingDir = Join-Path $rootDir "cpanel-deploy-staging"
-$zipPath = Join-Path $rootDir "cpanel_deploy.zip"
+$zipPath = Join-Path $rootDir "deploy-cpanel.zip"
 
 Write-Host "Creating clean cPanel deployment package..." -ForegroundColor Cyan
 
@@ -43,7 +43,7 @@ foreach ($file in $filesToCopy) {
     }
 }
 
-# 5. Compress staging directory to cpanel_deploy.zip
+# 5. Compress staging directory to deploy-cpanel.zip
 Write-Host "Compressing files into $zipPath ..." -ForegroundColor Cyan
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory(

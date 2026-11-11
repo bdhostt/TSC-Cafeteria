@@ -1470,10 +1470,12 @@ async function startServer() {
 
   // Download 1-Click Printer Agent Setup ZIP
   app.get("/api/download/printer-agent-zip", (req, res) => {
-    const brandSlug = "POSDEMO";
+    const brandSlug = "TSC";
     const candidates = [
-      path.join(process.cwd(), "public", "downloads", "POSDEMO-Printer-Setup.zip"),
-      path.join(process.cwd(), "dist", "downloads", "POSDEMO-Printer-Setup.zip")
+      path.join(process.cwd(), "public", "downloads", "TSC-Printer-Setup.zip"),
+      path.join(process.cwd(), "public", "downloads", "TSCPrinter-Setup.zip"),
+      path.join(process.cwd(), "dist", "downloads", "TSC-Printer-Setup.zip"),
+      path.join(process.cwd(), "dist", "downloads", "TSCPrinter-Setup.zip")
     ];
     for (const zipPath of candidates) {
       if (fs.existsSync(zipPath)) {
@@ -1488,7 +1490,8 @@ async function startServer() {
   // Download 1-Click Installer BAT directly
   app.get("/api/download/printer-installer-bat", (req, res) => {
     const batCandidates = [
-      path.join(process.cwd(), "scripts", "INSTALL-POSDEMO-PRINTER.bat")
+      path.join(process.cwd(), "scripts", "INSTALL-TSC-PRINTER.bat"),
+      path.join(process.cwd(), "scripts", "INSTALL-POS-PRINTER.bat")
     ];
     const batPath = batCandidates.find(p => fs.existsSync(p));
     if (batPath) {
@@ -1501,7 +1504,7 @@ async function startServer() {
       batContent = batContent.replace(/https:\/\/posdemo\.bdhostt\.com/g, effectiveUrl);
       batContent = batContent.replace(/https:\/\/tsc-cafeteria\.onrender\.com/g, effectiveUrl);
 
-      res.setHeader('Content-Disposition', `attachment; filename="INSTALL-POSDEMO-PRINTER.bat"`);
+      res.setHeader('Content-Disposition', `attachment; filename="INSTALL-TSC-PRINTER.bat"`);
       res.setHeader('Content-Type', 'application/x-bat');
       return res.send(batContent);
     }

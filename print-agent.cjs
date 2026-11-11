@@ -50,7 +50,7 @@ function loadEnvFile() {
 }
 loadEnvFile();
 
-const envTargetUrl = process.env.APP_URL || process.env.CLOUD_SERVER_URL || 'https://posdemo.bdhostt.com';
+const envTargetUrl = process.env.APP_URL || process.env.CLOUD_SERVER_URL || 'https://tsc.bdhostt.com';
 const CLOUD_SERVER_URL = (process.argv[2] || envTargetUrl).replace(/\/+$/, '');
 const LOCAL_PORT = 9123;
 const POLL_INTERVAL_MS = 250;
@@ -1423,7 +1423,7 @@ async function pollCloudPrintQueue() {
 
 async function init() {
   console.log('================================================================');
-  console.log('   🚀 BD HOSTT POS - THERMAL PRINTER CLOUD BRIDGE (ACTIVE)');
+  console.log('   🚀 BD HOSTT TSC CAFETERIA - THERMAL PRINTER CLOUD BRIDGE (ACTIVE)');
   console.log('================================================================');
   console.log('  [+] Cloud Target   : ' + CLOUD_SERVER_URL);
   console.log('  [+] Local Bridge   : http://127.0.0.1:' + LOCAL_PORT + ' (Instant 0ms Print)');
